@@ -47,6 +47,8 @@ module ligetron_verifier::merkle {
     const E_BATCH_LEN_MISMATCH: u64  = 7;
     /// Each field element must be exactly 32 bytes.
     const E_INVALID_FIELD_ELEM_LEN: u64 = 8;
+    /// leaf_hash passed to verify_path_prehashed must be exactly 32 bytes.
+    const E_INVALID_LEAF_LEN: u64 = 9;
 
     const HASH_LEN: u64          = 32;
     /// log2(8192) — standard Ligetron path depth.
@@ -87,7 +89,7 @@ module ligetron_verifier::merkle {
         siblings: vector<vector<u8>>,
         side_bits: vector<u8>,
     ) {
-        assert!(leaf_hash.length() == HASH_LEN, E_INVALID_SIBLING_LEN);
+        assert!(leaf_hash.length() == HASH_LEN, E_INVALID_LEAF_LEN);
         assert!(expected_root.length() == HASH_LEN, E_INVALID_ROOT_LEN);
 
         let path_len = siblings.length();
