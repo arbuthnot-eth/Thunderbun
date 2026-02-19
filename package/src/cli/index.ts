@@ -1462,7 +1462,9 @@ ${schemesXml}
 			// Extract template files
 			let fileCount = 0;
 			for (const [relativePath, content] of Object.entries(template.files)) {
-				const fullPath = join(projectPath, relativePath);
+				// Rename "gitignore" → ".gitignore" (npm strips leading dots from published packages)
+				const outputPath = relativePath === "gitignore" ? ".gitignore" : relativePath;
+				const fullPath = join(projectPath, outputPath);
 				const dir = dirname(fullPath);
 
 				// Create directory if it doesn't exist
@@ -1473,6 +1475,8 @@ ${schemesXml}
 				fileCount++;
 			}
 
+			const isWebTemplate = ["sui-twa"].includes(templateName);
+
 			console.log(
 				`✅ Created ${fileCount} files from "${templateName}" template`,
 			);
@@ -1481,7 +1485,11 @@ ${schemesXml}
 			console.log("📦 Next steps:");
 			console.log(`   cd ${projectName}`);
 			console.log("   bun install");
-			console.log("   bun start");
+			if (isWebTemplate) {
+				console.log("   bun run dev    # opens at http://localhost:5173");
+			} else {
+				console.log("   bun start");
+			}
 			console.log("");
 			console.log("🎉 Happy building with ThunderBun!");
 			console.log("");

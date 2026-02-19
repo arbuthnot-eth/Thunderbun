@@ -1,0 +1,28 @@
+{
+  "name": "my-sui-twa-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "twa:init": "bubblewrap init --manifest=dist/manifest.webmanifest",
+    "twa:build": "bubblewrap build",
+    "twa:update": "bubblewrap update"
+  },
+  "dependencies": {
+    "@mysten/sui": "^1.0.0",
+    "@suins/core": "^0.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-legacy": "^5.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vite-plugin-pwa": "^0.21.0",
+    "workbox-window": "^7.0.0"
+  }
+}

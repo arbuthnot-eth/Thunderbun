@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-sui-dark text-sui-text;
+    overscroll-behavior: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-sui-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-sui-muted;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+           bg-sui-blue text-white font-medium text-sm
+           hover:bg-opacity-90 active:scale-95
+           transition-all duration-150 cursor-pointer;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+           border border-sui-border text-sui-text font-medium text-sm
+           hover:border-sui-accent hover:text-sui-accent
+           transition-all duration-150 cursor-pointer;
+  }
+
+  .card {
+    @apply bg-sui-panel border border-sui-border rounded-xl p-5;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-sui-muted
+           hover:text-sui-text hover:bg-sui-dark cursor-pointer
+           transition-colors duration-150;
+  }
+
+  .nav-item.active {
+    @apply text-white bg-sui-blue bg-opacity-20 font-medium;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
+  }
+
+  .badge-blue {
+    @apply badge bg-sui-blue bg-opacity-20 text-sui-blue;
+  }
+
+  .badge-green {
+    @apply badge bg-sui-success bg-opacity-20 text-sui-success;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 rounded-lg bg-sui-dark border border-sui-border
+           text-sui-text text-sm placeholder-sui-muted
+           focus:outline-none focus:border-sui-accent
+           transition-colors duration-150;
+  }
+
+  .section-header {
+    @apply text-xl font-semibold text-white mb-1;
+  }
+
+  .section-desc {
+    @apply text-sm text-sui-muted mb-6;
+  }
+}

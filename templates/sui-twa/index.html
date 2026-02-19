@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#4DA2FF" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Sui-native PWA built with ThunderBun" />
+    <link rel="icon" type="image/png" href="/icons/pwa-192x192.png" />
+    <link rel="apple-touch-icon" href="/icons/pwa-192x192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <title>Sui App</title>
+  </head>
+  <body class="bg-sui-dark text-sui-text font-sans">
+    <div id="app" class="flex h-screen overflow-hidden">
+      <!-- Sidebar -->
+      <aside id="sidebar" class="w-64 bg-sui-panel border-r border-sui-border flex flex-col shrink-0 transition-transform duration-200">
+        <!-- Logo -->
+        <div class="flex items-center gap-3 px-5 py-5 border-b border-sui-border">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sui-blue to-sui-accent flex items-center justify-center text-white font-bold text-sm">S</div>
+          <span class="font-semibold text-white text-sm tracking-wide" id="app-title">Sui App</span>
+        </div>
+
+        <!-- Wallet Card -->
+        <div class="px-4 py-3 border-b border-sui-border">
+          <div id="wallet-card" class="rounded-lg bg-sui-dark p-3 cursor-pointer hover:bg-opacity-80 transition-colors" onclick="window.app?.showSection('home')">
+            <div id="wallet-disconnected" class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-sui-muted"></div>
+              <span class="text-xs text-sui-muted">Not connected</span>
+            </div>
+            <div id="wallet-connected" class="hidden">
+              <div class="flex items-center gap-2 mb-1">
+                <div class="w-2 h-2 rounded-full bg-sui-success animate-pulse"></div>
+                <span class="text-xs text-sui-success font-medium">Connected</span>
+              </div>
+              <p class="text-xs text-sui-text font-mono truncate" id="wallet-address"></p>
+              <p class="text-xs text-sui-muted mt-0.5" id="wallet-balance"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 px-3 py-3 overflow-y-auto">
+          <div class="mb-4">
+            <p class="text-xs font-semibold text-sui-muted uppercase tracking-wider px-2 mb-2">Core</p>
+            <div id="nav-links" class="space-y-0.5">
+              <!-- Injected by nav.ts -->
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <p class="text-xs font-semibold text-sui-muted uppercase tracking-wider px-2 mb-2">Ecosystem</p>
+            <div id="ecosystem-links" class="space-y-0.5">
+              <!-- Injected by nav.ts -->
+            </div>
+          </div>
+        </nav>
+
+        <!-- Footer -->
+        <div class="px-4 py-3 border-t border-sui-border">
+          <p class="text-xs text-sui-muted text-center">
+            Built with <a href="https://github.com/arbuthnot-eth/thunderbun" target="_blank" class="text-sui-accent hover:underline">ThunderBun</a>
+          </p>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 overflow-y-auto bg-sui-dark" id="main-content">
+        <!-- Sections rendered here by router -->
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
