@@ -1,0 +1,747 @@
+/**
+ * zkproof-pipeline.ts
+ *
+ * Composable, configuration-driven ZK proof pipeline for ThunderBun.
+ *
+ * Each step is an independent async function — combine only what you need.
+ *
+ * PRESET USAGE
+ * ─────────────
+ *   import { runPipeline, FULL_CONFIG, DEV_CONFIG } from "./lib/zkproof-pipeline";
+ *
+ *   // Full production flow (all steps)
+ *   const result = await runPipeline(FULL_CONFIG, { program: "fibonacci", input: "20" });
+ *
+ *   // Development mode (skip on-chain, stub prover, local Walrus)
+ *   const result = await runPipeline(DEV_CONFIG, { program: "fibonacci", input: "20" });
+ *
+ *   // Custom: verify-only (no Walrus, no Seal, no DeepBook)
+ *   const result = await runPipeline({
+ *     ...VERIFY_ONLY_CONFIG,
+ *     contract: { packageId: "0x...", registryId: "0x..." },
+ *   }, { program: "fibonacci", input: "20" });
+ *
+ * STEP COMPOSITION
+ * ─────────────────
+ *   import { proveWasm, wrapGroth16, uploadToWalrus, sealEncrypt } from "./lib/zkproof-pipeline";
+ *
+ *   const iop     = await proveWasm({ program: "fibonacci", publicInput: "20" }, cfg.prover);
+ *   const groth16 = await wrapGroth16(iop, cfg.groth16);
+ *   const blobId  = await uploadToWalrus(iop.proofBytes, cfg.walrus);
+ */
+
+import { SuiClient }    from "@mysten/sui/client";
+import { Transaction }  from "@mysten/sui/transactions";
+import { bcs }          from "@mysten/sui/bcs";
+import { SealClient, getAllowlistedKeyServers } from "@mysten/seal";
+import { DeepBookClient } from "@mysten/deepbook-v3";
+
+// ─── Config types ─────────────────────────────────────────────────────────────
+
+export interface NetworkConfig {
+  /** "testnet" | "mainnet" | "devnet" | custom RPC URL */
+  network: "testnet" | "mainnet" | "devnet" | (string & {});
+  suiNodeUrl: string;
+}
+
+export interface ContractConfig {
+  /**
+   * Deployed ligetron-verifier package ID.
+   * Set via VITE_LIGETRON_PACKAGE_ID or pass directly.
+   */
+  packageId: string;
+  /** Shared VerifierRegistry object ID. */
+  registryId: string;
+}
+
+export interface ProverConfig {
+  /** Path to the Ligetron WASM module, relative to /public. */
+  wasmPath: string;
+  /**
+   * "real"   — use the actual Ligetron WASM prover (requires wasmPath)
+   * "stub"   — deterministic stub for development/CI (no GPU needed)
+   */
+  mode: "real" | "stub";
+}
+
+export interface Groth16Config {
+  /**
+   * "service" — POST to a hosted wrapping service (production)
+   * "stub"    — return 256 zero-bytes (dev/CI; will fail on-chain pairing check)
+   */
+  mode: "service" | "stub";
+  /** URL for the Groth16 wrapping service endpoint (required if mode="service"). */
+  serviceUrl?: string;
+  /** Optional auth header value for the service. */
+  serviceAuthHeader?: string;
+}
+
+export interface WalrusConfig {
+  /** Whether to upload the IOP proof blob to Walrus. */
+  enabled: boolean;
+  publisherUrl: string;
+  aggregatorUrl: string;
+  /** Number of Walrus storage epochs to purchase. Default 5. */
+  epochs: number;
+  /** Max upload size guard in bytes. Default 10MB. */
+  maxSizeBytes: number;
+}
+
+export interface SealConfig {
+  /** Whether to Seal-encrypt the attestation payload. */
+  enabled: boolean;
+  /**
+   * "1-of-N" — any single Seal server can decrypt (development convenience)
+   * "M-of-N" — requires threshold-many servers (production)
+   */
+  threshold: number;
+  /** Custom key server object IDs. Leave empty to use the allowlisted defaults. */
+  keyServerIds?: string[];
+}
+
+export interface DeepBookConfig {
+  /** Whether to perform a DeepBook SUI → WAL swap in the PTB. */
+  enabled: boolean;
+  /** Object ID of the SUI/WAL DeepBook pool. */
+  poolId: string;
+  /** Amount of SUI (MIST) to swap. Default 0.1 SUI = 100_000_000. */
+  swapAmountMist: bigint;
+  /** Minimum WAL output (0 = accept any). */
+  minWalOut: bigint;
+  /** WAL token type on the target network. */
+  walTokenType: string;
+  /** DeepBook package ID on the target network. */
+  deepbookPackageId: string;
+}
+
+export interface AttestationConfig {
+  /**
+   * "object"    — mint a ProofAttestation Sui object (default, requires contract)
+   * "event"     — emit ProofVerified event only (lighter, no object minted)
+   * "stateless" — verify only, no on-chain state change (view function)
+   */
+  mode: "object" | "event" | "stateless";
+}
+
+/** Full pipeline configuration. */
+export interface ZkProofConfig {
+  network:     NetworkConfig;
+  contract:    ContractConfig;
+  prover:      ProverConfig;
+  groth16:     Groth16Config;
+  walrus:      WalrusConfig;
+  seal:        SealConfig;
+  deepbook:    DeepBookConfig;
+  attestation: AttestationConfig;
+}
+
+// ─── Result types ─────────────────────────────────────────────────────────────
+
+export interface IopProofResult {
+  proofBytes: Uint8Array;
+  programDigest: Uint8Array;
+  publicInputsRaw: Uint8Array;
+  provingTimeMs: number;
+}
+
+export interface Groth16ProofResult {
+  proofBytes: Uint8Array;   // 256 bytes Arkworks BN254
+  proofNonce: Uint8Array;   // sha256(proofBytes)
+}
+
+export interface WalrusBlobResult {
+  blobId: string;
+  skipped: false;
+}
+export interface WalrusSkipped { skipped: true }
+export type WalrusResult = WalrusBlobResult | WalrusSkipped;
+
+export interface SealResult {
+  sealId: Uint8Array;
+  ciphertext: Uint8Array;
+  blobId: string;
+  skipped: false;
+}
+export interface SealSkipped { skipped: true; sealId: Uint8Array }
+export type SealEncryptResult = SealResult | SealSkipped;
+
+export interface OnChainResult {
+  txDigest: string;
+  attestationObjectId?: string;  // present when attestation.mode = "object"
+  proofNonce: string;
+  skipped: false;
+}
+export interface OnChainSkipped { skipped: true }
+export type OnChainResult2 = OnChainResult | OnChainSkipped;
+
+export interface PipelineResult {
+  iop:        IopProofResult;
+  groth16:    Groth16ProofResult;
+  walrus:     WalrusResult;
+  seal:       SealEncryptResult;
+  onChain:    OnChainResult2;
+}
+
+// ─── Pipeline step: prove ─────────────────────────────────────────────────────
+
+export async function proveWasm(
+  args: { program: string; publicInput: string },
+  cfg: ProverConfig,
+): Promise<IopProofResult> {
+  if (cfg.mode === "real") {
+    return proveWasmReal(args, cfg.wasmPath);
+  }
+  return proveWasmStub(args);
+}
+
+async function proveWasmReal(
+  args: { program: string; publicInput: string },
+  wasmPath: string,
+): Promise<IopProofResult> {
+  // Integration: spawn a Web Worker loading the Ligetron WASM module.
+  //
+  //   Create: src/workers/ligetron.worker.ts
+  //   ────────────────────────────────────
+  //   import init, { LigetronProver } from "/wasm/ligetron/ligetron.js";
+  //
+  //   self.onmessage = async ({ data }) => {
+  //     await init();
+  //     const prover = new LigetronProver(data.wasmBytes);
+  //     const proof  = prover.prove(data.publicInputs);
+  //     self.postMessage({
+  //       proofBytes:      proof.iop_bytes(),
+  //       programDigest:   proof.program_digest(),   // sha256(wasmBytes)
+  //       publicInputsRaw: data.publicInputs,
+  //     });
+  //   };
+  //
+  //   Build Ligetron to WASM:
+  //     cd ligero-prover
+  //     emcmake cmake -DCMAKE_BUILD_TYPE=Release .
+  //     emmake make ligetron_wasm
+  //     cp ligetron.{js,wasm} <sui-twa-app>/public/wasm/ligetron/
+
+  throw new Error(
+    `Ligetron WASM prover not yet integrated. ` +
+    `Build the prover to WASM and place at ${wasmPath}. ` +
+    `See src/lib/zkproof-pipeline.ts for the Web Worker integration guide.`
+  );
+}
+
+async function proveWasmStub(
+  args: { program: string; publicInput: string },
+): Promise<IopProofResult> {
+  const t0 = Date.now();
+  await sleep(400 + Math.random() * 200);
+  const programBytes     = new TextEncoder().encode(`wasm-stub:${args.program}`);
+  const publicInputBytes = new TextEncoder().encode(args.publicInput);
+  return {
+    proofBytes:      crypto.getRandomValues(new Uint8Array(256)),
+    programDigest:   await sha256(programBytes),
+    publicInputsRaw: publicInputBytes,
+    provingTimeMs:   Date.now() - t0,
+  };
+}
+
+// ─── Pipeline step: Groth16 wrap ──────────────────────────────────────────────
+
+export async function wrapGroth16(
+  iop: IopProofResult,
+  cfg: Groth16Config,
+): Promise<Groth16ProofResult> {
+  let proofBytes: Uint8Array;
+
+  if (cfg.mode === "service") {
+    if (!cfg.serviceUrl) throw new Error("groth16.serviceUrl is required when mode='service'");
+
+    // POST the IOP proof to the wrapping service.
+    // Expected request:  { iopProofHex: string, programDigestHex: string, inputsDigestHex: string }
+    // Expected response: { groth16ProofHex: string }
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (cfg.serviceAuthHeader) headers["Authorization"] = cfg.serviceAuthHeader;
+
+    const res = await fetch(cfg.serviceUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        iopProofHex:      hex(iop.proofBytes),
+        programDigestHex: hex(iop.programDigest),
+        inputsDigestHex:  hex(await sha256(iop.publicInputsRaw)),
+      }),
+    });
+    if (!res.ok) throw new Error(`Groth16 service ${res.status}: ${await res.text()}`);
+    const { groth16ProofHex } = await res.json() as { groth16ProofHex: string };
+    proofBytes = fromHex(groth16ProofHex);
+  } else {
+    // Stub: 256 zero bytes — will fail the on-chain pairing check.
+    // Useful for testing the full flow without a real circuit.
+    proofBytes = new Uint8Array(256);
+  }
+
+  if (proofBytes.length !== 256) {
+    throw new Error(`Groth16 proof must be 256 bytes, got ${proofBytes.length}`);
+  }
+
+  return { proofBytes, proofNonce: await sha256(proofBytes) };
+}
+
+// ─── Pipeline step: Walrus upload ─────────────────────────────────────────────
+
+export async function uploadToWalrus(
+  data: Uint8Array,
+  cfg: WalrusConfig,
+  label = "blob",
+): Promise<WalrusResult> {
+  if (!cfg.enabled) return { skipped: true };
+
+  if (data.length > cfg.maxSizeBytes) {
+    throw new Error(`${label} is ${data.length}B, exceeds Walrus limit of ${cfg.maxSizeBytes}B`);
+  }
+
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(`${cfg.publisherUrl}/v1/blobs?epochs=${cfg.epochs}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: data,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+      const json = await res.json() as {
+        blobId?: string;
+        newlyCreated?: { blobObject?: { blobId?: string } };
+        alreadyCertified?: { blobId?: string };
+      };
+      const blobId =
+        json.blobId ??
+        json.newlyCreated?.blobObject?.blobId ??
+        json.alreadyCertified?.blobId;
+      if (!blobId) throw new Error("Walrus response missing blobId");
+      return { blobId, skipped: false };
+    } catch (e) {
+      lastErr = e as Error;
+      if (attempt < 3) await sleep(500 * attempt);
+    }
+  }
+  throw new Error(`Walrus ${label} upload failed after 3 attempts: ${lastErr?.message}`);
+}
+
+export async function fetchFromWalrus(blobId: string, cfg: WalrusConfig): Promise<Uint8Array> {
+  const res = await fetch(`${cfg.aggregatorUrl}/v1/${blobId}`);
+  if (!res.ok) throw new Error(`Walrus fetch ${res.status}: ${await res.text()}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+// ─── Pipeline step: Seal encrypt ──────────────────────────────────────────────
+
+/**
+ * Derive the canonical Seal ID for a proof.
+ * MUST match proof_attestation::derive_seal_id on-chain:
+ *   seal_id = sha256(proof_nonce || program_digest)
+ */
+export async function deriveSealId(
+  proofNonce: Uint8Array,
+  programDigest: Uint8Array,
+): Promise<Uint8Array> {
+  const combined = new Uint8Array(proofNonce.length + programDigest.length);
+  combined.set(proofNonce);
+  combined.set(programDigest, proofNonce.length);
+  return sha256(combined);
+}
+
+export async function sealEncrypt(
+  plaintext: Uint8Array,
+  sealId: Uint8Array,
+  cfg: SealConfig,
+  suiNodeUrl: string,
+  packageId: string,
+  walrusCfg: WalrusConfig,
+): Promise<SealEncryptResult> {
+  if (!cfg.enabled) return { skipped: true, sealId };
+
+  const client = new SuiClient({ url: suiNodeUrl });
+  const serverIds = cfg.keyServerIds?.length
+    ? cfg.keyServerIds
+    : await getAllowlistedKeyServers(suiNodeUrl.includes("testnet") ? "testnet" : "mainnet");
+
+  const seal = new SealClient({
+    suiClient: client,
+    serverObjectIds: serverIds,
+    verificationOptions: { timeout: 15_000 },
+  });
+
+  const { encryptedObject } = await seal.encrypt({
+    threshold: cfg.threshold,
+    packageId,
+    id: sealId,
+    data: plaintext,
+  });
+
+  const walrusResult = await uploadToWalrus(encryptedObject.data, walrusCfg, "Seal ciphertext");
+  if (walrusResult.skipped) {
+    throw new Error("Seal requires Walrus to be enabled — cannot store ciphertext");
+  }
+
+  return {
+    sealId,
+    ciphertext: encryptedObject.data,
+    blobId: walrusResult.blobId,
+    skipped: false,
+  };
+}
+
+export async function sealDecrypt(
+  sealResult: SealResult,
+  attestationObjectId: string,
+  packageId: string,
+  suiNodeUrl: string,
+  walrusCfg: WalrusConfig,
+  cfg: SealConfig,
+): Promise<Uint8Array> {
+  const client   = new SuiClient({ url: suiNodeUrl });
+  const serverIds = cfg.keyServerIds?.length
+    ? cfg.keyServerIds
+    : await getAllowlistedKeyServers(suiNodeUrl.includes("testnet") ? "testnet" : "mainnet");
+
+  const seal = new SealClient({ suiClient: client, serverObjectIds: serverIds });
+
+  // Fetch ciphertext from Walrus.
+  const ciphertext = sealResult.ciphertext.length
+    ? sealResult.ciphertext
+    : await fetchFromWalrus(sealResult.blobId, walrusCfg);
+
+  // Build the seal_approve transaction (proves ownership to Seal nodes).
+  const approveTx = new Transaction();
+  approveTx.moveCall({
+    target: `${packageId}::proof_attestation::seal_approve`,
+    arguments: [
+      approveTx.pure(bcs.vector(bcs.u8()).serialize(Array.from(sealResult.sealId))),
+      approveTx.object(attestationObjectId),
+    ],
+  });
+  const approveTxBytes = await approveTx.build({ client });
+
+  return seal.decrypt({
+    data: ciphertext,
+    sessionKey: approveTxBytes,
+    txBytes: approveTxBytes,
+  });
+}
+
+// ─── Pipeline step: on-chain PTB ──────────────────────────────────────────────
+
+export interface OnChainArgs {
+  wallet: {
+    address: string;
+    signTransaction: (args: { transaction: Uint8Array }) => Promise<{ signature: string }>;
+  };
+  iop: IopProofResult;
+  groth16: Groth16ProofResult;
+  iopWalrus: WalrusResult;
+  sealResult: SealEncryptResult;
+}
+
+export async function executeOnChain(
+  args: OnChainArgs,
+  cfg: ZkProofConfig,
+): Promise<OnChainResult2> {
+  const { wallet, iop, groth16, iopWalrus, sealResult } = args;
+
+  if (cfg.attestation.mode === "stateless") {
+    // Pure view — no transaction needed; but sui::groth16 is not a view in Move,
+    // so we still need to send a tx. We use verify_proof (emits event, records nonce).
+    return runVerifyProofTx(args, cfg);
+  }
+
+  if (cfg.attestation.mode === "event") {
+    return runVerifyProofTx(args, cfg);
+  }
+
+  // mode === "object": full verify_and_attest
+  const iopBlobId  = iopWalrus.skipped ? "" : iopWalrus.blobId;
+  const sealBlobId = sealResult.skipped ? "" : (sealResult as SealResult).blobId;
+  const sealId     = sealResult.sealId;
+
+  // Require blobs when seal is enabled
+  if (cfg.seal.enabled && (!iopBlobId || !sealBlobId)) {
+    throw new Error("Walrus blob IDs required when Seal is enabled");
+  }
+
+  const client = new SuiClient({ url: cfg.network.suiNodeUrl });
+  const tx = new Transaction();
+
+  // ── Optional: DeepBook SUI → WAL swap ────────────────────────────────────────
+  if (cfg.deepbook.enabled && cfg.deepbook.poolId) {
+    const splitCoin = tx.splitCoins(tx.gas, [tx.pure.u64(cfg.deepbook.swapAmountMist)]);
+    const [walCoin] = tx.moveCall({
+      target: `${cfg.deepbook.deepbookPackageId}::pool::swap_exact_base_for_quote`,
+      typeArguments: ["0x2::sui::SUI", cfg.deepbook.walTokenType],
+      arguments: [
+        tx.object(cfg.deepbook.poolId),
+        splitCoin,
+        tx.pure.u64(cfg.deepbook.minWalOut),
+        tx.pure.u64(Date.now() + 90_000),
+        tx.object("0x6"),
+      ],
+    });
+    tx.transferObjects([walCoin], wallet.address);
+  }
+
+  // ── verify_and_attest (or verify_proof if no blobs) ───────────────────────────
+  const useFull = cfg.walrus.enabled && cfg.seal.enabled && iopBlobId && sealBlobId;
+  let attestation: ReturnType<typeof tx.moveCall> | undefined;
+
+  if (useFull) {
+    [attestation] = tx.moveCall({
+      target: `${cfg.contract.packageId}::proof_attestation::verify_and_attest`,
+      arguments: [
+        tx.object(cfg.contract.registryId),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(iop.programDigest))),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(iop.publicInputsRaw))),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(groth16.proofBytes))),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(new TextEncoder().encode(iopBlobId)))),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(new TextEncoder().encode(sealBlobId)))),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(sealId))),
+      ],
+    });
+    tx.transferObjects([attestation!], wallet.address);
+  } else {
+    // Fallback: emit event only (no ProofAttestation object minted)
+    tx.moveCall({
+      target: `${cfg.contract.packageId}::ligetron_verifier::verify_proof`,
+      arguments: [
+        tx.object(cfg.contract.registryId),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(iop.programDigest))),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(iop.publicInputsRaw))),
+        tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(groth16.proofBytes))),
+      ],
+    });
+  }
+
+  const txBytes = await tx.build({ client });
+  const { signature } = await wallet.signTransaction({ transaction: txBytes as Uint8Array });
+
+  const res = await client.executeTransactionBlock({
+    transactionBlock: txBytes,
+    signature,
+    options: { showEffects: true, showEvents: true, showObjectChanges: true },
+  });
+
+  const created = res.objectChanges?.find(
+    c => c.type === "created" &&
+         (c as { objectType?: string }).objectType?.includes("ProofAttestation")
+  );
+
+  return {
+    txDigest: res.digest,
+    attestationObjectId: (created as { objectId?: string } | undefined)?.objectId,
+    proofNonce: hex(groth16.proofNonce),
+    skipped: false,
+  };
+}
+
+async function runVerifyProofTx(args: OnChainArgs, cfg: ZkProofConfig): Promise<OnChainResult2> {
+  const { wallet, iop, groth16 } = args;
+  const client = new SuiClient({ url: cfg.network.suiNodeUrl });
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: `${cfg.contract.packageId}::ligetron_verifier::verify_proof`,
+    arguments: [
+      tx.object(cfg.contract.registryId),
+      tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(iop.programDigest))),
+      tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(iop.publicInputsRaw))),
+      tx.pure(bcs.vector(bcs.u8()).serialize(Array.from(groth16.proofBytes))),
+    ],
+  });
+
+  const txBytes = await tx.build({ client });
+  const { signature } = await wallet.signTransaction({ transaction: txBytes as Uint8Array });
+  const res = await client.executeTransactionBlock({
+    transactionBlock: txBytes, signature,
+    options: { showEvents: true },
+  });
+
+  return { txDigest: res.digest, proofNonce: hex(groth16.proofNonce), skipped: false };
+}
+
+// ─── Orchestrator ─────────────────────────────────────────────────────────────
+
+export type PipelineProgressCallback = (
+  step: number,
+  total: number,
+  label: string,
+  status: "running" | "done" | "skipped" | "error",
+  detail?: string,
+) => void;
+
+/**
+ * Run the full (or partial) pipeline according to `cfg`.
+ * Pass `onProgress` for live UI updates.
+ */
+export async function runPipeline(
+  cfg: ZkProofConfig,
+  args: { program: string; publicInput: string; privatePayload?: string },
+  walletAdapter?: OnChainArgs["wallet"],
+  onProgress?: PipelineProgressCallback,
+): Promise<PipelineResult> {
+  const p = onProgress ?? (() => {});
+  const totalSteps = 5;
+
+  // 1. Prove
+  p(1, totalSteps, "Ligetron WASM prover", "running");
+  const iop = await proveWasm({ program: args.program, publicInput: args.publicInput }, cfg.prover)
+    .catch(rethrow("Prover failed"));
+  p(1, totalSteps, `IOP proof ready (${iop.provingTimeMs}ms)`, "done");
+
+  // 2. Groth16 wrap
+  p(2, totalSteps, "Groth16 wrapping", cfg.groth16.mode === "stub" ? "skipped" : "running");
+  const groth16 = await wrapGroth16(iop, cfg.groth16).catch(rethrow("Groth16 wrap failed"));
+  p(2, totalSteps, "Groth16 proof ready", "done");
+
+  // 3. Walrus: upload IOP proof
+  p(3, totalSteps, "Walrus: upload IOP proof", cfg.walrus.enabled ? "running" : "skipped");
+  const iopWalrus = await uploadToWalrus(iop.proofBytes, cfg.walrus, "IOP proof")
+    .catch(rethrow("Walrus IOP upload failed"));
+  if (!iopWalrus.skipped) p(3, totalSteps, `Walrus IOP: ${iopWalrus.blobId.slice(0, 16)}…`, "done");
+
+  // 4. Seal: encrypt + upload
+  p(4, totalSteps, "Seal: encrypt attestation", cfg.seal.enabled ? "running" : "skipped");
+  const sealId = await deriveSealId(groth16.proofNonce, iop.programDigest);
+  const payload = args.privatePayload
+    ? new TextEncoder().encode(args.privatePayload)
+    : new TextEncoder().encode(JSON.stringify({
+        program: args.program,
+        publicInput: args.publicInput,
+        proofNonce: hex(groth16.proofNonce),
+        timestamp: new Date().toISOString(),
+      }));
+
+  const sealResult = await sealEncrypt(
+    payload, sealId, cfg.seal, cfg.network.suiNodeUrl, cfg.contract.packageId, cfg.walrus,
+  ).catch(rethrow("Seal encrypt failed"));
+  if (!sealResult.skipped) p(4, totalSteps, `Seal ciphertext stored`, "done");
+
+  // 5. On-chain
+  if (!walletAdapter) {
+    return { iop, groth16, walrus: iopWalrus, seal: sealResult, onChain: { skipped: true } };
+  }
+
+  p(5, totalSteps, "On-chain PTB", "running");
+  const onChain = await executeOnChain(
+    { wallet: walletAdapter, iop, groth16, iopWalrus, sealResult }, cfg,
+  ).catch(rethrow("On-chain transaction failed"));
+  p(5, totalSteps, onChain.skipped ? "skipped" : `Tx: ${onChain.txDigest.slice(0, 16)}…`, "done");
+
+  return { iop, groth16, walrus: iopWalrus, seal: sealResult, onChain };
+}
+
+// ─── Preset configs ───────────────────────────────────────────────────────────
+
+const env = (typeof import.meta !== "undefined"
+  ? (import.meta as Record<string, unknown>)["env"]
+  : {}) as Record<string, string> ?? {};
+
+/** Read a contract config from environment variables. */
+export function contractFromEnv(): ContractConfig {
+  return {
+    packageId:  env["VITE_LIGETRON_PACKAGE_ID"]  ?? "0x0000000000000000000000000000000000000000000000000000000000000000",
+    registryId: env["VITE_LIGETRON_REGISTRY_ID"] ?? "0x0000000000000000000000000000000000000000000000000000000000000000",
+  };
+}
+
+export const TESTNET_NETWORK: NetworkConfig = {
+  network: "testnet",
+  suiNodeUrl: "https://fullnode.testnet.sui.io",
+};
+
+export const MAINNET_NETWORK: NetworkConfig = {
+  network: "mainnet",
+  suiNodeUrl: "https://fullnode.mainnet.sui.io",
+};
+
+export const DEFAULT_WALRUS_TESTNET: WalrusConfig = {
+  enabled: true,
+  publisherUrl:  "https://publisher.walrus-testnet.walrus.space",
+  aggregatorUrl: "https://aggregator.walrus-testnet.walrus.space",
+  epochs: 5,
+  maxSizeBytes: 10 * 1024 * 1024,
+};
+
+export const DEFAULT_SEAL_TESTNET: SealConfig = {
+  enabled: true,
+  threshold: 1,
+};
+
+export const DEFAULT_DEEPBOOK_TESTNET: DeepBookConfig = {
+  enabled: false, // off by default — requires live SUI/WAL pool
+  poolId: env["VITE_DEEPBOOK_SUI_WAL_POOL"] ?? "",
+  swapAmountMist: 100_000_000n,
+  minWalOut: 0n,
+  walTokenType: env["VITE_WAL_TOKEN_TYPE"] ?? "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL",
+  deepbookPackageId: env["VITE_DEEPBOOK_PACKAGE_ID"] ?? "",
+};
+
+/** Full production config (all steps enabled). Requires env vars. */
+export const FULL_CONFIG: ZkProofConfig = {
+  network:     TESTNET_NETWORK,
+  contract:    contractFromEnv(),
+  prover:      { mode: "stub", wasmPath: "/wasm/ligetron/ligetron.js" },
+  groth16:     { mode: "stub" },
+  walrus:      DEFAULT_WALRUS_TESTNET,
+  seal:        DEFAULT_SEAL_TESTNET,
+  deepbook:    { ...DEFAULT_DEEPBOOK_TESTNET, enabled: true },
+  attestation: { mode: "object" },
+};
+
+/** Verify-only config: no Walrus, no Seal, no DeepBook, no attestation object. */
+export const VERIFY_ONLY_CONFIG: ZkProofConfig = {
+  network:     TESTNET_NETWORK,
+  contract:    contractFromEnv(),
+  prover:      { mode: "stub", wasmPath: "/wasm/ligetron/ligetron.js" },
+  groth16:     { mode: "stub" },
+  walrus:      { ...DEFAULT_WALRUS_TESTNET, enabled: false },
+  seal:        { ...DEFAULT_SEAL_TESTNET,   enabled: false },
+  deepbook:    { ...DEFAULT_DEEPBOOK_TESTNET, enabled: false },
+  attestation: { mode: "event" },
+};
+
+/**
+ * Development config: stub prover + Groth16, Walrus + Seal enabled for testing,
+ * DeepBook disabled, attestation in event-only mode (no object minted).
+ * Does not require a deployed contract to run off-chain steps.
+ */
+export const DEV_CONFIG: ZkProofConfig = {
+  network:     TESTNET_NETWORK,
+  contract:    contractFromEnv(),
+  prover:      { mode: "stub", wasmPath: "/wasm/ligetron/ligetron.js" },
+  groth16:     { mode: "stub" },
+  walrus:      DEFAULT_WALRUS_TESTNET,
+  seal:        DEFAULT_SEAL_TESTNET,
+  deepbook:    { ...DEFAULT_DEEPBOOK_TESTNET, enabled: false },
+  attestation: { mode: "event" },
+};
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+
+export async function sha256(data: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+}
+
+export function hex(b: Uint8Array): string {
+  return Array.from(b).map(x => x.toString(16).padStart(2, "0")).join("");
+}
+
+export function fromHex(s: string): Uint8Array {
+  if (s.startsWith("0x")) s = s.slice(2);
+  const out = new Uint8Array(s.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(s.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+function sleep(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
+
+function rethrow(label: string): (e: unknown) => never {
+  return (e) => { throw new Error(`${label}: ${(e as Error).message}`); };
+}

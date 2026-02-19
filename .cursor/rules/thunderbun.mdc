@@ -1,0 +1,46 @@
+---
+description: ThunderBun project conventions for Sui, Move, vanilla TS, and the zkproof pipeline
+alwaysApply: true
+---
+
+# ThunderBun coding rules
+
+## Vanilla TypeScript — no frameworks
+- No React, Vue, Svelte, or dapp-kit
+- All UI built with `innerHTML`, `document.createElement`, and event listeners
+- Sections export a single `renderX(container: HTMLElement): void` function
+
+## CSS — vanilla only
+- Use design tokens: `var(--space-N)`, `var(--accent)`, `var(--surface-N)`, `var(--text-muted)`
+- No Tailwind, no CSS-in-JS
+- Component-scoped styles injected via `<style>` tag if needed
+
+## zkproof-pipeline.ts — composability rules
+- Every pipeline step must be an exported async function accepting a typed config object
+- Never hardcode network URLs, object IDs, or token types inside step functions
+- All secrets (keys, wallets) are passed in — never read from global state inside lib/
+- `ZkProofConfig` must be the single source of truth; presets must cover all use cases
+
+## Move (Sui 2024.beta edition)
+- Use method syntax: `v.length()`, `v.borrow(i)`, `v.push_back(x)` — NOT `vector::length(v)`
+- Use `std::hash` for SHA-256, NOT `sui::hash`
+- `#[expected_failure(abort_code = N)]` uses integer literals, not cross-module constants
+- One responsibility per module; cross-module calls are fine within the same package
+- Suppress only justified lints: `#[allow(lint(self_transfer))]` on convenience wrappers
+- Remove the `[dependencies]` section from Move.toml if on edition 2024.beta — MoveStdlib is auto-injected
+
+## Environment variables
+- All configurable values go in `.env` as `VITE_*` and are accessed via `import.meta.env`
+- `contractFromEnv()` in `zkproof-pipeline.ts` is the canonical way to read contract IDs
+- Never commit `.env` files with real keys
+
+## Adding a new template section
+1. `templates/sui-twa/src/sections/mysection.ts` → export `renderMySection`
+2. Register in `main.ts`: `SectionId`, `NAV`, and `RENDERERS`
+
+## Adding a new pipeline step
+1. Add config type + add field to `ZkProofConfig`
+2. Export the step function from `zkproof-pipeline.ts`
+3. Insert into `runPipeline()` with a progress callback
+4. Update `FULL_CONFIG`, `DEV_CONFIG`, `VERIFY_ONLY_CONFIG`
+5. Add toggle to `zkproof.ts` options grid using `optionToggle()`
