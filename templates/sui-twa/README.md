@@ -1,8 +1,6 @@
 # Thunderbun
 
-Sui dApp as a TWA — run in browser, ship to the Play Store. Vanilla TypeScript · Sui dApp Kit · PWA-ready.
-
-> **Note on React:** `react` / `react-dom` are peer dependencies of `@mysten/dapp-kit-core` — they are **not** used in application code. All sections are vanilla TypeScript with zero framework overhead.
+Sui dApp as a TWA — run in browser, ship to the Play Store. gRPC-first · dApp Kit · Cloudflare Workers + Agents · PWA-ready.
 
 ---
 
@@ -14,6 +12,43 @@ bun run dev
 ```
 
 Opens at `http://localhost:5173`.
+
+---
+
+## 🔌 JSON-RPC → gRPC Migration
+
+**JSON-RPC shuts down April 2026.** ThunderBun uses `SuiGrpcClient` from `@mysten/sui/grpc` everywhere — the migration is already done.
+
+### What changed
+
+| Before (JSON-RPC, deprecated) | After (gRPC, ThunderBun default) |
+|-------------------------------|----------------------------------|
+| `import { SuiClient } from "@mysten/sui/client"` | `import { SuiGrpcClient } from "@mysten/sui/grpc"` |
+| `new SuiClient({ url: getFullnodeUrl("testnet") })` | `new SuiGrpcClient({ baseUrl: "https://fullnode.testnet.sui.io:443", network: "testnet", mvr: {} })` |
+| `res.totalBalance` | `res.balance.balance` |
+| `getOwnedObjects` + `showDisplay: true` | `listOwnedObjects` + `include: { json: true }` |
+| `o.data?.display?.data?.name` | `o.json?.name` |
+| `resolveNameServiceAddress(name)` | `SuinsClient.getNameRecord(name)` → `.targetAddress` |
+| `resolveNameServiceNames(address)` | `client.defaultNameServiceName({ address })` |
+
+### SDK compatibility
+
+All `@mysten/*` SDKs accept `ClientWithCoreApi` — pass your `SuiGrpcClient` directly:
+
+```ts
+import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { SealClient } from "@mysten/seal";
+
+const client = new SuiGrpcClient({ baseUrl: "https://fullnode.testnet.sui.io:443", network: "testnet", mvr: {} });
+const seal = new SealClient({ suiClient: client, ... });
+```
+
+Works with: `dapp-kit-core`, `deepbook-v3`, `seal`, `walrus`, `suins`.
+
+### Third-party SDKs
+
+- **WaaP SDK** — Wallet Standard only, no client dependency. Works as-is.
+- **Ika SDK** — Bundles its own `@mysten/sui@1.x`. ThunderBun isolates it via dynamic import so it never touches the main gRPC client.
 
 ---
 
@@ -54,37 +89,32 @@ Edit **`twa-manifest.json`** in the project root (two fields to change):
 
 ```json
 {
-  "packageId": "com.yourname.app",
-  "host":      "your-app.vercel.app"
+  "packageId": "xyz.sui.thunder",
+  "host":      "thunder.sui.ski"
 }
 ```
 
 > `host` is your domain only — no `https://`, no trailing slash.
-> `packageId` must be globally unique on Play Store (`com.yourname.app` works for testing).
+> `packageId` must be globally unique on Play Store.
 
 ---
 
-### Step 3 — Build and deploy to Cloudflare Pages
+### Step 3 — Build and deploy to Cloudflare Workers
 
 ```bash
 npx wrangler login          # one-time: opens browser to authenticate
-bun run deploy              # builds + deploys in one command
+bun run deploy              # builds + deploys Worker + static assets
 ```
 
-The first deploy creates your project and prints the live URL:
+The first deploy creates your Worker. Then add a custom domain (e.g. `thunder.sui.ski`) in Cloudflare Dashboard → Workers & Pages → your Worker → Custom domains.
 
-```
-✨  Deployment complete! Take a peek over at https://thunderbun.pages.dev
-```
-
-Put that domain (without `https://`) in `twa-manifest.json` → `host`:
+Put that domain in `twa-manifest.json` → `host`:
 
 ```json
-"host": "thunderbun.pages.dev"
+"host": "thunder.sui.ski"
 ```
 
-> **Custom domain?** Go to Cloudflare Dashboard → Pages → your project → Custom domains.
-> Update `host` and `iconUrl`/`maskableIconUrl`/`webManifestUrl` in `twa-manifest.json` to match.
+> Update `iconUrl`, `maskableIconUrl`, and `webManifestUrl` in `twa-manifest.json` to match your domain.
 
 ---
 
@@ -105,7 +135,7 @@ Then **redeploy** so the assetlinks file goes live:
 bun run deploy
 ```
 
-Verify it works: `curl https://thunderbun.pages.dev/.well-known/assetlinks.json`
+Verify it works: `curl https://thunder.sui.ski/.well-known/assetlinks.json`
 
 ---
 
@@ -146,7 +176,7 @@ Output: `android/app/build/outputs/bundle/release/app-release.aab`
 |---------|-----|
 | App opens Chrome instead of TWA | assetlinks.json not deployed, wrong fingerprint, or `host` mismatch in `twa-manifest.json` |
 | `curl /.well-known/assetlinks.json` returns 404 | Run `bun run deploy` — the `public/.well-known/` folder must be re-deployed |
-| assetlinks.json served as wrong content-type | The `public/_headers` file fixes this for Cloudflare Pages — check it was deployed |
+| assetlinks.json served as wrong content-type | The Worker serves static assets from the Vite build — check it was deployed |
 | `keytool not found` | Java not installed — see prerequisites |
 | `bubblewrap: command not found` | Run `bun run twa:setup` |
 | Build fails with Gradle error | Make sure Java 17 is active: `java -version` |
@@ -159,7 +189,7 @@ Output: `android/app/build/outputs/bundle/release/app-release.aab`
 Bump `appVersionCode` (integer, must increase) and `appVersionName` in `twa-manifest.json`, then:
 
 ```bash
-bun run deploy            # rebuild + redeploy to Cloudflare Pages
+bun run deploy            # rebuild + redeploy to Workers
 bun run twa:build         # new .aab
 # upload new .aab to Play Console
 ```

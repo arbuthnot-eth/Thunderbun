@@ -1,10 +1,64 @@
 # ThunderBun ⚡
 
-**Sui-native TWA framework — Cloudflare Workers, Agents, and Play Store in one scaffold.**
+**Sui-native TWA framework — gRPC-first, Cloudflare Workers + Agents, Play Store in one scaffold.**
 
-Vanilla TypeScript · WaaP wallet · gRPC + MVR · Hono router · Durable Object agents · PWA/TWA
+The first Sui dApp template built entirely on `SuiGrpcClient`. JSON-RPC shuts down April 2026 — ThunderBun is already migrated.
 
-> No React · No Enoki · No JSON-RPC
+---
+
+## JSON-RPC → gRPC Migration
+
+Sui is deprecating JSON-RPC. ThunderBun ships with the full migration already done:
+
+| Layer | Before (deprecated) | After (ThunderBun) |
+|-------|--------------------|--------------------|
+| **Client** | `SuiClient` / `SuiJsonRpcClient` | `SuiGrpcClient` from `@mysten/sui/grpc` |
+| **Endpoint** | `getFullnodeUrl("testnet")` | `https://fullnode.testnet.sui.io:443` |
+| **Name resolution** | MVR over JSON-RPC | MVR over gRPC (`mvr: {}`) |
+| **Balance** | `res.totalBalance` | `res.balance.balance` |
+| **Object listing** | `getOwnedObjects` + `showDisplay` | `listOwnedObjects` + `include: { json: true }` |
+| **Object fields** | `o.data?.display?.data?.name` | `o.json?.name` |
+| **SuiNS forward** | `resolveNameServiceAddress` | `SuinsClient.getNameRecord()` |
+| **SuiNS reverse** | `resolveNameServiceNames` (paginated) | `defaultNameServiceName()` (single default) |
+| **Transaction exec** | `executeTransactionBlock` | `executeTransaction` |
+
+### How ThunderBun handles it
+
+```ts
+// src/dapp-kit.ts — the core client
+import { SuiGrpcClient } from "@mysten/sui/grpc";
+
+const client = new SuiGrpcClient({
+  baseUrl: `https://fullnode.${network}.sui.io:443`,
+  network,
+  mvr: {},  // Move Registry name resolution
+});
+```
+
+All Mysten ecosystem SDKs accept `ClientWithCoreApi` and work with gRPC out of the box:
+
+- `@mysten/dapp-kit-core` — connect modal, wallet standard
+- `@mysten/deepbook-v3` — order book queries
+- `@mysten/seal` — threshold encryption
+- `@mysten/walrus` — blob storage
+- `@mysten/suins` — name service
+
+### Migrating your existing dApp
+
+1. Replace `SuiClient` → `SuiGrpcClient` (from `@mysten/sui/grpc`)
+2. Replace `url:` → `baseUrl:` in constructor
+3. Replace `getFullnodeUrl()` → `https://fullnode.${network}.sui.io:443`
+4. Add `network` and `mvr: {}` to constructor options
+5. Update response destructuring (`totalBalance` → `balance.balance`, etc.)
+6. Replace `getOwnedObjects` → `listOwnedObjects` with `include: { json: true }`
+
+### Third-party SDK compatibility
+
+| SDK | Status | Notes |
+|-----|--------|-------|
+| `@human.tech/waap-sdk` | Works | Wallet Standard only — client-agnostic |
+| `@ika.xyz/sdk` | Isolated | Bundles own `@mysten/sui@1.x`, uses dynamic import — does not touch main client |
+| `@x402/core` + `@x402/hono` | Works | HTTP-level protocol, no Sui client dependency |
 
 ---
 
@@ -24,11 +78,11 @@ bun run dev       # Opens at localhost:5173
 
 | Category | Feature | SDK / Tool |
 |----------|---------|------------|
+| **Transport** | gRPC + MVR name resolution | `@mysten/sui/grpc` |
+| **Connect** | dApp Kit connect modal | `@mysten/dapp-kit-core` |
 | **Wallet** | WaaP embedded wallet | `@human.tech/waap-sdk` |
 | **Wallet** | Passkeys (WebAuthn, cross-subdomain) | `@mysten/sui/keypairs/passkey` |
 | **Wallet** | Sponsored transactions (client + gas station) | `@mysten/sui` native |
-| **Transport** | gRPC + MVR name resolution | `@mysten/sui/grpc` |
-| **Connect** | dApp Kit connect modal | `@mysten/dapp-kit-core` |
 | **Names** | SuiNS forward + reverse lookup | `@mysten/suins` |
 | **Storage** | Walrus blob read/write | `@mysten/walrus` |
 | **Trading** | DeepBook v3 order book queries | `@mysten/deepbook-v3` |
@@ -100,11 +154,11 @@ bun run twa:build          # outputs app-release.aab
 
 | Path | Purpose |
 |------|---------|
+| `src/dapp-kit.ts` | `SuiGrpcClient` instance with MVR — the core gRPC client |
 | `src/worker.ts` | Hono router — agents, gas station, x402, static assets |
 | `src/agents/ProofAgent.ts` | Durable Object with SQLite + WebSocket state sync |
-| `src/dapp-kit.ts` | dApp Kit instance with gRPC transport and MVR |
 | `src/wallet.ts` | WaaP + connect modal + sponsored tx helpers |
-| `src/sui-client.ts` | Lazy singletons for Seal, DeepBook, Walrus |
+| `src/sui-client.ts` | Lazy singletons for Seal, DeepBook, Walrus (all via gRPC) |
 | `src/sections/` | Page sections (vanilla TS render functions) |
 | `wrangler.toml` | Worker config, Durable Object bindings, env vars |
 | `vite.config.ts` | PWA manifest, Workbox caching |
@@ -113,7 +167,7 @@ bun run twa:build          # outputs app-release.aab
 
 ## Links
 
-- [WaaP](https://docs.waap.xyz) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [Sui Docs](https://docs.sui.io)
+- [Sui gRPC Migration](https://docs.sui.io) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [WaaP](https://docs.waap.xyz)
 - [Cloudflare Workers](https://developers.cloudflare.com/workers/) · [Agents SDK](https://github.com/cloudflare/agents)
 - [Hono](https://hono.dev) · [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)
 
