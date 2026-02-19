@@ -30,19 +30,6 @@ directory            = "dist"
 not_found_handling   = "single-page-application"
 binding              = "ASSETS"
 
-# ─── Durable Objects (agents) ────────────────────────────────────────────────
-# Each Durable Object class corresponds to one Agent. Add new agents here.
-[[durable_objects.bindings]]
-name       = "ProofAgent"
-class_name = "ProofAgent"
-
-# ─── Durable Object migrations ───────────────────────────────────────────────
-# new_sqlite_classes = agent gets a built-in SQLite database (sql` tagged template).
-# Bump tag and add new_sqlite_classes whenever you add a new Agent class.
-[[migrations]]
-tag                = "v1"
-new_sqlite_classes = ["ProofAgent"]
-
 # ─── Environment variables ───────────────────────────────────────────────────
 # Plain vars go here; secrets use: wrangler secret put VAR_NAME
 [vars]
@@ -55,12 +42,6 @@ routes = [
   { pattern = "thunderbun.ai", custom_domain = true },
   { pattern = "www.thunderbun.ai", custom_domain = true },
 ]
-[[env.production.durable_objects.bindings]]
-name       = "ProofAgent"
-class_name = "ProofAgent"
-[[env.production.migrations]]
-tag                = "v1"
-new_sqlite_classes = ["ProofAgent"]
 [env.production.vars]
 NETWORK = "mainnet"
 

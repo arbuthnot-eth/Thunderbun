@@ -77,7 +77,7 @@ class App {
     } catch (err) {
       if (this.current !== id) return;
       console.error(err);
-      this.main.innerHTML = \`<div class="section"><div class="error-msg visible">Failed to load section: \${err}</div></div>\`;
+      this.main.innerHTML = `<div class="section"><div class="error-msg visible">Failed to load section: ${err}</div></div>`;
     }
   }
 
@@ -129,3 +129,10 @@ class App {
 }
 
 export const app = new App();
+
+const splash = document.getElementById("splash");
+if (splash) {
+  document.getElementById("app")!.classList.add("ready");
+  splash.classList.add("fade");
+  splash.addEventListener("transitionend", () => splash.remove());
+}

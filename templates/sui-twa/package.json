@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun scripts/generate-icons.ts && vite",
-    "build": "bun scripts/generate-icons.ts && bunx tsc -p tsconfig.json && bunx vite build",
+    "build": "bun scripts/generate-icons.ts && bun --bun tsc -p tsconfig.json && bun --bun vite build",
     "preview": "vite preview",
     "icons:generate": "bun scripts/generate-icons.ts",
     "twa:prereqs": "bash scripts/check-prereqs.sh",

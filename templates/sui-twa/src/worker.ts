@@ -2,31 +2,21 @@
  * ThunderBun Cloudflare Worker entry point (Hono)
  *
  * Responsibilities:
- *   1. Route /agents/* to Durable Object agents via `routeAgentRequest`
- *   2. /api/sponsor — opt-in gas station for sponsored transactions
- *   3. /api/paid/* — x402 scaffold (ready for @x402/sui when it ships)
- *   4. Serve all other requests from ASSETS binding (Vite-built PWA)
+ *   1. /api/sponsor — opt-in gas station for sponsored transactions
+ *   2. /api/paid/* — x402 scaffold (ready for @x402/sui when it ships)
+ *   3. Serve all other requests from ASSETS binding (Vite-built PWA)
  *
  * Docs:
  *   Workers: https://developers.cloudflare.com/workers/
  *   Hono:    https://hono.dev
- *   agents:  https://github.com/cloudflare/agents
  */
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { routeAgentRequest } from "agents";
-import { ProofAgent } from "./agents/ProofAgent";
-
-// Re-export agent class so Wrangler can register the Durable Object.
-export { ProofAgent };
 
 export interface Env {
   /** Bound to the Vite dist/ folder — serves static assets with SPA fallback */
   ASSETS: Fetcher;
-
-  /** Durable Object namespace for the ProofAgent (declared in wrangler.toml) */
-  ProofAgent: DurableObjectNamespace<ProofAgent>;
 
   /** Plain var from wrangler.toml [vars] — "testnet" | "mainnet" */
   NETWORK: string;
@@ -41,13 +31,6 @@ export interface Env {
 const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", cors());
-
-// ── Agent routing ────────────────────────────────────────────────────────────
-
-app.all("/agents/*", async (c) => {
-  const res = await routeAgentRequest(c.req.raw, c.env);
-  return res ?? c.notFound();
-});
 
 // ── Gas Station — opt-in sponsored transactions ─────────────────────────────
 
