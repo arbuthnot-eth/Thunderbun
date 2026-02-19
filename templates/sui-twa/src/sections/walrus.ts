@@ -1,11 +1,13 @@
 /**
- * Walrus section — decentralized blob storage via HTTP REST API
+ * Walrus section — decentralized blob storage via @mysten/walrus SDK
  * Docs: https://docs.wal.app/
  *
- * No extra SDK needed — Walrus exposes simple HTTP endpoints:
- *   PUT /v1/blobs?epochs=N   → store a blob, returns { blobId }
- *   GET /v1/blobs/:blobId    → retrieve a blob
+ * Uses the Walrus SDK for reading blobs.
+ * Writing falls back to HTTP publisher (SDK writeBlob requires a Signer keypair;
+ * browser wallets sign via signTransaction, not direct key access).
  */
+
+import { getWalrusClient } from "../sui-client";
 
 const PUBLISHER  = "https://publisher.walrus-testnet.walrus.space";
 const AGGREGATOR = "https://aggregator.walrus-testnet.walrus.space";
@@ -16,6 +18,9 @@ interface WalrusBlobResponse {
 }
 
 export function renderWalrus(container: HTMLElement) {
+  const walrusClient = getWalrusClient();
+  const sdkAvailable = walrusClient !== null;
+
   container.innerHTML = `
     <div class="section">
       <div class="section-top">
@@ -23,7 +28,10 @@ export function renderWalrus(container: HTMLElement) {
           <h1 class="section-title">Walrus 🐋</h1>
           <p class="section-desc">Decentralized blob storage. Store anything — text, images, files.</p>
         </div>
-        <a href="https://docs.wal.app" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+        <div class="row gap-2">
+          <span class="badge ${sdkAvailable ? "badge-green" : "badge-yellow"}">${sdkAvailable ? "SDK" : "HTTP REST"}</span>
+          <a href="https://docs.wal.app" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+        </div>
       </div>
 
       <!-- Store -->
@@ -65,7 +73,10 @@ export function renderWalrus(container: HTMLElement) {
 
       <!-- Retrieve -->
       <div class="card">
-        <div class="card-title">Retrieve a blob</div>
+        <div class="row-between" style="margin-bottom:14px">
+          <div class="card-title" style="margin:0">Retrieve a blob</div>
+          <span class="badge ${sdkAvailable ? "badge-green" : "badge-yellow"}">${sdkAvailable ? "SDK readBlob" : "HTTP GET"}</span>
+        </div>
         <label class="input-label">Blob ID</label>
         <div class="input-row">
           <input id="blob-input" type="text" class="input-field mono" placeholder="Enter blob ID…" />
@@ -78,11 +89,36 @@ export function renderWalrus(container: HTMLElement) {
         <div class="error-msg" id="retrieve-err"></div>
       </div>
 
+      <!-- SDK snippet -->
+      <div class="card">
+        <div class="card-title">SDK usage</div>
+        <pre style="font-size:11px;line-height:1.6">import { WalrusClient } from '@mysten/walrus';
+
+// Create client (auto-configures for network)
+const walrus = new WalrusClient({
+  network: 'testnet',
+  suiClient,
+});
+
+// Read a blob
+const bytes = await walrus.readBlob({ blobId });
+const text = new TextDecoder().decode(bytes);
+
+// Write a blob (requires Signer keypair)
+const { blobId } = await walrus.writeBlob({
+  blob: new TextEncoder().encode("hello walrus"),
+  epochs: 5,
+  deletable: false,
+  signer: keypair,
+});</pre>
+      </div>
+
       <div class="info-links">
         <div class="info-links-label">Resources</div>
         <div class="info-links-row">
           <a href="https://docs.wal.app" target="_blank" rel="noopener" class="badge badge-blue">Documentation ↗</a>
           <a href="https://walrus.site" target="_blank" rel="noopener" class="badge badge-blue">Walrus Sites ↗</a>
+          <a href="https://www.npmjs.com/package/@mysten/walrus" target="_blank" rel="noopener" class="badge badge-blue">npm ↗</a>
           <a href="https://github.com/MystenLabs/walrus" target="_blank" rel="noopener" class="badge badge-blue">GitHub ↗</a>
         </div>
       </div>
@@ -126,7 +162,7 @@ export function renderWalrus(container: HTMLElement) {
     container.querySelector<HTMLElement>("#store-result")!.classList.remove("visible");
   }
 
-  // Store
+  // Store (HTTP publisher — SDK writeBlob requires Signer keypair)
   container.querySelector("#store-btn")?.addEventListener("click", async () => {
     if (!selectedFile) return;
     const btn    = container.querySelector<HTMLButtonElement>("#store-btn")!;
@@ -172,7 +208,7 @@ export function renderWalrus(container: HTMLElement) {
     setTimeout(() => { btn.textContent = orig; }, 1500);
   });
 
-  // Retrieve
+  // Retrieve — SDK readBlob with HTTP fallback
   container.querySelector("#retrieve-btn")?.addEventListener("click", async () => {
     const blobId = container.querySelector<HTMLInputElement>("#blob-input")!.value.trim();
     if (!blobId) return;
@@ -188,9 +224,20 @@ export function renderWalrus(container: HTMLElement) {
     btn.textContent = "Fetching…";
 
     try {
-      const res = await fetch(`${AGGREGATOR}/v1/blobs/${blobId}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
+      let text: string;
+      const client = getWalrusClient();
+
+      if (client) {
+        // SDK path
+        const bytes = await client.readBlob({ blobId });
+        text = new TextDecoder().decode(bytes);
+      } else {
+        // HTTP fallback
+        const res = await fetch(`${AGGREGATOR}/v1/blobs/${blobId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        text = await res.text();
+      }
+
       contentEl.textContent = text.length > 600 ? text.slice(0, 600) + "\n…(truncated)" : text;
       resultEl.classList.add("visible");
     } catch (err) {

@@ -1,21 +1,25 @@
 /**
  * Seal section — decentralised secrets management & threshold encryption
  * Docs: https://seal-docs.wal.app/
- * Package: npm install @mysten/seal
+ * Package: @mysten/seal
  *
  * Seal encrypts data client-side and stores encryption keys in a threshold
  * committee of key servers. Access is controlled by Move smart contracts on Sui.
  *
- * Flow:
- *   encrypt(data, threshold, packageId, id) → { encryptedBytes, backupKey }
- *   store encryptedBytes on Walrus / any storage
- *   decrypt(encryptedBytes, sessionKey, txBytes) → plaintext
- *
- * Note: full Seal usage requires a deployed Move access-control package.
- * This demo shows the encrypt / decrypt API and links to example patterns.
+ * This section includes:
+ *   - Explainer (how Seal works)
+ *   - Real SealClient.encrypt() demo (testnet only)
+ *   - Local AES-GCM demo (any network, no key servers)
+ *   - Decrypt explanation with PTB construction
  */
 
+import { getSealClient } from "../sui-client";
+import { wallet } from "../wallet";
+
 export function renderSeal(container: HTMLElement) {
+  const sealClient = getSealClient();
+  const network = wallet.getState().network;
+
   container.innerHTML = `
     <div class="section">
       <div class="section-top">
@@ -23,7 +27,10 @@ export function renderSeal(container: HTMLElement) {
           <h1 class="section-title">Seal 🔒</h1>
           <p class="section-desc">Threshold encryption with on-chain access control powered by Sui Move.</p>
         </div>
-        <a href="https://seal-docs.wal.app" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+        <div class="row gap-2">
+          <span class="badge ${sealClient ? "badge-green" : "badge-yellow"}">${sealClient ? "SDK ready" : "No key servers (" + network + ")"}</span>
+          <a href="https://seal-docs.wal.app" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+        </div>
       </div>
 
       <!-- How it works -->
@@ -74,45 +81,96 @@ export function renderSeal(container: HTMLElement) {
         </div>
       </div>
 
-      <!-- SDK snippet -->
+      <!-- Seal SDK encrypt demo (testnet only) -->
       <div class="card">
-        <div class="card-title">SDK usage</div>
-        <pre style="font-size:11px;line-height:1.6">import { SealClient, SessionKey, getAllowlistedKeyServers } from '@mysten/seal';
-import { fromHEX } from '@mysten/sui/utils';
+        <div class="row-between" style="margin-bottom:14px">
+          <div class="card-title" style="margin:0">Seal SDK Encrypt</div>
+          <span class="badge ${sealClient ? "badge-green" : "badge-yellow"}">${sealClient ? "Testnet key servers" : "Requires testnet"}</span>
+        </div>
+        <p class="small muted" style="margin-bottom:12px">
+          Encrypt data using the real Seal threshold encryption SDK.
+          Requires a deployed Move package with <code>seal_approve</code> for decryption.
+        </p>
+        <div class="input-group">
+          <label class="input-label">Plaintext</label>
+          <input id="seal-sdk-plaintext" type="text" class="input-field" placeholder="Secret message…" ${!sealClient ? "disabled" : ""} />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Package ID (Move access-control package)</label>
+          <input id="seal-sdk-pkg" type="text" class="input-field mono" placeholder="0x…" ${!sealClient ? "disabled" : ""} />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Identity (object ID or encoded id)</label>
+          <input id="seal-sdk-id" type="text" class="input-field mono" placeholder="0x…" ${!sealClient ? "disabled" : ""} />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Threshold</label>
+          <select id="seal-sdk-threshold" class="input-field" style="width:auto" ${!sealClient ? "disabled" : ""}>
+            <option value="2" selected>2-of-3</option>
+            <option value="1">1-of-3</option>
+            <option value="3">3-of-3</option>
+          </select>
+        </div>
+        <button id="seal-sdk-encrypt-btn" class="btn btn-primary" ${!sealClient ? "disabled" : ""}>
+          ${sealClient ? "Encrypt with Seal" : "Switch to testnet to enable"}
+        </button>
 
-// 1. Create a Seal client (uses testnet key servers)
-const sealClient = new SealClient({
-  suiClient,
-  serverObjectIds: getAllowlistedKeyServers('testnet'),
-  verifyKeyServers: false, // set true for production
-});
+        <div class="result-box" id="seal-sdk-result">
+          <div class="result-label">Encrypted output (hex)</div>
+          <div class="result-value mono break-all small" id="seal-sdk-ciphertext"></div>
+          <div class="result-label mt-3">Backup key (hex)</div>
+          <div class="result-value mono break-all small" id="seal-sdk-key"></div>
+          <button class="btn btn-secondary btn-sm mt-3" id="seal-sdk-copy">Copy ciphertext</button>
+        </div>
+        <div class="error-msg" id="seal-sdk-err"></div>
+      </div>
 
-// 2. Encrypt
-const data = new TextEncoder().encode("secret message");
-const { encryptedObject, key: backupKey } = await sealClient.encrypt({
-  threshold: 2,
-  packageId: fromHEX(YOUR_MOVE_PACKAGE_ID),
-  id: fromHEX(YOUR_OBJECT_ID),
-  data,
-});
+      <!-- Decrypt explanation -->
+      <div class="card">
+        <div class="card-title">Decrypting with Seal</div>
+        <p class="small muted" style="margin-bottom:12px">
+          Decryption requires building a PTB that calls your Move <code>seal_approve</code>
+          function. The key servers verify on-chain that the caller has permission,
+          then return threshold decryption shares.
+        </p>
+        <pre style="font-size:11px;line-height:1.6">import { SealClient, SessionKey } from '@mysten/seal';
+import { Transaction } from '@mysten/sui/transactions';
 
-// 3. Decrypt (after building a tx that calls seal_approve)
+// Build approval PTB
 const tx = new Transaction();
 tx.moveCall({
   target: \`\${packageId}::allowlist::seal_approve\`,
-  arguments: [tx.pure.vector("u8", fromHEX(id)), tx.object(allowlistId)],
+  arguments: [
+    tx.pure.vector("u8", [...idBytes]),
+    tx.object(allowlistId),
+  ],
 });
-const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
-const sessionKey = new SessionKey({ address, packageId, ttlMin: 10 });
-const decrypted = await sealClient.decrypt({ data: encryptedObject, sessionKey, txBytes });</pre>
+
+const txBytes = await tx.build({
+  client: suiClient,
+  onlyTransactionKind: true,
+});
+
+// Create session key and decrypt
+const sessionKey = new SessionKey({
+  address: walletAddress,
+  packageId,
+  ttlMin: 10,
+});
+
+const plaintext = await sealClient.decrypt({
+  data: encryptedBytes,
+  sessionKey,
+  txBytes,
+});</pre>
       </div>
 
-      <!-- Interactive demo (local encrypt only — no key servers needed) -->
+      <!-- Local AES-GCM demo -->
       <div class="card">
         <div class="card-title">Local encrypt demo</div>
         <p class="small muted" style="margin-bottom:12px">
           Encrypt a message locally using AES-GCM (browser native).
-          Full threshold encryption requires deployed key servers — see the SDK snippet above.
+          Full threshold encryption requires deployed key servers — see the Seal SDK card above.
         </p>
 
         <div class="input-group">
@@ -164,6 +222,63 @@ const decrypted = await sealClient.decrypt({ data: encryptedObject, sessionKey, 
     </div>
   `;
 
+  // ── Seal SDK Encrypt ────────────────────────────────────────────────────
+  container.querySelector("#seal-sdk-encrypt-btn")?.addEventListener("click", async () => {
+    const client = getSealClient();
+    if (!client) return;
+
+    const plaintext = container.querySelector<HTMLInputElement>("#seal-sdk-plaintext")!.value;
+    const packageId = container.querySelector<HTMLInputElement>("#seal-sdk-pkg")!.value.trim();
+    const id = container.querySelector<HTMLInputElement>("#seal-sdk-id")!.value.trim();
+    const threshold = parseInt(container.querySelector<HTMLSelectElement>("#seal-sdk-threshold")!.value, 10);
+    const resultEl = container.querySelector<HTMLElement>("#seal-sdk-result")!;
+    const errEl = container.querySelector<HTMLElement>("#seal-sdk-err")!;
+
+    resultEl.classList.remove("visible");
+    errEl.classList.remove("visible");
+
+    if (!plaintext || !packageId || !id) {
+      errEl.textContent = "Enter plaintext, package ID, and identity.";
+      errEl.classList.add("visible");
+      return;
+    }
+
+    const btn = container.querySelector<HTMLButtonElement>("#seal-sdk-encrypt-btn")!;
+    btn.disabled = true;
+    btn.textContent = "Encrypting…";
+
+    try {
+      const data = new TextEncoder().encode(plaintext);
+      const { encryptedObject, key } = await client.encrypt({
+        threshold,
+        packageId,
+        id,
+        data,
+      });
+
+      const toHex = (arr: Uint8Array) => Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+      container.querySelector<HTMLElement>("#seal-sdk-ciphertext")!.textContent = toHex(encryptedObject);
+      container.querySelector<HTMLElement>("#seal-sdk-key")!.textContent = toHex(key);
+      resultEl.classList.add("visible");
+    } catch (err) {
+      errEl.textContent = err instanceof Error ? err.message : String(err);
+      errEl.classList.add("visible");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Encrypt with Seal";
+    }
+  });
+
+  container.querySelector("#seal-sdk-copy")?.addEventListener("click", () => {
+    navigator.clipboard.writeText(
+      container.querySelector<HTMLElement>("#seal-sdk-ciphertext")!.textContent ?? ""
+    );
+    const btn = container.querySelector<HTMLButtonElement>("#seal-sdk-copy")!;
+    const orig = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+
   // ── Encrypt (local AES-GCM demo) ─────────────────────────────────────────
   container.querySelector("#seal-encrypt-btn")?.addEventListener("click", async () => {
     const plaintext = container.querySelector<HTMLInputElement>("#seal-plaintext")!.value;
@@ -192,7 +307,6 @@ const decrypted = await sealClient.decrypt({ data: encryptedObject, sessionKey, 
         keyMaterial,
         enc.encode(plaintext)
       );
-      // Prepend IV to ciphertext for later decryption
       const combined = new Uint8Array(iv.byteLength + cipherBuf.byteLength);
       combined.set(iv);
       combined.set(new Uint8Array(cipherBuf), iv.byteLength);

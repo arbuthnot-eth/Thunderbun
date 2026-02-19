@@ -9,10 +9,12 @@ import { renderSeal }     from "./sections/seal";
 import { renderNFT }      from "./sections/nft";
 import { renderSettings } from "./sections/settings";
 import { renderZkProof }  from "./sections/zkproof";
+import { renderIka }      from "./sections/ika";
+import { renderPasskeys } from "./sections/passkeys";
 
 export type SectionId =
   | "home" | "suins" | "walrus" | "deepbook"
-  | "seal" | "nft" | "zkproof" | "settings";
+  | "seal" | "nft" | "zkproof" | "ika" | "passkeys" | "settings";
 
 interface NavItem {
   id: SectionId;
@@ -28,6 +30,8 @@ const NAV: NavItem[] = [
   { id: "walrus",   label: "Walrus Storage", icon: "🐋", group: "ecosystem" },
   { id: "deepbook", label: "DeepBook",       icon: "📖", group: "ecosystem" },
   { id: "seal",     label: "Seal Encrypt",   icon: "🔒", group: "ecosystem" },
+  { id: "passkeys", label: "Passkeys",       icon: "🔑", group: "ecosystem" },
+  { id: "ika",      label: "Ika MPC",        icon: "🔐", group: "ecosystem" },
   { id: "nft",      label: "TradePort NFTs", icon: "🖼", group: "ecosystem" },
   { id: "zkproof",  label: "Proof Verifier",  icon: "🔬", group: "ecosystem" },
 ];
@@ -36,7 +40,6 @@ const EXTERNAL: { label: string; href: string; icon: string }[] = [
   { label: "WaaP Wallet",  href: "https://docs.waap.xyz",              icon: "👛" },
   { label: "dApp Kit",     href: "https://sdk.mystenlabs.com/dapp-kit", icon: "🔌" },
   { label: "MVR Packages", href: "https://www.moveregistry.com",        icon: "📦" },
-  { label: "Ika MPC",      href: "https://docs.ika.xyz",               icon: "🔐" },
   { label: "Nautilus TEE", href: "https://docs.sui.io/guides/developer/nautilus", icon: "⚓" },
   { label: "Shinami Gas",  href: "https://shinami.com",                icon: "⛽" },
 ];
@@ -47,6 +50,8 @@ const RENDERERS: Record<SectionId, (el: HTMLElement) => void> = {
   walrus:   renderWalrus,
   deepbook: renderDeepBook,
   seal:     renderSeal,
+  passkeys: renderPasskeys,
+  ika:      renderIka,
   nft:      renderNFT,
   zkproof:  renderZkProof,
   settings: renderSettings,

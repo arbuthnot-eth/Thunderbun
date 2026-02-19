@@ -3,7 +3,7 @@
  * Docs: https://www.tradeport.xyz/docs
  *
  * Two tools:
- *   1. SuiClient.getOwnedObjects() — fetches wallet NFTs with display metadata
+ *   1. SuiGrpcClient.listOwnedObjects() — fetches wallet NFTs with JSON struct data
  *   2. TradePort GraphQL API — rich collection/listing/history data
  *
  * TradePort Trading SDK (@tradeport/sui-trading-sdk) requires an API key.
@@ -91,24 +91,24 @@ export function renderNFT(container: HTMLElement) {
 
     try {
       const client = wallet.getClient();
-      const { data } = await client.getOwnedObjects({
+      const { objects } = await client.listOwnedObjects({
         owner: address,
-        options: { showDisplay: true, showType: true },
+        include: { json: true },
         limit: 24,
       });
 
-      const nfts: NFT[] = data
+      const nfts: NFT[] = objects
         .filter((o) => {
-          const d = o.data?.display?.data as Record<string, unknown> | undefined;
-          return d && (d["image_url"] || d["name"]);
+          const j = o.json as Record<string, unknown> | null;
+          return j && (j["image_url"] || j["img_url"] || j["url"] || j["name"]);
         })
         .map((o) => {
-          const d = (o.data?.display?.data ?? {}) as Record<string, unknown>;
+          const j = (o.json ?? {}) as Record<string, unknown>;
           return {
-            objectId:  o.data?.objectId ?? "",
-            name:      String(d["name"] ?? d["title"] ?? "Unnamed"),
-            imageUrl:  String(d["image_url"] ?? d["img_url"] ?? ""),
-            collection: String(d["collection"] ?? d["project_name"] ?? ""),
+            objectId:  o.objectId,
+            name:      String(j["name"] ?? j["title"] ?? "Unnamed"),
+            imageUrl:  String(j["image_url"] ?? j["img_url"] ?? j["url"] ?? ""),
+            collection: String(j["collection"] ?? j["project_name"] ?? ""),
           };
         });
 

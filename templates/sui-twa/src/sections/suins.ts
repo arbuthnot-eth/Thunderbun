@@ -1,16 +1,13 @@
 /**
- * SuiNS section — SuiNS Indexer API + SDK
+ * SuiNS section — SuiNS SDK + gRPC
  *
- * Uses three complementary APIs:
- *   1. SuiClient.resolveNameServiceAddress(name)         → address   (name → addr, JSON-RPC suix_resolveNameServiceAddress)
- *   2. SuiClient.resolveNameServiceNames({ address })    → string[]  (addr → all names, JSON-RPC suix_resolveNameServiceNames — the indexer)
- *   3. SuinsClient.getNameRecord(name)                   → full record (avatar, expiry, walrusSiteId, contentHash)
+ * Uses two complementary APIs:
+ *   1. SuinsClient.getNameRecord(name)                         → full record incl. targetAddress (name → addr)
+ *   2. SuiGrpcClient.defaultNameServiceName({ address })       → default name (addr → primary name)
  *
  * Docs:
- *   https://docs.suins.io/developer/indexing
  *   https://docs.suins.io/developer/sdk/querying
- *   https://docs.sui.io/sui-api-ref#suix_resolvenameservicenames
- *   https://docs.sui.io/sui-api-ref#suix_resolvenameserviceaddress
+ *   https://docs.suins.io/developer/indexing
  */
 
 import { SuinsClient } from "@mysten/suins";
@@ -65,8 +62,7 @@ export function renderSuiNS(container: HTMLElement) {
         <div>
           <h1 class="section-title">SuiNS</h1>
           <p class="section-desc">
-            Forward &amp; reverse resolution via the SuiNS Indexer API
-            (<code>suix_resolveNameServiceAddress</code> / <code>suix_resolveNameServiceNames</code>).
+            Forward &amp; reverse name resolution via the SuiNS SDK and gRPC.
           </p>
         </div>
         <a href="https://docs.suins.io/developer/indexing" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Indexer docs ↗</a>
@@ -75,7 +71,7 @@ export function renderSuiNS(container: HTMLElement) {
       <!-- ── Forward lookup: name → address ───────────────────────────── -->
       <div class="card">
         <div class="card-title">Forward lookup — name → address</div>
-        <p class="card-note">Uses <code>suix_resolveNameServiceAddress</code> (Sui Indexer API)</p>
+        <p class="card-note">Uses SuiNS SDK <code>getNameRecord()</code></p>
         <label class="input-label">SuiNS name</label>
         <div class="input-row">
           <input id="suins-name" type="text" class="input-field" placeholder="example.sui" />
@@ -103,17 +99,17 @@ export function renderSuiNS(container: HTMLElement) {
         <div class="error-msg" id="suins-record-err"></div>
       </div>
 
-      <!-- ── Reverse lookup: address → names ──────────────────────────── -->
+      <!-- ── Reverse lookup: address → default name ─────────────────── -->
       <div class="card">
-        <div class="card-title">Reverse lookup — address → names</div>
-        <p class="card-note">Uses <code>suix_resolveNameServiceNames</code> (SuiNS Indexer API) — returns all names pointing to an address</p>
+        <div class="card-title">Reverse lookup — address → default name</div>
+        <p class="card-note">Uses gRPC <code>defaultNameServiceName()</code> — returns primary name</p>
         <label class="input-label">Sui address</label>
         <div class="input-row">
           <input id="suins-addr" type="text" class="input-field mono" placeholder="0x…" />
           <button id="suins-reverse" class="btn btn-primary" data-idle="Look up">Look up</button>
         </div>
         <div class="result-box" id="suins-rev-result">
-          <div class="result-label">Names registered to this address</div>
+          <div class="result-label">Default name for this address</div>
           <div id="suins-rev-names" class="tag-list"></div>
         </div>
         <div class="error-msg" id="suins-rev-err"></div>
@@ -166,8 +162,8 @@ function attachHandlers(container: HTMLElement) {
     setLoading(btn, "Resolving…", true);
 
     try {
-      // suix_resolveNameServiceAddress — forward: name → address
-      const address = await wallet.getClient().resolveNameServiceAddress({ name });
+      const record = await getSuinsClient().getNameRecord(name);
+      const address = record?.targetAddress ?? null;
       if (address) {
         addrEl.textContent = address;
         showResult(resBox);
@@ -240,31 +236,15 @@ function attachHandlers(container: HTMLElement) {
     setLoading(btn, "Looking up…", true);
 
     try {
-      // suix_resolveNameServiceNames — reverse: address → all names (indexer API)
-      // Paginates automatically until all names are fetched.
-      const allNames: string[] = [];
-      let cursor: string | null | undefined = undefined;
-      let hasMore = true;
+      const { data } = await wallet.getClient().defaultNameServiceName({ address });
+      const defaultName = data.name;
 
-      while (hasMore) {
-        const page = await wallet.getClient().resolveNameServiceNames({
-          address,
-          cursor: cursor ?? undefined,
-          limit: 50,
-        });
-        allNames.push(...page.data);
-        hasMore = page.hasNextPage;
-        cursor = page.nextCursor;
-      }
-
-      if (allNames.length === 0) {
-        showErr(errEl, "No SuiNS names registered for this address.");
+      if (!defaultName) {
+        showErr(errEl, "No default SuiNS name for this address.");
         return;
       }
 
-      namesEl.innerHTML = allNames
-        .map((n) => `<span class="badge badge-green">${n}</span>`)
-        .join(" ");
+      namesEl.innerHTML = `<span class="badge badge-green">${defaultName}</span>`;
       showResult(resBox);
     } catch (err) {
       showErr(errEl, "Lookup failed: " + (err instanceof Error ? err.message : String(err)));

@@ -2,6 +2,8 @@
 
 Sui dApp as a TWA — run in browser, ship to the Play Store. Vanilla TypeScript · Sui dApp Kit · PWA-ready.
 
+> **Note on React:** `react` / `react-dom` are peer dependencies of `@mysten/dapp-kit-core` — they are **not** used in application code. All sections are vanilla TypeScript with zero framework overhead.
+
 ---
 
 ## ⚡ Quick start (local)
@@ -166,17 +168,30 @@ bun run twa:build         # new .aab
 
 ## What's included
 
-| Feature | Description |
-|---------|-------------|
-| **WaaP** | Embedded wallet (email/social) — prioritized, works in TWA without extension |
-| **dApp Kit** | Connect modal (WaaP + Sui Wallet, etc.) via Sui dApp Kit |
-| **SuiNS** | Resolve `.sui` names to addresses |
-| **Walrus** | Decentralized storage |
-| **DeepBook** | Order book queries + place orders |
-| **TradePort** | NFT browsing |
-| **Seal** | Threshold encryption |
-| **Proof Verifier** | Link to on-chain Groth16 / Ligetron verification |
-| **PWA** | Service worker, offline-ready, add to home screen |
+### SDK Integrations
+
+| Feature | SDK | Status |
+|---------|-----|--------|
+| **WaaP** | `@human.tech/waap-sdk` | Embedded wallet (email/social) — prioritized, works in TWA |
+| **dApp Kit** | `@mysten/dapp-kit-core` | Connect modal (WaaP + Sui Wallet, etc.) with gRPC + MVR |
+| **Passkeys** | `@mysten/sui/keypairs/passkey` | WebAuthn passkeys for passwordless Sui signing, cross-subdomain |
+| **Sponsored Tx** | `@mysten/sui` native | Client-side helpers + opt-in server gas station (`/api/sponsor`) |
+| **SuiNS** | `@mysten/suins` | Forward lookup via SDK, reverse via gRPC `defaultNameServiceName` |
+| **Walrus** | `@mysten/walrus` | SDK `readBlob()` + HTTP publisher fallback for writes |
+| **DeepBook** | `@mysten/deepbook-v3` | SDK queries: `midPrice`, `getLevel2TicksFromMid`, pool params |
+| **Seal** | `@mysten/seal` | Real `SealClient.encrypt()` on testnet + local AES-GCM demo |
+| **Ika MPC** | `@ika.xyz/sdk` | Network status, dWallet info, dynamic import for code splitting |
+| **TradePort** | REST API | NFT browsing |
+| **Proof Verifier** | — | Link to on-chain Groth16 / Ligetron verification |
+| **x402 Scaffold** | `@x402/core` + `@x402/hono` | Paywalled endpoints ready for `@x402/sui` |
+| **Hono Router** | `hono` | Worker routing (agents, /api/sponsor, /api/paid/*, static assets) |
+| **PWA** | `vite-plugin-pwa` | Service worker, offline-ready, add to home screen |
+
+### Web4 Roadmap (Batch 2)
+
+- `@x402/sui` payment scheme — activate x402 Hono middleware when it ships
+- CommerceAgent (Cloudflare Durable Object with autonomous payments)
+- Agent dashboard with real-time WebSocket state
 
 ---
 
@@ -184,8 +199,12 @@ bun run twa:build         # new .aab
 
 | Path | Purpose |
 |------|---------|
+| `src/dapp-kit.ts` | dApp Kit instance with gRPC transport and MVR enabled |
 | `src/wallet.ts` | WaaP + dApp Kit connect modal + Wallet Standard |
-| `src/sections/` | Page sections |
+| `src/sui-client.ts` | Shared SDK client accessors (Seal, DeepBook, Walrus) |
+| `src/sections/` | Page sections (each is a vanilla TS render function) |
+| `src/sections/passkeys.ts` | Passkey registration, auth, cross-subdomain iframe demo |
+| `src/worker.ts` | Hono router — agents, gas station, x402 scaffold, static assets |
 | `public/icons/` | PWA icons (replace before publish) |
 | `vite.config.ts` | PWA manifest, Workbox |
 
@@ -194,6 +213,28 @@ bun run twa:build         # new .aab
 ## Links
 
 - [WaaP](https://docs.waap.xyz) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [Sui Docs](https://docs.sui.io) · [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) · [Play Console](https://play.google.com/console)
+
+---
+
+## Gas Station Setup (Optional)
+
+The Worker includes an opt-in gas station at `POST /api/sponsor`. To enable it:
+
+```bash
+# Set the sponsor private key (Bech32 suiprivkey1q... format)
+wrangler secret put SPONSOR_PRIVATE_KEY
+
+# Optionally set max gas budget in MIST (default: 50_000_000 = 0.05 SUI)
+wrangler secret put MAX_GAS_BUDGET
+```
+
+When configured, clients can send base64-encoded transaction bytes to `/api/sponsor` and receive a sponsor signature back. See the Settings section in the app for the full client-side flow.
+
+---
+
+## x402 Payment Scaffold
+
+The Worker includes scaffolded routes at `/api/paid/*` with an `X-X402-Ready: scaffold` header. These endpoints are ready to be paywalled using the x402 Hono middleware once `@x402/sui` ships. The `@x402/core` and `@x402/hono` packages are already installed as dependencies.
 
 ---
 

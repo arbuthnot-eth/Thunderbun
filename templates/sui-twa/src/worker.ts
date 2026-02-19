@@ -1,24 +1,24 @@
 /**
- * ThunderBun Cloudflare Worker entry point
+ * ThunderBun Cloudflare Worker entry point (Hono)
  *
  * Responsibilities:
- *   1. Route /agents/* requests to the appropriate Durable Object agent via
- *      `routeAgentRequest` from the `agents` SDK.
- *   2. Serve all other requests (the Vite-built PWA) from the ASSETS binding,
- *      with SPA fallback configured in wrangler.toml.
+ *   1. Route /agents/* to Durable Object agents via `routeAgentRequest`
+ *   2. /api/sponsor — opt-in gas station for sponsored transactions
+ *   3. /api/paid/* — x402 scaffold (ready for @x402/sui when it ships)
+ *   4. Serve all other requests from ASSETS binding (Vite-built PWA)
  *
  * Docs:
- *   Workers:       https://developers.cloudflare.com/workers/
- *   agents SDK:    https://github.com/cloudflare/agents
- *   Static assets: https://developers.cloudflare.com/workers/static-assets/
+ *   Workers: https://developers.cloudflare.com/workers/
+ *   Hono:    https://hono.dev
+ *   agents:  https://github.com/cloudflare/agents
  */
 
+import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { routeAgentRequest } from "agents";
 import { ProofAgent } from "./agents/ProofAgent";
 
 // Re-export agent class so Wrangler can register the Durable Object.
-// Every Agent subclass used in wrangler.toml [[durable_objects.bindings]]
-// MUST be exported from the Worker's main module.
 export { ProofAgent };
 
 export interface Env {
@@ -30,35 +30,73 @@ export interface Env {
 
   /** Plain var from wrangler.toml [vars] — "testnet" | "mainnet" */
   NETWORK: string;
+
+  /** Bech32 `suiprivkey1q...` — opt-in gas station (wrangler secret put) */
+  SPONSOR_PRIVATE_KEY?: string;
+
+  /** Max gas budget in MIST — defaults to 50_000_000 (0.05 SUI) */
+  MAX_GAS_BUDGET?: string;
 }
 
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
+const app = new Hono<{ Bindings: Env }>();
 
-    // CORS pre-flight for agent WebSocket upgrades and RPC calls
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Upgrade",
-        },
-      });
-    }
+app.use("*", cors());
 
-    // Route /agents/* to the agents SDK.
-    // The SDK matches the path pattern /agents/<AgentName>/<instanceId> and
-    // forwards to the correct Durable Object, handling WebSocket upgrades,
-    // RPC calls (@callable methods), and state sync automatically.
-    if (url.pathname.startsWith("/agents/")) {
-      const agentResponse = await routeAgentRequest(request, env);
-      if (agentResponse) return agentResponse;
-    }
+// ── Agent routing ────────────────────────────────────────────────────────────
 
-    // All other requests → static PWA assets (dist/).
-    // wrangler.toml sets not_found_handling = "single-page-application" so
-    // missing paths (e.g. /proof/abc) serve index.html for client-side routing.
-    return env.ASSETS.fetch(request);
-  },
-} satisfies ExportedHandler<Env>;
+app.all("/agents/*", async (c) => {
+  const res = await routeAgentRequest(c.req.raw, c.env);
+  return res ?? c.notFound();
+});
+
+// ── Gas Station — opt-in sponsored transactions ─────────────────────────────
+
+app.post("/api/sponsor", async (c) => {
+  const secretKey = c.env.SPONSOR_PRIVATE_KEY;
+  if (!secretKey) {
+    return c.json({ error: "Gas station not configured" }, 501);
+  }
+
+  const body = await c.req.json<{ txBytes: string }>();
+  if (!body.txBytes) {
+    return c.json({ error: "Missing txBytes" }, 400);
+  }
+
+  const maxBudget = BigInt(c.env.MAX_GAS_BUDGET ?? "50000000");
+  // TODO: parse gas budget from transaction BCS and validate against maxBudget
+  void maxBudget;
+
+  const { decodeSuiPrivateKey } = await import("@mysten/sui/cryptography");
+  const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
+
+  const { secretKey: raw } = decodeSuiPrivateKey(secretKey);
+  const keypair = Ed25519Keypair.fromSecretKey(raw);
+
+  const txBytes = Uint8Array.from(atob(body.txBytes), (ch) => ch.charCodeAt(0));
+  const { signature } = await keypair.signTransaction(txBytes);
+
+  return c.json({
+    sponsorSignature: signature,
+    sponsorAddress: keypair.toSuiAddress(),
+  });
+});
+
+// ── x402 paywalled routes (scaffold — ready for @x402/sui) ─────────────────
+
+app.use("/api/paid/*", async (c, next) => {
+  // TODO: x402 Hono middleware when @x402/sui ships
+  c.header("X-X402-Ready", "scaffold");
+  await next();
+});
+
+app.get("/api/paid/example", (c) => {
+  return c.json({
+    message: "This endpoint will be paywalled via x402 + Sui USDC",
+  });
+});
+
+// ── Static assets fallback ──────────────────────────────────────────────────
+
+app.all("*", async (c) => c.env.ASSETS.fetch(c.req.raw));
+
+export default app;

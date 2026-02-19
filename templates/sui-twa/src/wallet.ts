@@ -8,7 +8,8 @@
  * Docs: https://sdk.mystenlabs.com/dapp-kit
  */
 
-import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
+import type { SuiGrpcClient } from "@mysten/sui/grpc";
+import type { Transaction } from "@mysten/sui/transactions";
 
 // Load web components (connect modal, etc.)
 import "@mysten/dapp-kit-core/web";
@@ -98,11 +99,11 @@ class WalletManager {
     if (!state.address) return;
     try {
       const client = dAppKit.getClient();
-      const { totalBalance } = await client.getBalance({
+      const { balance } = await client.getBalance({
         owner: state.address,
         coinType: "0x2::sui::SUI",
       });
-      this.balanceCache = BigInt(totalBalance);
+      this.balanceCache = BigInt(balance.balance);
       this.emit();
     } catch {
       /* ignore */
@@ -114,8 +115,8 @@ class WalletManager {
     if (this.getState().address) this.refreshBalance();
   }
 
-  getClient(): SuiJsonRpcClient {
-    return dAppKit.getClient() as SuiJsonRpcClient;
+  getClient(): SuiGrpcClient {
+    return dAppKit.getClient() as SuiGrpcClient;
   }
 
   formatBalance(): string {
@@ -129,6 +130,32 @@ class WalletManager {
     if (!addr) return "";
     if (full) return addr;
     return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  }
+
+  // ── Sponsored Transactions ────────────────────────────────────────────────
+
+  async buildSponsoredTx(
+    build: (tx: Transaction) => void,
+    sponsorAddress: string,
+  ): Promise<{ bytes: string; userSignature: string }> {
+    const mod = await import("@mysten/sui/transactions");
+    const tx = new mod.Transaction();
+    tx.setSender(this.getState().address!);
+    tx.setGasOwner(sponsorAddress);
+    build(tx);
+    const { signature, bytes } = await dAppKit.signTransaction({ transaction: tx });
+    return { bytes, userSignature: signature };
+  }
+
+  async executeSponsoredTx(
+    bytes: string,
+    signatures: string[],
+  ): Promise<unknown> {
+    const txBytes = Uint8Array.from(atob(bytes), (ch) => ch.charCodeAt(0));
+    return this.getClient().executeTransaction({
+      transaction: txBytes,
+      signatures,
+    });
   }
 
   private emit() {

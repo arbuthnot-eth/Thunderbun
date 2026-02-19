@@ -18,7 +18,7 @@
 
 name            = "thunderbun"
 main            = "src/worker.ts"
-compatibility_date  = "2025-02-19"
+compatibility_date  = "2026-02-19"
 compatibility_flags = ["nodejs_compat"]
 
 # ─── Static assets (Vite build output) ───────────────────────────────────────

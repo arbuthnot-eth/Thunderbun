@@ -67,14 +67,17 @@ export function renderSettings(container: HTMLElement) {
         <div class="card-title">MVR — Move Package Registry 📦</div>
         <p class="small muted" style="margin-bottom:12px">
           MVR allows using <code>@pkg/module</code> named references in transactions
-          instead of raw package addresses. Registered in this template via
-          <code>namedPackagesPlugin</code>.
+          instead of raw package addresses. Activated in this template via
+          <code>mvr: {}</code> in the <code>SuiGrpcClient</code> constructor
+          (<code>dapp-kit.ts</code>). All transactions automatically resolve
+          MVR names without needing a global serialization plugin.
         </p>
-        <pre style="font-size:11px">// Already registered in wallet.ts:
-Transaction.registerGlobalSerializationPlugin(
-  'namedPackagesPlugin',
-  namedPackagesPlugin({ url: 'https://mainnet.mvr.mystenlabs.com' })
-);
+        <pre style="font-size:11px">// In dapp-kit.ts:
+new SuiGrpcClient({
+  baseUrl: \`https://fullnode.\${network}.sui.io:443\`,
+  network,
+  mvr: {},  // ← enables MVR name resolution
+});
 
 // Now use named packages in PTBs:
 tx.moveCall({
@@ -95,12 +98,10 @@ tx.moveCall({
           It uses 2PC (two-party computation) to sign transactions without exposing private keys.
           Ideal for key management, cross-chain bridges, and institutional custody.
         </p>
-        <pre style="font-size:11px">// Install: pnpm add @ika.xyz/sdk
-import { IkaClient } from '@ika.xyz/sdk';
-
-const ikaClient = new IkaClient({
-  url: 'https://ika-rpc.testnet.ika.xyz',
-});</pre>
+        <p class="small" style="margin-bottom:8px">
+          <strong>→</strong> See the <a href="#" id="ika-nav-link" style="color:var(--accent)">Ika MPC section</a>
+          for live network status, SDK demos, and dWallet information.
+        </p>
         <div class="info-links-row mt-3">
           <a href="https://docs.ika.xyz" target="_blank" rel="noopener" class="badge badge-blue">Ika docs ↗</a>
           <a href="https://github.com/dwallet-labs/ika" target="_blank" rel="noopener" class="badge badge-blue">GitHub ↗</a>
@@ -119,6 +120,56 @@ const ikaClient = new IkaClient({
           <a href="https://docs.sui.io/guides/developer/nautilus" target="_blank" rel="noopener" class="badge badge-blue">Nautilus docs ↗</a>
           <a href="https://github.com/MystenLabs/nautilus" target="_blank" rel="noopener" class="badge badge-blue">GitHub template ↗</a>
         </div>
+      </div>
+
+      <!-- Passkeys -->
+      <div class="card">
+        <div class="card-title">Passkeys — WebAuthn for Sui</div>
+        <p class="small muted" style="margin-bottom:12px">
+          Passkeys let users sign Sui transactions with biometrics (Face ID, fingerprint, PIN) —
+          no seed phrase or extension needed. Set <code>rpId</code> to the root domain for
+          cross-subdomain portability.
+        </p>
+        <p class="small" style="margin-bottom:8px">
+          <strong>&rarr;</strong> See the <a href="#" id="passkeys-nav-link" style="color:var(--accent)">Passkeys section</a>
+          for a live demo and cross-subdomain iframe architecture.
+        </p>
+        <div class="info-links-row mt-3">
+          <a href="https://sdk.mystenlabs.com/typescript/cryptography/keypairs/passkey" target="_blank" rel="noopener" class="badge badge-blue">SDK docs ↗</a>
+          <a href="https://webauthn.guide" target="_blank" rel="noopener" class="badge badge-blue">WebAuthn guide ↗</a>
+        </div>
+      </div>
+
+      <!-- Sponsored Transactions -->
+      <div class="card">
+        <div class="card-title">Sponsored Transactions</div>
+        <p class="small muted" style="margin-bottom:12px">
+          Two patterns for gasless UX — both using native Sui SDK (no Enoki):
+        </p>
+        <ul class="small muted" style="margin-bottom:12px;padding-left:18px">
+          <li><strong>Client-side:</strong> <code>wallet.buildSponsoredTx()</code> sets
+              <code>gasOwner</code> to a known sponsor, user signs, then both signatures
+              are submitted via <code>executeSponsoredTx()</code></li>
+          <li><strong>Server gas station:</strong> <code>POST /api/sponsor</code> on the
+              Worker signs with a hot wallet — opt-in via <code>SPONSOR_PRIVATE_KEY</code>
+              Wrangler secret</li>
+        </ul>
+        <pre style="font-size:11px">// Client-side sponsored transaction
+const { bytes, userSignature } = await wallet.buildSponsoredTx(
+  (tx) =&gt; tx.moveCall({ target: "...", arguments: [...] }),
+  sponsorAddress
+);
+
+// Send to gas station for sponsor signature
+const res = await fetch("/api/sponsor", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ txBytes: bytes }),
+});
+const { sponsorSignature } = await res.json();
+
+// Execute with both signatures
+await wallet.executeSponsoredTx(bytes, [userSignature, sponsorSignature]);</pre>
       </div>
 
       <!-- About -->
@@ -170,5 +221,19 @@ const ikaClient = new IkaClient({
       btn.disabled = false;
       btn.textContent = "Connect Wallet";
     }
+  });
+
+  // Ika nav link — navigates to Ika section
+  container.querySelector("#ika-nav-link")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    const app = (window as unknown as Record<string, { showSection: (id: string) => void }>).__app;
+    if (app) app.showSection("ika");
+  });
+
+  // Passkeys nav link — navigates to Passkeys section
+  container.querySelector("#passkeys-nav-link")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    const app = (window as unknown as Record<string, { showSection: (id: string) => void }>).__app;
+    if (app) app.showSection("passkeys");
   });
 }
