@@ -1,0 +1,64 @@
+{
+  "_comment": "ThunderBun TWA manifest — used by bubblewrap to build the Android APK/AAB.",
+  "_instructions": [
+    "1. Replace YOUR_APP_DOMAIN_HERE with your deployed domain (no https://, no trailing slash).",
+    "   Example: 'thunderbun-abc123.vercel.app'",
+    "2. Replace com.thunderbun.app with your own reverse-domain package ID.",
+    "   Example: 'xyz.myproject.app' (must be globally unique on Play Store).",
+    "3. Run: bun run twa:build",
+    "4. The .aab file will be at android/app/build/outputs/bundle/release/app-release.aab"
+  ],
+
+  "packageId":         "com.thunderbun.app",
+  "host":              "YOUR_APP_DOMAIN_HERE",
+  "name":              "ThunderBun",
+  "launcherName":      "ThunderBun",
+  "display":           "standalone",
+  "orientation":       "portrait",
+
+  "themeColor":        "#4DA2FF",
+  "navigationColor":   "#0D1117",
+  "navigationColorDark": "#0D1117",
+  "navigationDividerColor": "#0D1117",
+  "backgroundColor":   "#0D1117",
+
+  "startUrl":          "/",
+  "scope":             "/",
+
+  "iconUrl":           "https://YOUR_APP_DOMAIN_HERE/icons/pwa-512x512.png",
+  "maskableIconUrl":   "https://YOUR_APP_DOMAIN_HERE/icons/pwa-512x512.png",
+  "monochromeIconUrl": "",
+
+  "webManifestUrl":    "https://YOUR_APP_DOMAIN_HERE/manifest.webmanifest",
+
+  "shortcuts":         [],
+  "features":          {},
+
+  "appVersionName":    "1.0.0",
+  "appVersionCode":    1,
+
+  "sdkVersion":        34,
+  "minSdkVersion":     21,
+
+  "signingMode":       "none",
+  "generatorApp":      "bubblewrap-cli",
+
+  "enableNotifications":           false,
+  "enableSiteSettingsShortcut":    true,
+  "isSplashScreenFadeOutEnabled":  false,
+  "splashScreenFadeOutDuration":   300,
+  "fullScopeUrl":      "https://YOUR_APP_DOMAIN_HERE/",
+
+  "_signing_instructions": [
+    "For INTERNAL TESTING (no Play Console review), signingMode='none' is fine.",
+    "bubblewrap will auto-generate a debug key.",
+    "For PRODUCTION, run: bash scripts/gen-keystore.sh release",
+    "Then update signingMode to 'local' and fill in keystore/alias/passwords below."
+  ],
+  "_signingKey": {
+    "path":      "android-release.keystore",
+    "alias":     "thunderbun-key",
+    "keypass":   "",
+    "storepass": ""
+  }
+}
