@@ -7,10 +7,11 @@ import { renderDeepBook } from "./sections/deepbook";
 import { renderSeal }     from "./sections/seal";
 import { renderNFT }      from "./sections/nft";
 import { renderSettings } from "./sections/settings";
+import { renderZkProof }  from "./sections/zkproof";
 
 export type SectionId =
   | "home" | "suins" | "walrus" | "deepbook"
-  | "seal" | "nft" | "settings";
+  | "seal" | "nft" | "zkproof" | "settings";
 
 interface NavItem {
   id: SectionId;
@@ -27,6 +28,7 @@ const NAV: NavItem[] = [
   { id: "deepbook", label: "DeepBook",       icon: "📖", group: "ecosystem" },
   { id: "seal",     label: "Seal Encrypt",   icon: "🔒", group: "ecosystem" },
   { id: "nft",      label: "TradePort NFTs", icon: "🖼", group: "ecosystem" },
+  { id: "zkproof",  label: "Ligetron ZK",    icon: "🔬", group: "ecosystem" },
 ];
 
 const EXTERNAL: { label: string; href: string; icon: string }[] = [
@@ -44,6 +46,7 @@ const RENDERERS: Record<SectionId, (el: HTMLElement) => void> = {
   deepbook: renderDeepBook,
   seal:     renderSeal,
   nft:      renderNFT,
+  zkproof:  renderZkProof,
   settings: renderSettings,
 };
 

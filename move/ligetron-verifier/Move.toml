@@ -5,19 +5,10 @@ edition = "2024.beta"
 description = "On-chain Groth16-wrapped Ligetron (Ligero-family IOP) proof verifier for Sui"
 license = "MIT"
 
+# Removing explicit Sui dependency so the 2024.beta framework auto-injects
+# Sui, MoveStdlib, Bridge, DeepBook, and SuiSystem with correct addresses.
+# (Explicit deps disable this auto-injection, breaking 'std' address resolution.)
 [dependencies]
-Sui = {
-    git = "https://github.com/MystenLabs/sui.git",
-    subdir = "crates/sui-framework/packages/sui-framework",
-    rev = "framework/testnet",
-}
 
 [addresses]
 ligetron_verifier = "0x0"
-
-[dev-dependencies]
-Sui = {
-    git = "https://github.com/MystenLabs/sui.git",
-    subdir = "crates/sui-framework/packages/sui-framework",
-    rev = "framework/testnet",
-}
