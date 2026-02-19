@@ -1,0 +1,32 @@
+name: TWA Play Store Tests
+
+on:
+  push:
+    paths:
+      - 'templates/sui-twa/**'
+  pull_request:
+    paths:
+      - 'templates/sui-twa/**'
+
+defaults:
+  run:
+    working-directory: templates/sui-twa
+
+jobs:
+  test:
+    name: Play Store validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile || bun install
+
+      - name: Run Play Store tests
+        run: bun run test:playstore
+
+      - name: TypeScript type check
+        run: bun run tsc -p tsconfig.json --noEmit

@@ -7,9 +7,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icons/*.png", "icons/*.svg"],
       manifest: {
-        name: "Thunderbun",
-        short_name: "Thunderbun",
-        description: "Sui-native PWA built with Thunderbun",
+        name: "ThunderBun",
+        short_name: "ThunderBun",
+        description: "Sui-native PWA built with ThunderBun",
         theme_color: "#4DA2FF",
         background_color: "#0D1117",
         display: "standalone",

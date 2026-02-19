@@ -1,6 +1,6 @@
 {
-  "name": "Thunderbun",
-  "short_name": "Thunderbun",
+  "name": "ThunderBun",
+  "short_name": "ThunderBun",
   "description": "A Sui-native PWA built with ThunderBun",
   "start_url": "/",
   "scope": "/",

@@ -1,12 +1,178 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4DA2FF;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#58A6FF;stop-opacity:1" />
+    <!-- Vantablack background gradient (pure black with subtle depth) -->
+    <radialGradient id="vanta" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#050505"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+    <!-- Thunderbun yellow gradient -->
+    <linearGradient id="bunYellow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFD54F"/>
+      <stop offset="50%" stop-color="#FFC107"/>
+      <stop offset="100%" stop-color="#FFA000"/>
     </linearGradient>
+    <!-- Ear lightning glow -->
+    <linearGradient id="boltGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFEE58"/>
+      <stop offset="100%" stop-color="#FFB300"/>
+    </linearGradient>
+    <!-- Subtle glow behind bunny -->
+    <radialGradient id="aura" cx="50%" cy="52%" r="35%">
+      <stop offset="0%" stop-color="#FFD54F" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Snow blur filter -->
+    <filter id="snowBlur">
+      <feGaussianBlur stdDeviation="0.8"/>
+    </filter>
+    <filter id="snowBlurFar">
+      <feGaussianBlur stdDeviation="1.5"/>
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="96" fill="#0D1117"/>
-  <rect width="512" height="512" rx="96" fill="url(#g)" opacity="0.15"/>
-  <text x="256" y="320" font-family="system-ui,sans-serif" font-size="280" font-weight="700"
-        text-anchor="middle" fill="url(#g)">S</text>
+
+  <!-- Vantablack background -->
+  <rect width="512" height="512" rx="96" fill="url(#vanta)"/>
+
+  <!-- Ambient glow behind character -->
+  <rect width="512" height="512" rx="96" fill="url(#aura)"/>
+
+  <!-- ══════════ THUNDERBUN CHARACTER ══════════ -->
+  <g transform="translate(256, 270)">
+
+    <!-- LEFT EAR — lightning bolt shape -->
+    <g transform="translate(-62, -130)">
+      <polygon points="0,-80 20,-80 5,-30 25,-30 -10,30 0,-5 -18,-5"
+               fill="url(#boltGlow)" stroke="#F9A825" stroke-width="2" stroke-linejoin="round"/>
+    </g>
+
+    <!-- RIGHT EAR — lightning bolt shape -->
+    <g transform="translate(42, -130)">
+      <polygon points="0,-80 20,-80 5,-30 25,-30 -10,30 0,-5 -18,-5"
+               fill="url(#boltGlow)" stroke="#F9A825" stroke-width="2" stroke-linejoin="round"/>
+    </g>
+
+    <!-- BODY -->
+    <ellipse cx="0" cy="45" rx="55" ry="45" fill="url(#bunYellow)" stroke="#F9A825" stroke-width="2"/>
+
+    <!-- LEFT PAW -->
+    <ellipse cx="-30" cy="85" rx="18" ry="12" fill="url(#bunYellow)" stroke="#F9A825" stroke-width="1.5"/>
+    <!-- RIGHT PAW -->
+    <ellipse cx="30" cy="85" rx="18" ry="12" fill="url(#bunYellow)" stroke="#F9A825" stroke-width="1.5"/>
+
+    <!-- HEAD -->
+    <circle cx="0" cy="-15" r="70" fill="url(#bunYellow)" stroke="#F9A825" stroke-width="2"/>
+
+    <!-- CHEEKS — rosy -->
+    <ellipse cx="-45" cy="5" rx="16" ry="12" fill="#FFCC80" opacity="0.5"/>
+    <ellipse cx="45" cy="5" rx="16" ry="12" fill="#FFCC80" opacity="0.5"/>
+
+    <!-- LEFT EYE — happy closed arc -->
+    <path d="M-28,-22 Q-20,-32 -12,-22" fill="none" stroke="#5D4037" stroke-width="4.5" stroke-linecap="round"/>
+    <!-- RIGHT EYE — happy closed arc -->
+    <path d="M12,-22 Q20,-32 28,-22" fill="none" stroke="#5D4037" stroke-width="4.5" stroke-linecap="round"/>
+
+    <!-- NOSE -->
+    <ellipse cx="0" cy="-6" rx="5" ry="3.5" fill="#8D6E63"/>
+
+    <!-- MOUTH — happy smile -->
+    <path d="M-14,6 Q0,20 14,6" fill="none" stroke="#5D4037" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- BELLY LIGHTNING BOLT (small emblem) -->
+    <g transform="translate(0, 38) scale(0.5)">
+      <polygon points="0,-22 12,-22 3,-4 14,-4 -5,22 -1,2 -12,2"
+               fill="#FFF9C4" stroke="#FFB300" stroke-width="1.5" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <!-- ══════════ SNOW EFFECTS ══════════ -->
+  <!-- Layer 1: Large foreground snowflakes -->
+  <g fill="white" opacity="0.9">
+    <circle cx="68"  cy="42"  r="4"/>
+    <circle cx="155" cy="88"  r="3.5"/>
+    <circle cx="420" cy="55"  r="4"/>
+    <circle cx="345" cy="120" r="3"/>
+    <circle cx="90"  cy="200" r="3.5"/>
+    <circle cx="440" cy="230" r="4"/>
+    <circle cx="58"  cy="340" r="3"/>
+    <circle cx="130" cy="440" r="4"/>
+    <circle cx="390" cy="400" r="3.5"/>
+    <circle cx="460" cy="310" r="3"/>
+    <circle cx="75"  cy="470" r="3.5"/>
+    <circle cx="300" cy="460" r="4"/>
+    <circle cx="450" cy="450" r="3"/>
+  </g>
+
+  <!-- Layer 2: Medium snowflakes -->
+  <g fill="white" opacity="0.6" filter="url(#snowBlur)">
+    <circle cx="110" cy="65"  r="2.5"/>
+    <circle cx="250" cy="48"  r="2"/>
+    <circle cx="380" cy="82"  r="2.5"/>
+    <circle cx="48"  cy="140" r="2"/>
+    <circle cx="465" cy="155" r="2.5"/>
+    <circle cx="100" cy="280" r="2"/>
+    <circle cx="430" cy="355" r="2.5"/>
+    <circle cx="180" cy="390" r="2"/>
+    <circle cx="350" cy="470" r="2.5"/>
+    <circle cx="220" cy="480" r="2"/>
+    <circle cx="50"  cy="420" r="2.5"/>
+    <circle cx="470" cy="90"  r="2"/>
+    <circle cx="310" cy="50"  r="2.5"/>
+    <circle cx="195" cy="470" r="2"/>
+  </g>
+
+  <!-- Layer 3: Tiny distant snowflakes -->
+  <g fill="white" opacity="0.35" filter="url(#snowBlurFar)">
+    <circle cx="190" cy="30"  r="1.5"/>
+    <circle cx="330" cy="45"  r="1"/>
+    <circle cx="40"  cy="90"  r="1.5"/>
+    <circle cx="475" cy="70"  r="1"/>
+    <circle cx="280" cy="100" r="1.5"/>
+    <circle cx="55"  cy="250" r="1"/>
+    <circle cx="460" cy="190" r="1.5"/>
+    <circle cx="140" cy="350" r="1"/>
+    <circle cx="410" cy="280" r="1.5"/>
+    <circle cx="85"  cy="390" r="1"/>
+    <circle cx="240" cy="450" r="1.5"/>
+    <circle cx="370" cy="340" r="1"/>
+    <circle cx="490" cy="420" r="1.5"/>
+    <circle cx="165" cy="170" r="1"/>
+    <circle cx="355" cy="180" r="1.5"/>
+    <circle cx="420" cy="475" r="1"/>
+    <circle cx="270" cy="30"  r="1"/>
+    <circle cx="500" cy="260" r="1.5"/>
+    <circle cx="25"  cy="460" r="1"/>
+    <circle cx="320" cy="395" r="1.5"/>
+  </g>
+
+  <!-- Layer 4: Sparkle/crystal snowflakes (star shapes) -->
+  <g fill="white" opacity="0.7">
+    <!-- Snowflake star at top-left -->
+    <g transform="translate(95, 130)">
+      <line x1="0" y1="-5" x2="0" y2="5" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="-5" y1="0" x2="5" y2="0" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="-3.5" y1="-3.5" x2="3.5" y2="3.5" stroke="white" stroke-width="0.8" stroke-linecap="round"/>
+      <line x1="3.5" y1="-3.5" x2="-3.5" y2="3.5" stroke="white" stroke-width="0.8" stroke-linecap="round"/>
+    </g>
+    <!-- Snowflake star at top-right -->
+    <g transform="translate(400, 170)">
+      <line x1="0" y1="-4" x2="0" y2="4" stroke="white" stroke-width="1" stroke-linecap="round"/>
+      <line x1="-4" y1="0" x2="4" y2="0" stroke="white" stroke-width="1" stroke-linecap="round"/>
+      <line x1="-3" y1="-3" x2="3" y2="3" stroke="white" stroke-width="0.7" stroke-linecap="round"/>
+      <line x1="3" y1="-3" x2="-3" y2="3" stroke="white" stroke-width="0.7" stroke-linecap="round"/>
+    </g>
+    <!-- Snowflake star bottom-left -->
+    <g transform="translate(60, 400)">
+      <line x1="0" y1="-4.5" x2="0" y2="4.5" stroke="white" stroke-width="1" stroke-linecap="round"/>
+      <line x1="-4.5" y1="0" x2="4.5" y2="0" stroke="white" stroke-width="1" stroke-linecap="round"/>
+      <line x1="-3" y1="-3" x2="3" y2="3" stroke="white" stroke-width="0.7" stroke-linecap="round"/>
+      <line x1="3" y1="-3" x2="-3" y2="3" stroke="white" stroke-width="0.7" stroke-linecap="round"/>
+    </g>
+    <!-- Snowflake star bottom-right -->
+    <g transform="translate(440, 380)">
+      <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="white" stroke-width="0.9" stroke-linecap="round"/>
+      <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="white" stroke-width="0.9" stroke-linecap="round"/>
+      <line x1="-2.5" y1="-2.5" x2="2.5" y2="2.5" stroke="white" stroke-width="0.6" stroke-linecap="round"/>
+      <line x1="2.5" y1="-2.5" x2="-2.5" y2="2.5" stroke="white" stroke-width="0.6" stroke-linecap="round"/>
+    </g>
+  </g>
 </svg>
