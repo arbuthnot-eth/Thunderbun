@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 import type { PhotoBoothRPC } from "../bun/index";
 
 // Create RPC client
@@ -10,8 +10,8 @@ const rpc = Electroview.defineRPC<PhotoBoothRPC>({
 	},
 });
 
-// Initialize Electrobun with RPC
-const electrobun = new Electrobun.Electroview({ rpc });
+// Initialize ThunderBun with RPC
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 interface Photo {
 	id: string;
@@ -477,7 +477,7 @@ class PhotoBooth {
 
 		try {
 			const filename = `${photo.type}-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, "-")}.png`;
-			const result = await electrobun.rpc!.request.savePhoto({
+			const result = await thunderbun.rpc!.request.savePhoto({
 				dataUrl: photo.dataUrl,
 				filename: filename,
 			});

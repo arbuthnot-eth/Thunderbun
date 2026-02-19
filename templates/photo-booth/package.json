@@ -1,15 +1,15 @@
 {
-	"name": "electrobun-photo-booth",
+	"name": "thunderbun-photo-booth",
 	"version": "1.0.0",
-	"description": "A photo booth app demonstrating getUserMedia with Electrobun",
+	"description": "A photo booth app demonstrating getUserMedia with ThunderBun",
 	"scripts": {
-		"build": "electrobun build",
-		"dev": "electrobun dev",
+		"build": "thunderbun build",
+		"dev": "thunderbun dev",
 		"start": "bun run build && bun run dev",
-		"build:canary": "electrobun build --env=canary"
+		"build:canary": "thunderbun build --env=canary"
 	},
 	"dependencies": {
-		"electrobun": "latest"
+		"thunderbun": "latest"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

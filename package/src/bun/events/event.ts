@@ -1,4 +1,4 @@
-export default class ElectrobunEvent<DataType, ResponseType> {
+export default class ThunderBunEvent<DataType, ResponseType> {
 	// todo (yoav): make most of these readonly except for response
 	name: string;
 	data: DataType;

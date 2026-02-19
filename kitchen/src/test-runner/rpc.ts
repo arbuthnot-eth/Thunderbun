@@ -1,6 +1,6 @@
-import type { RPCSchema } from "electrobun";
+import type { RPCSchema } from "thunderbun";
 import type { TestResult } from "../test-framework/types";
-import type { UpdateStatusType, UpdateStatusEntry, UpdateStatusDetails } from "electrobun/bun";
+import type { UpdateStatusType, UpdateStatusEntry, UpdateStatusDetails } from "thunderbun/bun";
 
 export interface TestInfo {
   id: string;

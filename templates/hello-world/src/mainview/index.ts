@@ -1,1 +1,1 @@
-console.log("Hello Electrobun view loaded!");
+console.log("Hello ThunderBun view loaded!");

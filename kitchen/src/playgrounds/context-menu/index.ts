@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 
 interface MenuConfig {
   id: string;
@@ -127,7 +127,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 let currentMenuId = "menu1";
 
@@ -158,7 +158,7 @@ function showContextMenu(menuId: string) {
   const config = menuConfigs.find((c) => c.id === menuId);
   if (!config) return;
 
-  (electrobun.rpc as any)?.request.showContextMenu({ menu: config.menu });
+  (thunderbun.rpc as any)?.request.showContextMenu({ menu: config.menu });
   addLogEntry(`Showing: ${config.title}`);
 }
 
@@ -172,7 +172,7 @@ function setActiveButton(menuId: string) {
 document.addEventListener("DOMContentLoaded", () => {
   // Done button
   document.getElementById("doneBtn")?.addEventListener("click", () => {
-    (electrobun.rpc as any)?.request.closeWindow({});
+    (thunderbun.rpc as any)?.request.closeWindow({});
   });
 
   // Clear log button

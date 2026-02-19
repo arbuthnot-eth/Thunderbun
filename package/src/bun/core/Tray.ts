@@ -1,5 +1,5 @@
 import { ffi, type MenuItemConfig } from "../proc/native";
-import electrobunEventEmitter from "../events/eventEmitter";
+import thunderbunEventEmitter from "../events/eventEmitter";
 import { VIEWS_FOLDER } from "./Paths";
 import { join } from "path";
 import { type Pointer } from "bun:ffi";
@@ -84,7 +84,7 @@ export class Tray {
 
 	on(name: "tray-clicked", handler: (event: unknown) => void) {
 		const specificName = `${name}-${this.id}`;
-		electrobunEventEmitter.on(specificName, handler);
+		thunderbunEventEmitter.on(specificName, handler);
 	}
 
 	remove() {

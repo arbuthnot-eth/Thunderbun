@@ -3,9 +3,9 @@ import windowEvents from "./windowEvents";
 import webviewEvents from "./webviewEvents";
 import trayEvents from "./trayEvents";
 import applicationEvents from "./ApplicationEvents";
-import ElectrobunEvent from "./event";
+import ThunderBunEvent from "./event";
 
-class ElectrobunEventEmitter extends EventEmitter {
+class ThunderBunEventEmitter extends EventEmitter {
 	constructor() {
 		super();
 	}
@@ -14,13 +14,13 @@ class ElectrobunEventEmitter extends EventEmitter {
 	// eg: will-navigate is listened to globally for all webviews, but
 	// will-navigate-1 is listened to for a specific webview with id 1
 	emitEvent(
-		ElectrobunEvent: ElectrobunEvent<any, any>,
+		ThunderBunEvent: ThunderBunEvent<any, any>,
 		specifier?: number | string,
 	) {
 		if (specifier) {
-			this.emit(`${ElectrobunEvent.name}-${specifier}`, ElectrobunEvent);
+			this.emit(`${ThunderBunEvent.name}-${specifier}`, ThunderBunEvent);
 		} else {
-			this.emit(ElectrobunEvent.name, ElectrobunEvent);
+			this.emit(ThunderBunEvent.name, ThunderBunEvent);
 		}
 	}
 
@@ -40,6 +40,6 @@ class ElectrobunEventEmitter extends EventEmitter {
 	};
 }
 
-export const electrobunEventEmitter = new ElectrobunEventEmitter();
+export const thunderbunEventEmitter = new ThunderBunEventEmitter();
 
-export default electrobunEventEmitter;
+export default thunderbunEventEmitter;

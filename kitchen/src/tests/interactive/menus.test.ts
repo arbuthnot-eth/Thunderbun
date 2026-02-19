@@ -1,8 +1,8 @@
 // Interactive Menu Tests - Playgrounds for Application Menu and Context Menu
 
 import { defineTest } from "../../test-framework/types";
-import { ApplicationMenu, ContextMenu, BrowserView, BrowserWindow } from "electrobun/bun";
-import Electrobun from "electrobun/bun";
+import { ApplicationMenu, ContextMenu, BrowserView, BrowserWindow } from "thunderbun/bun";
+import ThunderBun from "thunderbun/bun";
 
 export const menuTests = [
   defineTest({
@@ -44,7 +44,7 @@ export const menuTests = [
             requests: {
               closeWindow: () => {
                 if (menuHandler) {
-                  Electrobun.events.off("application-menu-clicked", menuHandler);
+                  ThunderBun.events.off("application-menu-clicked", menuHandler);
                 }
                 winRef?.close();
                 return { success: true };
@@ -77,11 +77,11 @@ export const menuTests = [
             role: e.data.role,
           });
         };
-        Electrobun.events.on("application-menu-clicked", menuHandler);
+        ThunderBun.events.on("application-menu-clicked", menuHandler);
 
         win.on("close", () => {
           if (menuHandler) {
-            Electrobun.events.off("application-menu-clicked", menuHandler);
+            ThunderBun.events.off("application-menu-clicked", menuHandler);
           }
           log("Playground closed - test complete");
           resolve();
@@ -128,7 +128,7 @@ export const menuTests = [
             requests: {
               closeWindow: () => {
                 if (contextHandler) {
-                  Electrobun.events.off("context-menu-clicked", contextHandler);
+                  ThunderBun.events.off("context-menu-clicked", contextHandler);
                 }
                 winRef?.close();
                 return { success: true };
@@ -165,11 +165,11 @@ export const menuTests = [
             data: e.data.data,
           });
         };
-        Electrobun.events.on("context-menu-clicked", contextHandler);
+        ThunderBun.events.on("context-menu-clicked", contextHandler);
 
         win.on("close", () => {
           if (contextHandler) {
-            Electrobun.events.off("context-menu-clicked", contextHandler);
+            ThunderBun.events.off("context-menu-clicked", contextHandler);
           }
           log("Playground closed - test complete");
           resolve();

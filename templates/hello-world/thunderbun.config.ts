@@ -1,9 +1,9 @@
-import type { ElectrobunConfig } from "electrobun";
+import type { ThunderBunConfig } from "thunderbun";
 
 export default {
 	app: {
 		name: "hello-world",
-		identifier: "helloworld.electrobun.dev",
+		identifier: "helloworld.thunderbun.dev",
 		version: "0.0.1",
 	},
 	build: {
@@ -26,4 +26,4 @@ export default {
 			bundleCEF: false,
 		},
 	},
-} satisfies ElectrobunConfig;
+} satisfies ThunderBunConfig;

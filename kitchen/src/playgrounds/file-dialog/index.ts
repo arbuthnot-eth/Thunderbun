@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 
 // RPC setup - use long timeout since file dialogs can take a while
 const rpc = Electroview.defineRPC<any>({
@@ -9,7 +9,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 // DOM elements
 let startingFolderInput: HTMLInputElement;
@@ -44,7 +44,7 @@ function init() {
   // Setup event listeners
   openDialogBtn.addEventListener("click", openDialog);
   doneBtn.addEventListener("click", () => {
-    (electrobun.rpc as any)?.request.closeWindow({});
+    (thunderbun.rpc as any)?.request.closeWindow({});
   });
 
   // Setup preset buttons for folders
@@ -76,7 +76,7 @@ async function openDialog() {
   openDialogBtn.textContent = "Dialog Open...";
 
   try {
-    const result = await (electrobun.rpc as any)?.request.openFileDialog(options);
+    const result = await (thunderbun.rpc as any)?.request.openFileDialog(options);
 
     // Store in history
     resultHistory.unshift({

@@ -1,6 +1,6 @@
 # Photo Booth Template
 
-A cross-platform desktop photo booth application built with Electrobun. This template demonstrates how to use the getUserMedia API to access the user's camera, capture photos, and save them to disk.
+A cross-platform desktop photo booth application built with ThunderBun. This template demonstrates how to use the getUserMedia API to access the user's camera, capture photos, and save them to disk.
 
 ## Features
 
@@ -61,7 +61,7 @@ Photos are captured by drawing the current video frame to a canvas:
 4. Photo is stored in memory and displayed in the gallery
 
 ### File Saving
-The save functionality uses Electrobun's IPC to communicate between renderer and main process:
+The save functionality uses ThunderBun's IPC to communicate between renderer and main process:
 1. Renderer sends the photo data URL to main process
 2. Main process shows a native save dialog
 3. If user confirms, the base64 data is converted to a buffer and written to disk
@@ -105,4 +105,4 @@ This template uses modern web APIs that require:
 
 ## License
 
-This template is part of the Electrobun project and follows the same license terms.
+This template is part of the ThunderBun project and follows the same license terms.

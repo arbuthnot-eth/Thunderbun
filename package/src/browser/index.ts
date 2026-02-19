@@ -1,11 +1,11 @@
 import {
 	type RPCSchema,
 	type RPCTransport,
-	type ElectrobunRPCSchema,
-	type ElectrobunRPCConfig,
+	type ThunderBunRPCSchema,
+	type ThunderBunRPCConfig,
 	type RPCWithTransport,
 	createRPC,
-	defineElectrobunRPC,
+	defineThunderBunRPC,
 } from "../shared/rpc.js";
 import {
 	type WebviewTagElement,
@@ -13,8 +13,8 @@ import {
 } from "./webviewtag";
 import "./global.d.ts";
 
-const WEBVIEW_ID = window.__electrobunWebviewId;
-const RPC_SOCKET_PORT = window.__electrobunRpcSocketPort;
+const WEBVIEW_ID = window.__thunderbunWebviewId;
+const RPC_SOCKET_PORT = window.__thunderbunRpcSocketPort;
 
 class Electroview<T extends RPCWithTransport> {
 	bunSocket?: WebSocket;
@@ -32,7 +32,7 @@ class Electroview<T extends RPCWithTransport> {
 
 		// Set up handler for user RPC messages from bun
 		// Note: receiveInternalMessageFromBun is set up by the preload script
-		window.__electrobun!.receiveMessageFromBun =
+		window.__thunderbun!.receiveMessageFromBun =
 			this.receiveMessageFromBun.bind(this);
 
 		if (this.rpc) {
@@ -59,7 +59,7 @@ class Electroview<T extends RPCWithTransport> {
 				try {
 					const encryptedPacket = JSON.parse(message);
 
-					const decrypted = await window.__electrobun_decrypt(
+					const decrypted = await window.__thunderbun_decrypt(
 						encryptedPacket.encryptedData,
 						encryptedPacket.iv,
 						encryptedPacket.tag,
@@ -106,7 +106,7 @@ class Electroview<T extends RPCWithTransport> {
 		if (this.bunSocket?.readyState === WebSocket.OPEN) {
 			try {
 				const { encryptedData, iv, tag } =
-					await window.__electrobun_encrypt(msg);
+					await window.__thunderbun_encrypt(msg);
 
 				const encryptedPacket = {
 					encryptedData: encryptedData,
@@ -122,20 +122,20 @@ class Electroview<T extends RPCWithTransport> {
 		}
 
 		// if socket's are unavailable, fallback to postMessage
-		window.__electrobunBunBridge?.postMessage(msg);
+		window.__thunderbunBunBridge?.postMessage(msg);
 	}
 
 	receiveMessageFromBun(msg: unknown) {
-		// NOTE: in the webview messages are passed by executing ElectrobunView.receiveMessageFromBun(object)
+		// NOTE: in the webview messages are passed by executing ThunderBunView.receiveMessageFromBun(object)
 		// so they're already parsed into an object here
 		if (this.rpcHandler) {
 			this.rpcHandler(msg);
 		}
 	}
-	static defineRPC<Schema extends ElectrobunRPCSchema>(
-		config: ElectrobunRPCConfig<Schema, "webview">,
+	static defineRPC<Schema extends ThunderBunRPCSchema>(
+		config: ThunderBunRPCConfig<Schema, "webview">,
 	) {
-		return defineElectrobunRPC("webview", {
+		return defineThunderBunRPC("webview", {
 			...config,
 			extraRequestHandlers: {
 				evaluateJavascriptWithResponse: ({ script }: { script: string }) => {
@@ -169,16 +169,16 @@ class Electroview<T extends RPCWithTransport> {
 
 export {
 	type RPCSchema,
-	type ElectrobunRPCSchema,
-	type ElectrobunRPCConfig,
+	type ThunderBunRPCSchema,
+	type ThunderBunRPCConfig,
 	createRPC,
 	Electroview,
 	type WebviewTagElement,
 	type WebviewEventTypes,
 };
 
-const Electrobun = {
+const ThunderBun = {
 	Electroview,
 };
 
-export default Electrobun;
+export default ThunderBun;

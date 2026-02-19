@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 
 const rpc = Electroview.defineRPC<any>({
   maxRequestTime: 600000,
@@ -8,7 +8,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 // DOM elements
 let readBtn: HTMLButtonElement;
@@ -33,14 +33,14 @@ function init() {
   readBtn.addEventListener("click", readClipboard);
   writeBtn.addEventListener("click", writeClipboard);
   doneBtn.addEventListener("click", () => {
-    (electrobun.rpc as any)?.request.closeWindow({});
+    (thunderbun.rpc as any)?.request.closeWindow({});
   });
 }
 
 async function readClipboard() {
   try {
     addLog("Reading clipboard...");
-    const result = await (electrobun.rpc as any)?.request.readClipboard({});
+    const result = await (thunderbun.rpc as any)?.request.readClipboard({});
 
     if (result.text) {
       readResult.innerHTML = `<span class="clipboard-content">${escapeHtml(result.text)}</span>`;
@@ -71,7 +71,7 @@ async function writeClipboard() {
 
   try {
     addLog(`Writing: "${truncate(text, 50)}"...`);
-    await (electrobun.rpc as any)?.request.writeClipboard({ text });
+    await (thunderbun.rpc as any)?.request.writeClipboard({ text });
     writeStatus.className = "status-box success";
     writeStatus.textContent = "Text written to clipboard! Try pasting below.";
     addLog("Write successful", "success");

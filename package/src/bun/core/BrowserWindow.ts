@@ -1,5 +1,5 @@
 import { ffi } from "../proc/native";
-import electrobunEventEmitter from "../events/eventEmitter";
+import thunderbunEventEmitter from "../events/eventEmitter";
 import { BrowserView } from "./BrowserView";
 import { type Pointer } from "bun:ffi";
 import { BuildConfig } from "./BuildConfig";
@@ -39,14 +39,14 @@ export type WindowOptionsType<T = undefined> = {
 };
 
 const defaultOptions: WindowOptionsType = {
-	title: "Electrobun",
+	title: "ThunderBun",
 	frame: {
 		x: 0,
 		y: 0,
 		width: 800,
 		height: 600,
 	},
-	url: "https://electrobun.dev",
+	url: "https://thunderbun.dev",
 	html: null,
 	preload: null,
 	renderer: buildConfig.defaultRenderer,
@@ -61,7 +61,7 @@ export const BrowserWindowMap: {
 } = {};
 
 // Clean up the window map when a window closes and optionally quit the app
-electrobunEventEmitter.on("close", (event: { data: { id: number } }) => {
+thunderbunEventEmitter.on("close", (event: { data: { id: number } }) => {
 	delete BrowserWindowMap[event.data.id];
 
 	const exitOnLastWindowClosed =
@@ -75,7 +75,7 @@ electrobunEventEmitter.on("close", (event: { data: { id: number } }) => {
 export class BrowserWindow<T extends RPCWithTransport = RPCWithTransport> {
 	id: number = nextWindowId++;
 	ptr!: Pointer;
-	title: string = "Electrobun";
+	title: string = "ThunderBun";
 	state: "creating" | "created" = "creating";
 	url: string | null = null;
 	html: string | null = null;
@@ -303,6 +303,6 @@ export class BrowserWindow<T extends RPCWithTransport = RPCWithTransport> {
 	// name should only allow browserWindow events
 	on(name: string, handler: (event: unknown) => void) {
 		const specificName = `${name}-${this.id}`;
-		electrobunEventEmitter.on(specificName, handler);
+		thunderbunEventEmitter.on(specificName, handler);
 	}
 }

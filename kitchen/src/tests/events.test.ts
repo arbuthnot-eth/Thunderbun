@@ -1,7 +1,7 @@
 // Event System Tests
 
 import { defineTest, expect } from "../test-framework/types";
-import Electrobun, { Utils } from "electrobun/bun";
+import ThunderBun, { Utils } from "thunderbun/bun";
 
 export const eventsTests = [
   defineTest({
@@ -18,7 +18,7 @@ export const eventsTests = [
         _eventData = e.data;
       };
 
-      Electrobun.events.on("will-navigate", handler);
+      ThunderBun.events.on("will-navigate", handler);
 
       const win = await createWindow({
         url: "about:blank",
@@ -34,7 +34,7 @@ export const eventsTests = [
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Cleanup
-      Electrobun.events.off("will-navigate", handler);
+      ThunderBun.events.off("will-navigate", handler);
 
       expect(eventFired).toBe(true);
       log("Global will-navigate event fired");
@@ -228,14 +228,14 @@ export const eventsTests = [
         e.response = { allow: false };
       };
 
-      Electrobun.events.on("before-quit", handler);
+      ThunderBun.events.on("before-quit", handler);
 
       log("Calling Utils.quit() with before-quit handler that cancels");
       Utils.quit();
 
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      Electrobun.events.off("before-quit", handler);
+      ThunderBun.events.off("before-quit", handler);
 
       expect(beforeQuitFired).toBe(true);
       log("before-quit event fired and quit was cancelled");
@@ -253,7 +253,7 @@ export const eventsTests = [
         order.push("global");
       };
 
-      Electrobun.events.on("close", globalHandler);
+      ThunderBun.events.on("close", globalHandler);
 
       const win = await createWindow({
         html: "<html><body>Test</body></html>",
@@ -272,7 +272,7 @@ export const eventsTests = [
 
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      Electrobun.events.off("close", globalHandler);
+      ThunderBun.events.off("close", globalHandler);
 
       log(`Event order: ${order.join(", ")}`);
       expect(order[0]).toBe("specific");

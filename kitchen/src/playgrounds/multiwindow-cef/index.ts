@@ -1,4 +1,4 @@
-import { Electroview } from "electrobun/view";
+import { Electroview } from "thunderbun/view";
 
 const rpc = Electroview.defineRPC<any>({
   maxRequestTime: 600000,
@@ -13,7 +13,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electroview({ rpc });
+const thunderbun = new Electroview({ rpc });
 
 document.addEventListener("DOMContentLoaded", () => {
   // Mark window as created
@@ -28,8 +28,8 @@ document.addEventListener("DOMContentLoaded", () => {
     oopifStatus.classList.add("pending");
   }
 
-  // Listen for webview load using electrobun-webview's .on() method
-  const webview = document.querySelector("electrobun-webview") as any;
+  // Listen for webview load using thunderbun-webview's .on() method
+  const webview = document.querySelector("thunderbun-webview") as any;
   if (webview) {
     webview.on("dom-ready", () => {
       if (oopifStatus) {
@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
         oopifStatus.classList.add("success");
       }
       // Notify bun that this window's OOPIF loaded
-      (electrobun.rpc as any)?.send.oopifLoaded({});
+      (thunderbun.rpc as any)?.send.oopifLoaded({});
     });
   }
 });

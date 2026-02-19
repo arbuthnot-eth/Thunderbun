@@ -1,5 +1,5 @@
 // Drag Region Support for custom titlebars
-// Detects elements with CSS app-region: drag or .electrobun-webkit-app-region-drag class
+// Detects elements with CSS app-region: drag or .thunderbun-webkit-app-region-drag class
 
 import "./globals.d.ts";
 import { send } from "./internalRpc";
@@ -13,7 +13,7 @@ function isAppRegionDrag(e: MouseEvent): boolean {
 		'[style*="app-region"][style*="drag"]',
 	);
 	// Check for class-based drag region
-	const draggableByClass = target.closest(".electrobun-webkit-app-region-drag");
+	const draggableByClass = target.closest(".thunderbun-webkit-app-region-drag");
 
 	return !!(draggableByStyle || draggableByClass);
 }
@@ -21,13 +21,13 @@ function isAppRegionDrag(e: MouseEvent): boolean {
 export function initDragRegions() {
 	document.addEventListener("mousedown", (e) => {
 		if (isAppRegionDrag(e)) {
-			send("startWindowMove", { id: window.__electrobunWindowId });
+			send("startWindowMove", { id: window.__thunderbunWindowId });
 		}
 	});
 
 	document.addEventListener("mouseup", (e) => {
 		if (isAppRegionDrag(e)) {
-			send("stopWindowMove", { id: window.__electrobunWindowId });
+			send("stopWindowMove", { id: window.__thunderbunWindowId });
 		}
 	});
 }

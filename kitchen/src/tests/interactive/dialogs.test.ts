@@ -1,7 +1,7 @@
 // Interactive Dialog Tests - Require user interaction
 
 import { defineTest } from "../../test-framework/types";
-import { BrowserView, BrowserWindow, Utils } from "electrobun/bun";
+import { BrowserView, BrowserWindow, Utils } from "thunderbun/bun";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -141,13 +141,13 @@ export const dialogTests = [
     interactive: true,
     async run({ log, showInstructions }) {
       await showInstructions([
-        "This will open electrobun.dev in your browser",
+        "This will open thunderbun.dev in your browser",
         "Verify the browser opens correctly",
         "The test will auto-pass after attempting",
       ]);
 
-      log("Opening https://electrobun.dev in default browser");
-      const result = Utils.openExternal("https://electrobun.dev");
+      log("Opening https://thunderbun.dev in default browser");
+      const result = Utils.openExternal("https://thunderbun.dev");
       log(`openExternal returned: ${result}`);
 
       // Give time for browser to open
@@ -232,7 +232,7 @@ export const dialogTests = [
 
       log("Showing notification now");
       Utils.showNotification({
-        title: "Electrobun Test Notification",
+        title: "ThunderBun Test Notification",
         body: "This is a test notification from the kitchen sink",
         subtitle: "Interactive Test",
         silent: false, // Play sound so it's noticeable

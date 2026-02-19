@@ -1,5 +1,5 @@
 // Internal RPC System for webview tags, drag regions, etc.
-// Communicates with Bun via __electrobunInternalBridge
+// Communicates with Bun via __thunderbunInternalBridge
 
 import "./globals.d.ts";
 
@@ -23,7 +23,7 @@ function processQueue() {
 	isProcessingQueue = true;
 	const batch = JSON.stringify(sendQueue);
 	sendQueue.length = 0;
-	window.__electrobunInternalBridge?.postMessage(batch);
+	window.__thunderbunInternalBridge?.postMessage(batch);
 
 	// 2ms delay to work around Bun JSCallback threading issue
 	setTimeout(() => {
@@ -48,7 +48,7 @@ export function request(type: string, payload: unknown): Promise<unknown> {
 				method: type,
 				id,
 				params: payload,
-				hostWebviewId: window.__electrobunWebviewId,
+				hostWebviewId: window.__thunderbunWebviewId,
 			}),
 		);
 		processQueue();

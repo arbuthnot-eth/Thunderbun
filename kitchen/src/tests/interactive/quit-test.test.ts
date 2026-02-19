@@ -1,7 +1,7 @@
 // Interactive Quit/Shutdown Tests - Playground
 
 import { defineTest } from "../../test-framework/types";
-import Electrobun, { BrowserView, BrowserWindow, Utils } from "electrobun/bun";
+import ThunderBun, { BrowserView, BrowserWindow, Utils } from "thunderbun/bun";
 
 // Register the beforeQuit handler globally so it's active for all quit paths
 let beforeQuitRegistered = false;
@@ -11,7 +11,7 @@ function ensureBeforeQuitHandler() {
   if (beforeQuitRegistered) return;
   beforeQuitRegistered = true;
 
-  Electrobun.events.on("before-quit", (_event: any) => {
+  ThunderBun.events.on("before-quit", (_event: any) => {
     console.log("before-quit handler running");
     
     // Send message to the UI so the user can see it fired

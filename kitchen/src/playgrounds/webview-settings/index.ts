@@ -1,4 +1,4 @@
-import { Electroview } from "electrobun/view";
+import { Electroview } from "thunderbun/view";
 
 const rpc = Electroview.defineRPC<any>({
   maxRequestTime: 600000,
@@ -8,10 +8,10 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electroview({ rpc });
+const thunderbun = new Electroview({ rpc });
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("doneBtn")?.addEventListener("click", () => {
-    (electrobun.rpc as any)?.request.closeWindow({});
+    (thunderbun.rpc as any)?.request.closeWindow({});
   });
 });

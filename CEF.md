@@ -1,16 +1,16 @@
 # CEF Version Management
 
-Internal reference for how Electrobun manages CEF (Chromium Embedded Framework) versions, builds, and distribution.
+Internal reference for how ThunderBun manages CEF (Chromium Embedded Framework) versions, builds, and distribution.
 
 ## Tarball Layout
 
-Electrobun releases ship 3 tarballs per platform:
+ThunderBun releases ship 3 tarballs per platform:
 
 | Tarball | Contents | Source |
 |---------|----------|--------|
-| `electrobun-cli-*` | CLI binary | `bin/` |
-| `electrobun-core-*` | Platform binaries including `process_helper` | `dist/` (excluding `cef/` dir and files starting with "electrobun") |
-| `electrobun-cef-*` | CEF runtime files only (no electrobun code) | `dist/cef/` |
+| `thunderbun-cli-*` | CLI binary | `bin/` |
+| `thunderbun-core-*` | Platform binaries including `process_helper` | `dist/` (excluding `cef/` dir and files starting with "thunderbun") |
+| `thunderbun-cef-*` | CEF runtime files only (no thunderbun code) | `dist/cef/` |
 
 `process_helper` ships in the **core** tarball, not the CEF tarball. This means the CEF tarball contains only upstream CEF distribution files and can be swapped independently.
 
@@ -71,7 +71,7 @@ path: package/src/native/build/process_helper[.exe]
 
 ## Custom CEF Versions (End-User Flow)
 
-Developers using electrobun via npm can override the CEF version in their `electrobun.config.ts`:
+Developers using thunderbun via npm can override the CEF version in their `thunderbun.config.ts`:
 
 ```typescript
 export default {
@@ -79,7 +79,7 @@ export default {
     cefVersion: "145.0.1+gabcdef0+chromium-145.0.7600.50",
     // ...
   },
-} satisfies ElectrobunConfig;
+} satisfies ThunderBunConfig;
 ```
 
 When set, the CLI's `downloadAndExtractCustomCEF()` function:

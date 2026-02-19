@@ -1,4 +1,4 @@
-import ElectrobunEvent from "./event";
+import ThunderBunEvent from "./event";
 
 type IdData = { id: number };
 type ResizeData = {
@@ -11,9 +11,9 @@ type ResizeData = {
 type MoveData = { id: number; x: number; y: number };
 
 export default {
-	close: (data: IdData) => new ElectrobunEvent<IdData, {}>("close", data),
+	close: (data: IdData) => new ThunderBunEvent<IdData, {}>("close", data),
 	resize: (data: ResizeData) =>
-		new ElectrobunEvent<ResizeData, {}>("resize", data),
-	move: (data: MoveData) => new ElectrobunEvent<MoveData, {}>("move", data),
-	focus: (data: IdData) => new ElectrobunEvent<IdData, {}>("focus", data),
+		new ThunderBunEvent<ResizeData, {}>("resize", data),
+	move: (data: MoveData) => new ThunderBunEvent<MoveData, {}>("move", data),
+	focus: (data: IdData) => new ThunderBunEvent<IdData, {}>("focus", data),
 };

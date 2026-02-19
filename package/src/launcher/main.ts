@@ -198,7 +198,7 @@ function main() {
 
 		// Write to system temp directory with randomized filename for security
 		const systemTmpDir = tmpdir();
-		const randomFileName = `electrobun-${Date.now()}-${Math.random().toString(36).substring(7)}.js`;
+		const randomFileName = `thunderbun-${Date.now()}-${Math.random().toString(36).substring(7)}.js`;
 		appEntrypointPath = join(systemTmpDir, randomFileName);
 
 		// Prepend code to delete the temp file after a short delay

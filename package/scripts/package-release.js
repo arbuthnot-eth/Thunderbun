@@ -28,7 +28,7 @@ const platformName = platformMap[platform] || platform;
 // Always use x64 for Windows since we only build x64 Windows binaries
 const archName = platform === "win32" ? "x64" : archMap[arch] || arch;
 
-console.log(`Packaging Electrobun for ${platformName}-${archName}...`);
+console.log(`Packaging ThunderBun for ${platformName}-${archName}...`);
 
 // Build everything including CLI (no CI mode needed)
 console.log("Building full release...");
@@ -107,12 +107,12 @@ if (platform === "win32" && process.env.GITHUB_ACTIONS) {
 
 	// Set environment variable directly in the command for Windows
 	execSync(
-		`set "BUN_INSTALL_CACHE_DIR=${bunCacheDir}" && "${vendoredBun}" build src/cli/index.ts --compile ${compileTarget} --outfile bin/electrobun`,
+		`set "BUN_INSTALL_CACHE_DIR=${bunCacheDir}" && "${vendoredBun}" build src/cli/index.ts --compile ${compileTarget} --outfile bin/thunderbun`,
 		{ stdio: "inherit", shell: true },
 	);
 } else {
 	execSync(
-		`"${vendoredBun}" build src/cli/index.ts --compile ${compileTarget} --outfile bin/electrobun`,
+		`"${vendoredBun}" build src/cli/index.ts --compile ${compileTarget} --outfile bin/thunderbun`,
 		{ stdio: "inherit" },
 	);
 }
@@ -122,17 +122,17 @@ const distPath = path.join(__dirname, "..", "dist");
 const cliOutputFile = path.join(
 	__dirname,
 	"..",
-	`electrobun-cli-${platformName}-${archName}.tar.gz`,
+	`thunderbun-cli-${platformName}-${archName}.tar.gz`,
 );
 const coreOutputFile = path.join(
 	__dirname,
 	"..",
-	`electrobun-core-${platformName}-${archName}.tar.gz`,
+	`thunderbun-core-${platformName}-${archName}.tar.gz`,
 );
 const cefOutputFile = path.join(
 	__dirname,
 	"..",
-	`electrobun-cef-${platformName}-${archName}.tar.gz`,
+	`thunderbun-cef-${platformName}-${archName}.tar.gz`,
 );
 
 console.log(`Creating CLI tarball: ${cliOutputFile}`);
@@ -157,7 +157,7 @@ function createTarGz(tarGzPath, cwd, entries) {
 async function createTarballs() {
 	// Validate that we have platform-specific binaries, not just npm files
 	const expectedBinaries = [
-		platform === "win32" ? "electrobun.exe" : "electrobun",
+		platform === "win32" ? "thunderbun.exe" : "thunderbun",
 		platform === "win32" ? "bun.exe" : "bun",
 	];
 
@@ -185,7 +185,7 @@ async function createTarballs() {
 	const binPath = path.join(__dirname, "..", "bin");
 	const cliSrc = path.join(
 		binPath,
-		"electrobun" + (platform === "win32" ? ".exe" : ""),
+		"thunderbun" + (platform === "win32" ? ".exe" : ""),
 	);
 
 	if (fs.existsSync(cliSrc)) {
@@ -193,7 +193,7 @@ async function createTarballs() {
 
 		// Create CLI tarball directly from bin directory (system tar preserves permissions)
 		createTarGz(cliOutputFile, binPath, [
-			"electrobun" + (platform === "win32" ? ".exe" : ""),
+			"thunderbun" + (platform === "win32" ? ".exe" : ""),
 		]);
 
 		const cliStats = fs.statSync(cliOutputFile);
@@ -204,7 +204,7 @@ async function createTarballs() {
 	// 2. Create core binaries tarball (exclude CEF and CLI)
 	const coreFiles = fs
 		.readdirSync(distPath)
-		.filter((file) => file !== "cef" && !file.startsWith("electrobun"));
+		.filter((file) => file !== "cef" && !file.startsWith("thunderbun"));
 
 	if (coreFiles.length > 0) {
 		console.log(`Creating core binaries tarball: ${coreOutputFile}`);

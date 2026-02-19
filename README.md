@@ -1,117 +1,104 @@
-<p align="center">
-  <a href="https://electrobun.dev"><img src="https://github.com/blackboardsh/electrobun/assets/75102186/8799b522-0507-45e9-86e3-c3cfded1aa7c" alt="Logo" height=170></a>
-</p>
+# ThunderBun ⚡
 
-<h1 align="center">Electrobun</h1>
+**Build ultra-fast, tiny, Sui-native desktop, PWA & TWA apps with TypeScript.**
 
-<div align="center">
-  Get started with a template <br />
-  <code><strong>npx electrobun init</strong></code>   
-</div>
+ThunderBun is a fork of [Electrobun](https://github.com/blackboardsh/electrobun) supercharged for the Sui ecosystem — shipping native WaaP embedded wallets, SuiNS, Walrus, DeepBook, and Play Store TWA deployment out of the box.
 
+> ~120 KB bundle · No React · Vanilla TypeScript · Mobile-first
 
+---
 
-## What is Electrobun?
-
-Electrobun aims to be a complete **solution-in-a-box** for building, updating, and shipping ultra fast, tiny, and cross-platform desktop applications written in Typescript.
-Under the hood it uses <a href="https://bun.sh">bun</a> to execute the main process and to bundle webview typescript, and has native bindings written in <a href="https://ziglang.org/">zig</a>.
-
-Visit <a href="https://blackboard.sh/electrobun/">https://blackboard.sh/electrobun/</a> to see api documentation, guides, and more.
-
-**Project Goals**
-
-- Write typescript for the main process and webviews without having to think about it.
-- Isolation between main and webview processes with fast, typed, easy to implement RPC between them.
-- Small self-extracting app bundles ~12MB (when using system webview, most of this is the bun runtime)
-- Even smaller app updates as small as 14KB (using bsdiff it only downloads tiny patches between versions)
-- Provide everything you need in one tightly integrated workflow to start writing code in 5 minutes and distribute in 10.
-
-## Apps Built with Electrobun
-- [Audio TTS](https://github.com/blackboardsh/audio-tts) - desktop text-to-speech app using Qwen3-TTS for voice design, cloning, and generation
-- [Co(lab)](https://blackboard.sh/colab/) - a hybrid web browser + code editor for deep work
-
-### Video Demos
-
-[![Audio TTS Demo](https://img.youtube.com/vi/Z4dNK1d6l6E/maxresdefault.jpg)](https://www.youtube.com/watch?v=Z4dNK1d6l6E)
-
-[![Co(lab) Demo](https://img.youtube.com/vi/WWTCqGmE86w/maxresdefault.jpg)](https://www.youtube.com/watch?v=WWTCqGmE86w)
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=blackboardsh/electrobun&type=date&legend=top-left&cache=1)](https://www.star-history.com/#blackboardsh/electrobun&type=date&legend=top-left)
-
-## Contributing
-Ways to get involved:
-
-- Follow us on X for updates <a href="https://twitter.com/BlackboardTech">@BlackboardTech</a> or <a href="https://bsky.app/profile/yoav.codes">@yoav.codes</a>
-- Join the conversation on <a href="https://discord.gg/ueKE4tjaCE">Discord</a>
-- Create and participate in Github issues and discussions
-- Let me know what you're building with Electrobun
-
-## Development Setup
-Building apps with Electrobun is as easy as updating your package.json dependencies with `npm add electrobun` or try one of our templates via `npx electrobun init`.
-
-**This section is for building Electrobun from source locally in order to contribute fixes to it.**
-
-### Prerequisites
-
-**macOS:**
-- Xcode command line tools
-- cmake (install via homebrew: `brew install cmake`)
-
-**Windows:**
-- Visual Studio Build Tools or Visual Studio with C++ development tools
-- cmake
-
-**Linux:**
-- build-essential package
-- cmake
-- webkit2gtk and GTK development packages
-
-On Ubuntu/Debian based distros: `sudo apt install build-essential cmake pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev`
-
-### First-time Setup
+## Quick Start
 
 ```bash
-git clone --recurse-submodules https://github.com/blackboardsh/electrobun.git
-cd electrobun/package
+# Scaffold a Sui TWA (mobile-first, Play Store ready)
+npx thunderbun init --template sui-twa
+
+cd my-sui-twa-app
 bun install
-bun dev:clean
+bun run dev       # Opens at localhost:5173
 ```
-
-### Development Workflow
 
 ```bash
-# All commands are run from the /package directory
-cd electrobun/package
-
-# After making changes to source code
-bun dev
-
-# If you only changed kitchen sink code (not electrobun source)
-bun dev:rerun
-
-# If you need a completely fresh start
-bun dev:clean
+# Scaffold a desktop app
+npx thunderbun init --template hello-world
 ```
 
-### Additional Commands
+---
 
-All commands are run from the `/package` directory:
+## Templates
 
-- `bun dev:canary` - Build and run kitchen sink in canary mode
-- `bun build:dev` - Build electrobun in development mode
-- `bun build:release` - Build electrobun in release mode
+| Template | Description |
+|----------|-------------|
+| `sui-twa` | Vanilla TS · Vite · TailwindCSS · WaaP wallet · PWA/TWA → Play Store |
+| `hello-world` | Minimal ThunderBun desktop app |
+| `react-tailwind-vite` | React + Tailwind desktop app |
+| `photo-booth` | Camera + native APIs demo |
+| `multitab-browser` | Multi-window browser demo |
 
-### Debugging
+---
 
-**macOS:** Use `lldb <path-to-bundle>/Contents/MacOS/launcher` and then `run` to debug release builds
+## Sui Ecosystem Included (sui-twa)
+
+- **WaaP** — Embedded wallet from [docs.waap.xyz](https://docs.waap.xyz)
+- **SuiNS** — Human-readable names
+- **Walrus** — Decentralized storage
+- **DeepBook** — On-chain order book
+- **Ika** — Multi-party computation
+- **Seal** — Threshold encryption
+- **MVR** — Move package registry
+- **TradePort** — NFT marketplace SDK
+- **Sponsored gas** — Gasless transactions via Shinami/zkLogin
+
+---
+
+## TWA → Play Store (5 minutes)
+
+```bash
+cd my-sui-twa-app
+bun run build
+# Deploy dist/ to Vercel/Netlify → https://your-app.vercel.app
+
+bun run twa:init   # bubblewrap wizard
+bun run twa:build  # outputs app-release.aab
+# Upload .aab to Google Play Console
+```
+
+**Prerequisites:** Java 17+ · `npm i -g @bubblewrap/cli`
+
+---
 
 ## Platform Support
 
-| OS | Status |
-|---|---|
-| macOS 14+ | Official |
-| Windows 11+ | Official |
-| Ubuntu 22.04+ | Official |
-| Other Linux distros (gtk3, webkit2gtk-4.1) | Community |
+| Platform | Status |
+|----------|--------|
+| macOS 14+ | ✅ Desktop |
+| Windows 11+ | ✅ Desktop |
+| Ubuntu 22.04+ | ✅ Desktop |
+| Android (TWA) | ✅ Play Store via bubblewrap |
+| iOS (PWA) | ✅ Add to Home Screen |
+| Web | ✅ Any browser |
+
+---
+
+## Development (package)
+
+```bash
+cd package
+bun install
+bun build:dev
+bun build:cli
+```
+
+---
+
+## Links
+
+- [WaaP Docs](https://docs.waap.xyz)
+- [Sui Developer Portal](https://sui.io/developers)
+- [Bubblewrap CLI](https://github.com/GoogleChromeLabs/bubblewrap)
+- [Original Electrobun](https://github.com/blackboardsh/electrobun)
+
+---
+
+MIT License · ThunderBun Team

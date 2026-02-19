@@ -1,16 +1,16 @@
-// Electrobun Full Preload Script (for trusted webviews)
+// ThunderBun Full Preload Script (for trusted webviews)
 // This is compiled to JS and injected into webviews that are NOT sandboxed
 //
 // Includes: RPC, encryption, drag regions, webview tags, lifecycle events
 //
 // Before this script runs, the following must be set:
-// - window.__electrobunWebviewId
-// - window.__electrobunWindowId
-// - window.__electrobunRpcSocketPort
-// - window.__electrobunSecretKeyBytes
-// - window.__electrobunEventBridge (event emission - all webviews)
-// - window.__electrobunInternalBridge (internal RPC - trusted only)
-// - window.__electrobunBunBridge (user RPC - trusted only)
+// - window.__thunderbunWebviewId
+// - window.__thunderbunWindowId
+// - window.__thunderbunRpcSocketPort
+// - window.__thunderbunSecretKeyBytes
+// - window.__thunderbunEventBridge (event emission - all webviews)
+// - window.__thunderbunInternalBridge (internal RPC - trusted only)
+// - window.__thunderbunBunBridge (user RPC - trusted only)
 
 import "./globals.d.ts";
 import { initEncryption } from "./encryption";
@@ -36,8 +36,8 @@ const internalMessageHandler = (msg: unknown) => {
 	handleResponse(msg as { type: string; id: string; success: boolean; payload: unknown });
 };
 
-if (!window.__electrobun) {
-	window.__electrobun = {
+if (!window.__thunderbun) {
+	window.__thunderbun = {
 		receiveInternalMessageFromBun: internalMessageHandler,
 		receiveMessageFromBun: (msg: unknown) => {
 			// Default handler for user RPC - will be overridden if user creates Electroview
@@ -45,14 +45,14 @@ if (!window.__electrobun) {
 		},
 	};
 } else {
-	window.__electrobun.receiveInternalMessageFromBun = internalMessageHandler;
-	window.__electrobun.receiveMessageFromBun = (msg: unknown) => {
+	window.__thunderbun.receiveInternalMessageFromBun = internalMessageHandler;
+	window.__thunderbun.receiveMessageFromBun = (msg: unknown) => {
 		console.log("receiveMessageFromBun (no handler):", msg);
 	};
 }
 
 // Allow preload scripts to send custom messages to the host webview
-window.__electrobunSendToHost = (message: unknown) => {
+window.__thunderbunSendToHost = (message: unknown) => {
 	emitWebviewEvent("host-message", JSON.stringify(message));
 };
 

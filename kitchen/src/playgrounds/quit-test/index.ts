@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 
 const rpc = Electroview.defineRPC<any>({
   maxRequestTime: 600000,
@@ -8,7 +8,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 let eventLogEl: HTMLElement;
 
@@ -36,13 +36,13 @@ function init() {
   eventLogEl = document.getElementById("eventLog") as HTMLElement;
 
   document.getElementById("doneBtn")?.addEventListener("click", () => {
-    (electrobun.rpc as any)?.request.closeWindow({});
+    (thunderbun.rpc as any)?.request.closeWindow({});
   });
 
   document.getElementById("utilsQuitBtn")?.addEventListener("click", async () => {
     addLog("Requesting Utils.quit()...", "info");
     try {
-      await (electrobun.rpc as any)?.request.triggerQuit({ mode: "utils-quit" });
+      await (thunderbun.rpc as any)?.request.triggerQuit({ mode: "utils-quit" });
     } catch {
       addLog("RPC failed (app may have quit)", "info");
     }
@@ -51,7 +51,7 @@ function init() {
   document.getElementById("processExitBtn")?.addEventListener("click", async () => {
     addLog("Requesting process.exit(0)...", "info");
     try {
-      await (electrobun.rpc as any)?.request.triggerQuit({ mode: "process-exit" });
+      await (thunderbun.rpc as any)?.request.triggerQuit({ mode: "process-exit" });
     } catch {
       addLog("RPC failed (app may have quit)", "info");
     }
@@ -63,11 +63,11 @@ function init() {
 }
 
 // Listen for messages from bun (beforeQuit handler sends these)
-(electrobun.rpc as any)?.addMessageListener("beforeQuitFired", (data: { message: string }) => {
+(thunderbun.rpc as any)?.addMessageListener("beforeQuitFired", (data: { message: string }) => {
   addLog(data.message, "success");
 });
 
-(electrobun.rpc as any)?.addMessageListener("beforeQuitDone", (data: { message: string }) => {
+(thunderbun.rpc as any)?.addMessageListener("beforeQuitDone", (data: { message: string }) => {
   addLog(data.message, "success");
 });
 

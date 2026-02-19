@@ -995,8 +995,8 @@ rmdir /s /q "${extractionDirWin}" 2>nul
 :: Launch the new app
 start "" "${launcherPathWin}"
 
-:: Clean up scheduled tasks starting with ElectrobunUpdate_
-for /f "tokens=1" %%t in ('schtasks /query /fo list ^| findstr /i "ElectrobunUpdate_"') do (
+:: Clean up scheduled tasks starting with ThunderBunUpdate_
+for /f "tokens=1" %%t in ('schtasks /query /fo list ^| findstr /i "ThunderBunUpdate_"') do (
     schtasks /delete /tn "%%t" /f >nul 2>&1
 )
 
@@ -1010,7 +1010,7 @@ del "%~f0"
 						// Use Windows Task Scheduler to run the update script independently
 						// This ensures the script runs even after the app exits
 						const scriptPathWin = updateScriptPath.replace(/\//g, "\\");
-						const taskName = `ElectrobunUpdate_${Date.now()}`;
+						const taskName = `ThunderBunUpdate_${Date.now()}`;
 
 						// Create a scheduled task that runs immediately and deletes itself
 						execSync(

@@ -1,11 +1,11 @@
-import type { ElectrobunConfig } from "electrobun";
+import type { ThunderBunConfig } from "thunderbun";
 
 export default {
 	app: {
-		name: "Electrobun Kitchen Sink",
-		identifier: "sh.blackboard.electrobun-kitchen",
+		name: "ThunderBun Kitchen Sink",
+		identifier: "dev.thunderbun.kitchen",
 		version: "1.13.1-beta.0",
-		urlSchemes: ["electrobun-playground"],
+		urlSchemes: ["thunderbun-playground"],
 	},
 	runtime: {
 		// exitOnLastWindowClosed: false,
@@ -113,10 +113,10 @@ export default {
 				"views/playgrounds/webviewtag/index.html",
 			"src/playgrounds/webviewtag/host-message-test.html":
 				"views/playgrounds/webviewtag/host-message-test.html",
-			"src/playgrounds/webviewtag/electrobun.png":
-				"views/playgrounds/webviewtag/electrobun.png",
-			"assets/electrobun-logo-32-template.png":
-				"views/assets/electrobun-logo-32-template.png",
+			"src/playgrounds/webviewtag/thunderbun.png":
+				"views/playgrounds/webviewtag/thunderbun.png",
+			"assets/thunderbun-logo-32-template.png":
+				"views/assets/thunderbun-logo-32-template.png",
 			"src/playgrounds/window-events/index.html":
 				"views/playgrounds/window-events/index.html",
 			"src/playgrounds/custom-titlebar/index.html":
@@ -168,7 +168,7 @@ export default {
 		postBuild: "./buildScript.ts",
 	},
 	release: {
-		baseUrl: "https://electrobun-kitchen.blackboard.sh/",
+		baseUrl: "https://thunderbun-kitchen.thunderbun.dev/",
 		generatePatch: true,
 	},
-} satisfies ElectrobunConfig;
+} satisfies ThunderBunConfig;

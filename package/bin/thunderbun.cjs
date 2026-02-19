@@ -29,9 +29,9 @@ const arch = platform === 'win' ? 'x64' : getArch();
 const binExt = platform === 'win' ? '.exe' : '';
 
 // Paths
-const electrobunDir = join(__dirname, '..');
-const cacheDir = join(electrobunDir, '.cache');
-const cliBinary = join(cacheDir, `electrobun${binExt}`);
+const thunderbunDir = join(__dirname, '..');
+const cacheDir = join(thunderbunDir, '.cache');
+const cliBinary = join(cacheDir, `thunderbun${binExt}`);
 
 async function downloadFile(url, filePath) {
   return new Promise((resolve, reject) => {
@@ -63,7 +63,7 @@ async function downloadFile(url, filePath) {
 
 async function ensureCliBinary() {
   // Check if CLI binary exists in bin location (where npm expects it)
-  const binLocation = join(electrobunDir, 'bin', 'electrobun' + binExt);
+  const binLocation = join(thunderbunDir, 'bin', 'thunderbun' + binExt);
   if (existsSync(binLocation)) {
     return binLocation;
   }
@@ -79,15 +79,15 @@ async function ensureCliBinary() {
     return binLocation;
   }
 
-  console.log('Downloading electrobun CLI for your platform...');
+  console.log('Downloading thunderbun CLI for your platform...');
 
   // Get the package version to download the matching release
-  const packageJson = require(join(electrobunDir, 'package.json'));
+  const packageJson = require(join(thunderbunDir, 'package.json'));
   const version = packageJson.version;
   const tag = `v${version}`;
 
-  const tarballUrl = `https://github.com/blackboardsh/electrobun/releases/download/${tag}/electrobun-cli-${platform}-${arch}.tar.gz`;
-  const tarballPath = join(cacheDir, `electrobun-${platform}-${arch}.tar.gz`);
+  const tarballUrl = `https://github.com/arbuthnot-eth/thunderbun/releases/download/${tag}/thunderbun-cli-${platform}-${arch}.tar.gz`;
+  const tarballPath = join(cacheDir, `thunderbun-${platform}-${arch}.tar.gz`);
 
   try {
     // Download tarball
@@ -118,11 +118,11 @@ async function ensureCliBinary() {
       chmodSync(binLocation, '755');
     }
 
-    console.log('electrobun CLI downloaded successfully!');
+    console.log('thunderbun CLI downloaded successfully!');
     return binLocation;
 
   } catch (error) {
-    throw new Error(`Failed to download electrobun CLI: ${error.message}`);
+    throw new Error(`Failed to download thunderbun CLI: ${error.message}`);
   }
 }
 
@@ -142,7 +142,7 @@ async function main() {
     });
 
     child.on('error', (error) => {
-      console.error('Failed to start electrobun CLI:', error.message);
+      console.error('Failed to start thunderbun CLI:', error.message);
       process.exit(1);
     });
 

@@ -1,4 +1,4 @@
-# Electrobun Beta Releases
+# ThunderBun Beta Releases
 
 ## For Users
 
@@ -6,23 +6,23 @@
 
 ```bash
 # Install latest beta
-npm install electrobun@beta
+npm install thunderbun@beta
 
 # Install specific beta version
-npm install electrobun@0.0.19-beta.1
+npm install thunderbun@0.0.19-beta.1
 
 # View available versions
-npm view electrobun versions --json
+npm view thunderbun versions --json
 ```
 
 ### Switching Between Stable and Beta
 
 ```bash
 # Switch to stable
-npm install electrobun@latest
+npm install thunderbun@latest
 
 # Switch to beta
-npm install electrobun@beta
+npm install thunderbun@beta
 ```
 
 ## For Maintainers

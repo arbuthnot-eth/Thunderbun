@@ -1,13 +1,13 @@
 {
     "scripts": {        
-        "start": "electrobun dev",
-        "build:dev": "electrobun build",
-        "build:canary": "electrobun build --env=canary",
-        "build:stable": "electrobun build --env=stable",
-        "start:canary": "electrobun dev --env=canary"
+        "start": "thunderbun dev",
+        "build:dev": "thunderbun build",
+        "build:canary": "thunderbun build --env=canary",
+        "build:stable": "thunderbun build --env=stable",
+        "start:canary": "thunderbun dev --env=canary"
     },
     "dependencies": {
-        "electrobun": "file:../package"
+        "thunderbun": "file:../package"
     },
     "devDependencies": {
         "typescript": "^5.9.3"

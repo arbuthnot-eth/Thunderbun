@@ -2,7 +2,7 @@
 // Sandbox mode disables RPC and only allows event emission for untrusted content
 
 import { defineTest, expect } from "../test-framework/types";
-import { BrowserView } from "electrobun/bun";
+import { BrowserView } from "thunderbun/bun";
 import type { TestHarnessRPC } from "../test-harness/index";
 
 // Create RPC config for test harness (same as rpc.test.ts)

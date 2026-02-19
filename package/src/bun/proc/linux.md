@@ -30,7 +30,7 @@ After installation and restart, system tray icons should appear in your top pane
 
 ### Note for Application Developers
 
-When distributing Electrobun applications that use system tray:
+When distributing ThunderBun applications that use system tray:
 - Document the system tray requirements for GNOME users
 - Consider providing alternative UI access to tray functionality
 - The tray implementation gracefully handles environments where system tray is unavailable

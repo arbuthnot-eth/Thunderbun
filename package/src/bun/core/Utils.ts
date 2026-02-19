@@ -1,5 +1,5 @@
 import { ffi, native } from "../proc/native";
-import { electrobunEventEmitter } from "../events/eventEmitter";
+import { thunderbunEventEmitter } from "../events/eventEmitter";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
@@ -117,8 +117,8 @@ export const quit = () => {
 	if (isQuitting) return;
 	isQuitting = true;
 
-	const beforeQuitEvent = electrobunEventEmitter.events.app.beforeQuit({});
-	electrobunEventEmitter.emitEvent(beforeQuitEvent);
+	const beforeQuitEvent = thunderbunEventEmitter.events.app.beforeQuit({});
+	thunderbunEventEmitter.emitEvent(beforeQuitEvent);
 
 	if (
 		beforeQuitEvent.responseWasSet &&

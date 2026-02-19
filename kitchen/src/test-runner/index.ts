@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 import type { TestRunnerRPC, TestInfo, UpdateInfo, UpdateStatusEntry } from "./rpc";
 import type { TestResult, TestStatus } from "../test-framework/types";
 
@@ -49,7 +49,7 @@ const rpc = Electroview.defineRPC<TestRunnerRPC>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 // State
 let tests: TestInfo[] = [];
@@ -154,13 +154,13 @@ async function loadTests(retries = 10): Promise<void> {
 
   for (let i = 0; i < retries; i++) {
     try {
-      if (!electrobun.rpc) {
+      if (!thunderbun.rpc) {
         console.log(`RPC not ready yet, retrying in 500ms (attempt ${i + 1}/${retries})...`);
         await new Promise(resolve => setTimeout(resolve, 500));
         continue;
       }
 
-      const response = await electrobun.rpc.request.getTests({});
+      const response = await thunderbun.rpc.request.getTests({});
       if (response && response.length > 0) {
         tests = response;
         console.log(`Loaded ${tests.length} tests`);
@@ -222,7 +222,7 @@ async function runSingleTest(testId: string) {
 
   try {
     console.log(`Running test: ${test.name}`);
-    await electrobun.rpc?.request.runTest({ testId });
+    await thunderbun.rpc?.request.runTest({ testId });
   } catch (err) {
     console.error(`Failed to run test ${testId}:`, err);
   } finally {
@@ -316,7 +316,7 @@ async function runAllAutomated() {
   renderTests();
 
   try {
-    await electrobun.rpc?.request.runAllAutomated({});
+    await thunderbun.rpc?.request.runAllAutomated({});
   } catch (err) {
     console.error('Failed to run tests:', err);
   } finally {
@@ -328,7 +328,7 @@ async function runInteractiveTests() {
   setButtonsEnabled(false);
 
   try {
-    await electrobun.rpc?.request.runInteractiveTests({});
+    await thunderbun.rpc?.request.runInteractiveTests({});
   } catch (err) {
     console.error('Failed to run interactive tests:', err);
   } finally {
@@ -405,7 +405,7 @@ async function submitReady() {
   if (!currentInteractiveTestId) return;
 
   try {
-    await electrobun.rpc?.request.submitReady({
+    await thunderbun.rpc?.request.submitReady({
       testId: currentInteractiveTestId,
     });
   } catch (err) {
@@ -421,7 +421,7 @@ async function submitVerification(action: 'pass' | 'fail' | 'retest') {
   const notes = notesInput.value.trim() || undefined;
 
   try {
-    await electrobun.rpc?.request.submitVerification({
+    await thunderbun.rpc?.request.submitVerification({
       testId: currentInteractiveTestId,
       action,
       notes,
@@ -534,7 +534,7 @@ function updateUpdateUI(info: UpdateInfo) {
 
 async function applyUpdate() {
   try {
-    await electrobun.rpc?.request.applyUpdate({});
+    await thunderbun.rpc?.request.applyUpdate({});
   } catch (err) {
     console.error('Failed to apply update:', err);
   }
@@ -549,7 +549,7 @@ async function toggleHistoryPanel() {
     historyToggle.textContent = 'Hide History';
     // Load existing history
     try {
-      const history = await electrobun.rpc?.request.getUpdateStatusHistory({});
+      const history = await thunderbun.rpc?.request.getUpdateStatusHistory({});
       if (history) {
         historyList.innerHTML = '';
         for (const entry of history) {
@@ -567,7 +567,7 @@ async function toggleHistoryPanel() {
 
 async function clearStatusHistory() {
   try {
-    await electrobun.rpc?.request.clearUpdateStatusHistory({});
+    await thunderbun.rpc?.request.clearUpdateStatusHistory({});
     historyList.innerHTML = '';
   } catch (err) {
     console.error('Failed to clear status history:', err);

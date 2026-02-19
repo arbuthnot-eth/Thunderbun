@@ -1,6 +1,6 @@
 # Multitab Browser
 
-A demonstration of building a multi-tab browser using Electrobun framework.
+A demonstration of building a multi-tab browser using ThunderBun framework.
 
 ## Features
 

@@ -1,10 +1,10 @@
 # Build System
 
-This document describes Electrobun's build system and cross-platform compilation approach.
+This document describes ThunderBun's build system and cross-platform compilation approach.
 
 ## Overview
 
-Electrobun uses a custom build system (`build.ts`) that handles:
+ThunderBun uses a custom build system (`build.ts`) that handles:
 - Vendoring dependencies (Bun, Zig, CEF, WebView2)
 - Building native wrappers for each platform
 - Creating distribution packages
@@ -28,13 +28,13 @@ Electrobun uses a custom build system (`build.ts`) that handles:
 - Size: ~1.46MB
 - Dependencies: WebKitGTK, GTK+3, AppIndicator only
 - No CEF dependencies linked
-- Used when `bundleCEF: false` in electrobun.config
+- Used when `bundleCEF: false` in thunderbun.config
 
 #### `libNativeWrapper_cef.so` (CEF-enabled)  
 - Size: ~3.47MB
 - Dependencies: WebKitGTK, GTK+3, AppIndicator + CEF libraries
 - Full CEF functionality available
-- Used when `bundleCEF: true` in electrobun.config
+- Used when `bundleCEF: true` in thunderbun.config
 
 #### Why Dual Binaries?
 
@@ -46,7 +46,7 @@ Unlike macOS and Windows, Linux doesn't have reliable weak linking for shared li
 
 #### CLI Binary Selection
 
-The Electrobun CLI automatically copies the appropriate binary based on the `bundleCEF` setting:
+The ThunderBun CLI automatically copies the appropriate binary based on the `bundleCEF` setting:
 
 ```typescript
 const useCEF = config.build.linux?.bundleCEF;
@@ -55,14 +55,14 @@ const nativeWrapperSource = useCEF
   : PATHS.NATIVE_WRAPPER_LINUX;
 ```
 
-Both binaries are included in the distributed `electrobun` npm package, ensuring developers can toggle CEF support without recompilation.
+Both binaries are included in the distributed `thunderbun` npm package, ensuring developers can toggle CEF support without recompilation.
 
 ## Build Commands
 
 All commands are run from the `/package` directory:
 
 ```bash
-cd electrobun/package
+cd thunderbun/package
 
 # Full build with all platforms
 bun build.ts

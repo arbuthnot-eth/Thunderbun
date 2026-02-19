@@ -575,10 +575,10 @@ async function copyToDist() {
 		}
 		console.log(`launcher${binExt} copied successfully to ${launcherPath}`);
 	}
-	// Electrobun cli and npm launcher
+	// ThunderBun cli and npm launcher
 	await $`cp src/npmbin/index.js dist/npmbin.js`;
-	await $`cp src/cli/build/electrobun${binExt} dist/electrobun${binExt}`;
-	// Electrobun's Typescript bun and browser apis
+	await $`cp src/cli/build/thunderbun${binExt} dist/thunderbun${binExt}`;
+	// ThunderBun's Typescript bun and browser apis
 	await copyApiFiles();
 	// Native code and frameworks
 	if (OS === "macos") {
@@ -894,7 +894,7 @@ async function vendorBsdiff() {
 	const bsdiffPlatform = bsdiffPlatformMap[OS];
 	const bsdiffArch = ARCH;
 
-	const tarballUrl = `https://github.com/blackboardsh/zig-bsdiff/releases/download/v${BSDIFF_VERSION}/zig-bsdiff-${bsdiffPlatform}-${bsdiffArch}.tar.gz`;
+	const tarballUrl = `https://github.com/arbuthnot-eth/zig-bsdiff/releases/download/v${BSDIFF_VERSION}/zig-bsdiff-${bsdiffPlatform}-${bsdiffArch}.tar.gz`;
 	const tempTarball = join("vendors", `zig-bsdiff-temp.tar.gz`);
 
 	try {
@@ -962,7 +962,7 @@ async function vendorZstd() {
 
 	try {
 		await $`mkdir -p vendors/zig-zstd`;
-		const tarballUrl = `https://github.com/blackboardsh/zig-zstd/releases/download/v${ZSTD_VERSION}/zig-zstd-${zstdPlatform}-${zstdArch}.tar.gz`;
+		const tarballUrl = `https://github.com/arbuthnot-eth/zig-zstd/releases/download/v${ZSTD_VERSION}/zig-zstd-${zstdPlatform}-${zstdArch}.tar.gz`;
 		console.log(`Downloading zig-zstd from: ${tarballUrl}`);
 		await $`rm -f "${tempTarball}"`;
 		const githubToken =
@@ -1038,7 +1038,7 @@ async function vendorAsar() {
 			`Downloading zig-asar binaries for ${asarPlatform}-${targetArch}...`,
 		);
 
-		const tarballUrl = `https://github.com/blackboardsh/zig-asar/releases/download/v${ASAR_VERSION}/zig-asar-${asarPlatform}-${targetArch}.tar.gz`;
+		const tarballUrl = `https://github.com/arbuthnot-eth/zig-asar/releases/download/v${ASAR_VERSION}/zig-asar-${asarPlatform}-${targetArch}.tar.gz`;
 		const tempTarball = join("vendors", `zig-asar-temp-${targetArch}.tar.gz`);
 
 		try {
@@ -1884,13 +1884,13 @@ async function buildSelfExtractor() {
 }
 
 async function buildCli() {
-	// await $`bun build src/cli/index.ts --compile --outfile src/cli/build/electrobun`;
+	// await $`bun build src/cli/index.ts --compile --outfile src/cli/build/thunderbun`;
 
 	const compileTarget =
 		process.platform === "win32" ? "--target=bun-windows-x64-baseline" : "";
 
 	// Use vendored Bun for building CLI to ensure consistency with CI and proper code signing
-	await $`BUN_INSTALL_CACHE_DIR=/tmp/bun-cache ${PATH.bun.RUNTIME} build src/cli/index.ts --compile ${compileTarget} --outfile src/cli/build/electrobun`;
+	await $`BUN_INSTALL_CACHE_DIR=/tmp/bun-cache ${PATH.bun.RUNTIME} build src/cli/index.ts --compile ${compileTarget} --outfile src/cli/build/thunderbun`;
 }
 
 async function buildPreload() {
@@ -1961,10 +1961,10 @@ async function generateTemplateEmbeddings() {
 	const TEMPLATES_DIR = join(process.cwd(), "..", "templates");
 	const OUTPUT_FILE = join(process.cwd(), "src/cli/templates/embedded.ts");
 
-	const electrobunPackageJson = JSON.parse(
+	const thunderbunPackageJson = JSON.parse(
 		readFileSync(join(process.cwd(), "package.json"), "utf-8"),
 	);
-	const electrobunVersion = electrobunPackageJson.version;
+	const thunderbunVersion = thunderbunPackageJson.version;
 
 	if (!existsSync(TEMPLATES_DIR)) {
 		console.log("No templates directory found, skipping template generation");
@@ -2029,11 +2029,11 @@ async function generateTemplateEmbeddings() {
 
 		readDirectory(templateDir);
 
-		// Pin the electrobun dependency version in template package.json
+		// Pin the thunderbun dependency version in template package.json
 		if (files["package.json"]) {
 			const pkgJson = JSON.parse(files["package.json"]);
-			if (pkgJson.dependencies?.electrobun === "latest") {
-				pkgJson.dependencies.electrobun = electrobunVersion;
+			if (pkgJson.dependencies?.thunderbun === "latest") {
+				pkgJson.dependencies.thunderbun = thunderbunVersion;
 			}
 			files["package.json"] = JSON.stringify(pkgJson, null, "\t") + "\n";
 		}

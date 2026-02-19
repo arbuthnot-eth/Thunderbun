@@ -1,4 +1,4 @@
-import { BrowserWindow, BrowserView, Utils } from "electrobun/bun";
+import { BrowserWindow, BrowserView, Utils } from "thunderbun/bun";
 
 console.log("🌐 Multitab Browser starting...");
 
@@ -18,7 +18,7 @@ const rpc = BrowserView.defineRPC<any>({
 				const tab = {
 					id,
 					title: "New Tab",
-					url: url || "https://electrobun.dev",
+					url: url || "https://thunderbun.dev",
 					canGoBack: false,
 					canGoForward: false,
 					isLoading: false,

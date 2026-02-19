@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 
 interface MenuConfig {
   id: string;
@@ -291,7 +291,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 // @ts-expect-error - reserved for tracking active config
 let currentConfig = "config1";
@@ -339,7 +339,7 @@ function setActiveButton(configId: string) {
 document.addEventListener("DOMContentLoaded", () => {
   // Done button
   document.getElementById("doneBtn")?.addEventListener("click", () => {
-    (electrobun.rpc as any)?.request.closeWindow({});
+    (thunderbun.rpc as any)?.request.closeWindow({});
   });
 
   // Clear log button
@@ -357,12 +357,12 @@ document.addEventListener("DOMContentLoaded", () => {
       currentConfig = config.id;
       setActiveButton(config.id);
       updateConfigDetails(config.id);
-      (electrobun.rpc as any)?.request.setApplicationMenu({ menu: config.menu });
+      (thunderbun.rpc as any)?.request.setApplicationMenu({ menu: config.menu });
       addLogEntry(`Applied config: ${config.title}`);
     });
   });
 
   // Apply initial config
   const initialConfig = menuConfigs[0]!;
-  (electrobun.rpc as any)?.request.setApplicationMenu({ menu: initialConfig.menu });
+  (thunderbun.rpc as any)?.request.setApplicationMenu({ menu: initialConfig.menu });
 });

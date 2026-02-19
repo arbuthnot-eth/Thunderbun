@@ -1,7 +1,7 @@
 // Updater API Tests
 
 import { defineTest, expect } from "../test-framework/types";
-import Electrobun from "electrobun/bun";
+import ThunderBun from "thunderbun/bun";
 
 export const updaterTests = [
   defineTest({
@@ -9,7 +9,7 @@ export const updaterTests = [
     category: "Updater",
     description: "Test getting local app version",
     async run({ log }) {
-      const version = await Electrobun.Updater.localInfo.version();
+      const version = await ThunderBun.Updater.localInfo.version();
 
       expect(version).toBeTruthy();
       expect(typeof version).toBe("string");
@@ -23,7 +23,7 @@ export const updaterTests = [
     category: "Updater",
     description: "Test getting update channel",
     async run({ log }) {
-      const channel = await Electrobun.Updater.localInfo.channel();
+      const channel = await ThunderBun.Updater.localInfo.channel();
 
       expect(channel).toBeTruthy();
       expect(typeof channel).toBe("string");
@@ -37,7 +37,7 @@ export const updaterTests = [
     category: "Updater",
     description: "Test getting local build hash",
     async run({ log }) {
-      const hash = await Electrobun.Updater.localInfo.hash();
+      const hash = await ThunderBun.Updater.localInfo.hash();
 
       expect(hash).toBeTruthy();
       expect(typeof hash).toBe("string");
@@ -51,7 +51,7 @@ export const updaterTests = [
     category: "Updater",
     description: "Test getting app data folder path",
     async run({ log }) {
-      const folder = await Electrobun.Updater.appDataFolder();
+      const folder = await ThunderBun.Updater.appDataFolder();
 
       expect(folder).toBeTruthy();
       expect(typeof folder).toBe("string");
@@ -65,7 +65,7 @@ export const updaterTests = [
     category: "Updater",
     description: "Test getting channel bucket URL",
     async run({ log }) {
-      const url = await Electrobun.Updater.channelBucketUrl();
+      const url = await ThunderBun.Updater.channelBucketUrl();
 
       expect(typeof url).toBe("string");
       // URL might be empty if not configured
@@ -82,7 +82,7 @@ export const updaterTests = [
       log("Checking for updates...");
 
       try {
-        const updateInfo = await Electrobun.Updater.checkForUpdate();
+        const updateInfo = await ThunderBun.Updater.checkForUpdate();
 
         expect(updateInfo).toBeTruthy();
         expect(typeof updateInfo.updateAvailable).toBe("boolean");

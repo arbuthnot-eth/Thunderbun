@@ -1,9 +1,9 @@
-import type { ElectrobunConfig } from "electrobun";
+import type { ThunderBunConfig } from "thunderbun";
 
 export default {
 	app: {
 		name: "photo-booth",
-		identifier: "photobooth.electrobun.dev",
+		identifier: "photobooth.thunderbun.dev",
 		version: "0.0.1",
 	},
 	build: {
@@ -31,4 +31,4 @@ export default {
 			bundleCEF: false,
 		},
 	},
-} satisfies ElectrobunConfig;
+} satisfies ThunderBunConfig;

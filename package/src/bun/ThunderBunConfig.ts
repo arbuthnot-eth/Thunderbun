@@ -1,11 +1,11 @@
 /**
- * Electrobun configuration type definitions
- * Used in electrobun.config.ts files
+ * ThunderBun configuration type definitions
+ * Used in thunderbun.config.ts files
  */
 
 /**
  * Bun.build() options that can be passed through to the bundler.
- * Excludes options that are controlled by Electrobun (entrypoints, outdir, target).
+ * Excludes options that are controlled by ThunderBun (entrypoints, outdir, target).
  * See https://bun.sh/docs/bundler for full documentation.
  */
 type BunBuildOptions = Omit<
@@ -13,7 +13,7 @@ type BunBuildOptions = Omit<
 	"entrypoints" | "outdir" | "target"
 >;
 
-export interface ElectrobunConfig {
+export interface ThunderBunConfig {
 	/**
 	 * Application metadata configuration
 	 */
@@ -50,7 +50,7 @@ export interface ElectrobunConfig {
 		 *
 		 * To handle incoming URLs, listen for the "open-url" event:
 		 * ```typescript
-		 * Electrobun.events.on("open-url", (e) => {
+		 * ThunderBun.events.on("open-url", (e) => {
 		 *   console.log("Opened with URL:", e.data.url);
 		 * });
 		 * ```
@@ -133,9 +133,9 @@ export interface ElectrobunConfig {
 		 * Format: "CEF_VERSION+chromium-CHROMIUM_VERSION"
 		 * Example: "144.0.11+ge135be2+chromium-144.0.7559.97"
 		 *
-		 * Check the electrobun-cef-compat compatibility matrix for tested combinations
+		 * Check the thunderbun-cef-compat compatibility matrix for tested combinations
 		 * before overriding. Using an untested version may cause runtime issues.
-		 * @default Uses the version bundled with this Electrobun release
+		 * @default Uses the version bundled with this ThunderBun release
 		 */
 		cefVersion?: string;
 
@@ -144,8 +144,8 @@ export interface ElectrobunConfig {
 		 * Format: semver string (e.g., "1.4.2")
 		 *
 		 * This downloads the specified Bun version from GitHub releases and uses it
-		 * instead of the version bundled with this Electrobun release.
-		 * @default Uses the version bundled with this Electrobun release
+		 * instead of the version bundled with this ThunderBun release.
+		 * @default Uses the version bundled with this ThunderBun release
 		 */
 		bunVersion?: string;
 

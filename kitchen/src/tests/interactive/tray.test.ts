@@ -1,7 +1,7 @@
 // Interactive Tray Tests - Playground for exploring tray functionality
 
 import { defineTest } from "../../test-framework/types";
-import { BrowserView, BrowserWindow, Tray } from "electrobun/bun";
+import { BrowserView, BrowserWindow, Tray } from "thunderbun/bun";
 
 export const trayTests = [
   defineTest({
@@ -41,7 +41,7 @@ export const trayTests = [
 
                 currentTray = new Tray({
                   title: opts.title || "Test Tray",
-                  image: "views://assets/electrobun-logo-32-template.png",
+                  image: "views://assets/thunderbun-logo-32-template.png",
                   template: true,
                   width: 32,
                   height: 32,

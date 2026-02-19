@@ -1,9 +1,9 @@
-import type { ElectrobunConfig } from "electrobun";
+import type { ThunderBunConfig } from "thunderbun";
 
 export default {
 	app: {
 		name: "react-tailwind-vite",
-		identifier: "reacttailwindvite.electrobun.dev",
+		identifier: "reacttailwindvite.thunderbun.dev",
 		version: "0.0.1",
 	},
 	build: {
@@ -22,4 +22,4 @@ export default {
 			bundleCEF: false,
 		},
 	},
-} satisfies ElectrobunConfig;
+} satisfies ThunderBunConfig;

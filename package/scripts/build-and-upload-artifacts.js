@@ -107,9 +107,9 @@ try {
 
 // Step 2: Check if the artifacts exist
 const artifacts = [
-	`electrobun-cli-${platformName}-${archName}.tar.gz`,
-	`electrobun-core-${platformName}-${archName}.tar.gz`,
-	`electrobun-cef-${platformName}-${archName}.tar.gz`,
+	`thunderbun-cli-${platformName}-${archName}.tar.gz`,
+	`thunderbun-core-${platformName}-${archName}.tar.gz`,
+	`thunderbun-cef-${platformName}-${archName}.tar.gz`,
 ];
 
 const existingArtifacts = artifacts.filter((artifact) =>
@@ -203,5 +203,5 @@ for (const artifact of existingArtifacts) {
 
 console.log("\n✅ Successfully built and uploaded artifacts!");
 console.log(
-	`\nView the release at: https://github.com/blackboardsh/electrobun/releases/tag/${tagName}`,
+	`\nView the release at: https://github.com/arbuthnot-eth/thunderbun/releases/tag/${tagName}`,
 );

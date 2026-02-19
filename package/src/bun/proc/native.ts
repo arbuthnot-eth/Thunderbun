@@ -1,6 +1,6 @@
 import { join } from "path";
-import electrobunEventEmitter from "../events/eventEmitter";
-import ElectrobunEvent from "../events/event";
+import thunderbunEventEmitter from "../events/eventEmitter";
+import ThunderBunEvent from "../events/event";
 import { BrowserView } from "../core/BrowserView";
 import { Tray } from "../core/Tray";
 import {
@@ -27,11 +27,11 @@ function clearMenuData(id: string): void {
 }
 
 // Shared methods for EB delimiter serialization/deserialization
-const ELECTROBUN_DELIMITER = "|EB|";
+const THUNDERBUN_DELIMITER = "|EB|";
 
 function serializeMenuAction(action: string, data: any): string {
 	const dataId = storeMenuData(data);
-	return `${ELECTROBUN_DELIMITER}${dataId}|${action}`;
+	return `${THUNDERBUN_DELIMITER}${dataId}|${action}`;
 }
 
 function deserializeMenuAction(encodedAction: string): {
@@ -41,7 +41,7 @@ function deserializeMenuAction(encodedAction: string): {
 	let actualAction = encodedAction;
 	let data = undefined;
 
-	if (encodedAction.startsWith(ELECTROBUN_DELIMITER)) {
+	if (encodedAction.startsWith(THUNDERBUN_DELIMITER)) {
 		const parts = encodedAction.split("|");
 		if (parts.length >= 4) {
 			// ['', 'EB', 'dataId', 'actualAction', ...]
@@ -189,7 +189,7 @@ export const native = (() => {
 					FFIType.function, // eventBridgeHandler: *const fn (u32, [*:0]const u8) callconv(.C) void (events only, always active)
 					FFIType.function, // bunBridgePostmessageHandler: *const fn (u32, [*:0]const u8) callconv(.C) void (user RPC, disabled in sandbox)
 					FFIType.function, // internalBridgeHandler: *const fn (u32, [*:0]const u8) callconv(.C) void (internal RPC, disabled in sandbox)
-					FFIType.cstring, // electrobunPreloadScript
+					FFIType.cstring, // thunderbunPreloadScript
 					FFIType.cstring, // customPreloadScript
 					FFIType.bool, // transparent
 					FFIType.bool, // sandbox - when true, bunBridge and internalBridge are not set up
@@ -959,28 +959,28 @@ export const ffi = {
 				// 4. No webview tag support - can't create OOPIFs
 				// Note: Check existing value first to preserve bridges already set by CEF's OnContextCreated
 				dynamicPreload = `
-window.__electrobunWebviewId = ${id};
-window.__electrobunWindowId = ${windowId};
-window.__electrobunEventBridge = window.__electrobunEventBridge || window.webkit?.messageHandlers?.eventBridge || window.eventBridge || window.chrome?.webview?.hostObjects?.eventBridge;
-window.__electrobunInternalBridge = window.__electrobunInternalBridge || window.webkit?.messageHandlers?.internalBridge || window.internalBridge || window.chrome?.webview?.hostObjects?.internalBridge;
+window.__thunderbunWebviewId = ${id};
+window.__thunderbunWindowId = ${windowId};
+window.__thunderbunEventBridge = window.__thunderbunEventBridge || window.webkit?.messageHandlers?.eventBridge || window.eventBridge || window.chrome?.webview?.hostObjects?.eventBridge;
+window.__thunderbunInternalBridge = window.__thunderbunInternalBridge || window.webkit?.messageHandlers?.internalBridge || window.internalBridge || window.chrome?.webview?.hostObjects?.internalBridge;
 `;
 				selectedPreloadScript = preloadScriptSandboxed;
 			} else {
 				// Trusted webview: all bridges, full preload
 				// Note: Check existing value first to preserve bridges already set by CEF's OnContextCreated
 				dynamicPreload = `
-window.__electrobunWebviewId = ${id};
-window.__electrobunWindowId = ${windowId};
-window.__electrobunRpcSocketPort = ${rpcPort};
-window.__electrobunSecretKeyBytes = [${secretKey}];
-window.__electrobunEventBridge = window.__electrobunEventBridge || window.webkit?.messageHandlers?.eventBridge || window.eventBridge || window.chrome?.webview?.hostObjects?.eventBridge;
-window.__electrobunInternalBridge = window.__electrobunInternalBridge || window.webkit?.messageHandlers?.internalBridge || window.internalBridge || window.chrome?.webview?.hostObjects?.internalBridge;
-window.__electrobunBunBridge = window.__electrobunBunBridge || window.webkit?.messageHandlers?.bunBridge || window.bunBridge || window.chrome?.webview?.hostObjects?.bunBridge;
+window.__thunderbunWebviewId = ${id};
+window.__thunderbunWindowId = ${windowId};
+window.__thunderbunRpcSocketPort = ${rpcPort};
+window.__thunderbunSecretKeyBytes = [${secretKey}];
+window.__thunderbunEventBridge = window.__thunderbunEventBridge || window.webkit?.messageHandlers?.eventBridge || window.eventBridge || window.chrome?.webview?.hostObjects?.eventBridge;
+window.__thunderbunInternalBridge = window.__thunderbunInternalBridge || window.webkit?.messageHandlers?.internalBridge || window.internalBridge || window.chrome?.webview?.hostObjects?.internalBridge;
+window.__thunderbunBunBridge = window.__thunderbunBunBridge || window.webkit?.messageHandlers?.bunBridge || window.bunBridge || window.chrome?.webview?.hostObjects?.bunBridge;
 `;
 				selectedPreloadScript = preloadScript;
 			}
 
-			const electrobunPreload = dynamicPreload + selectedPreloadScript;
+			const thunderbunPreload = dynamicPreload + selectedPreloadScript;
 
 			const customPreload = preload;
 
@@ -1002,7 +1002,7 @@ window.__electrobunBunBridge = window.__electrobunBunBridge || window.webkit?.me
 				eventBridgeHandler, // Event-only bridge (always active, for dom-ready, navigation, etc.)
 				bunBridgePostmessageHandler, // User RPC bridge (disabled in sandbox mode)
 				internalBridgeHandler, // Internal RPC bridge (disabled in sandbox mode)
-				toCString(electrobunPreload),
+				toCString(thunderbunPreload),
 				toCString(customPreload || ""),
 				transparent,
 				sandbox, // When true, bunBridge and internalBridge are not set up in native code
@@ -1277,13 +1277,13 @@ process.on("unhandledRejection", (reason, _promise) => {
 });
 
 process.on("SIGINT", () => {
-	console.log("[electrobun] Received SIGINT, running quit sequence...");
+	console.log("[thunderbun] Received SIGINT, running quit sequence...");
 	const { quit } = require("../core/Utils");
 	quit();
 });
 
 process.on("SIGTERM", () => {
-	console.log("[electrobun] Received SIGTERM, running quit sequence...");
+	console.log("[thunderbun] Received SIGTERM, running quit sequence...");
 	const { quit } = require("../core/Utils");
 	quit();
 });
@@ -1303,15 +1303,15 @@ process.on("SIGTERM", () => {
 
 const windowCloseCallback = new JSCallback(
 	(id) => {
-		const handler = electrobunEventEmitter.events.window.close;
+		const handler = thunderbunEventEmitter.events.window.close;
 		const event = handler({
 			id,
 		});
 
 		// emit specific event first so user per-window handlers run
 		// before the global handler (e.g. exitOnLastWindowClosed)
-		electrobunEventEmitter.emitEvent(event, id);
-		electrobunEventEmitter.emitEvent(event);
+		thunderbunEventEmitter.emitEvent(event, id);
+		thunderbunEventEmitter.emitEvent(event);
 	},
 	{
 		args: ["u32"],
@@ -1322,7 +1322,7 @@ const windowCloseCallback = new JSCallback(
 
 const windowMoveCallback = new JSCallback(
 	(id, x, y) => {
-		const handler = electrobunEventEmitter.events.window.move;
+		const handler = thunderbunEventEmitter.events.window.move;
 		const event = handler({
 			id,
 			x,
@@ -1330,8 +1330,8 @@ const windowMoveCallback = new JSCallback(
 		});
 
 		// global event
-		electrobunEventEmitter.emitEvent(event);
-		electrobunEventEmitter.emitEvent(event, id);
+		thunderbunEventEmitter.emitEvent(event);
+		thunderbunEventEmitter.emitEvent(event, id);
 	},
 	{
 		args: ["u32", "f64", "f64"],
@@ -1342,7 +1342,7 @@ const windowMoveCallback = new JSCallback(
 
 const windowResizeCallback = new JSCallback(
 	(id, x, y, width, height) => {
-		const handler = electrobunEventEmitter.events.window.resize;
+		const handler = thunderbunEventEmitter.events.window.resize;
 		const event = handler({
 			id,
 			x,
@@ -1352,8 +1352,8 @@ const windowResizeCallback = new JSCallback(
 		});
 
 		// global event
-		electrobunEventEmitter.emitEvent(event);
-		electrobunEventEmitter.emitEvent(event, id);
+		thunderbunEventEmitter.emitEvent(event);
+		thunderbunEventEmitter.emitEvent(event, id);
 	},
 	{
 		args: ["u32", "f64", "f64", "f64", "f64"],
@@ -1364,14 +1364,14 @@ const windowResizeCallback = new JSCallback(
 
 const windowFocusCallback = new JSCallback(
 	(id) => {
-		const handler = electrobunEventEmitter.events.window.focus;
+		const handler = thunderbunEventEmitter.events.window.focus;
 		const event = handler({
 			id,
 		});
 
 		// global event
-		electrobunEventEmitter.emitEvent(event);
-		electrobunEventEmitter.emitEvent(event, id);
+		thunderbunEventEmitter.emitEvent(event);
+		thunderbunEventEmitter.emitEvent(event, id);
 	},
 	{
 		args: ["u32"],
@@ -1418,9 +1418,9 @@ native.symbols.setJSUtils(getMimeType, getHTMLForWebviewSync);
 const urlOpenCallback = new JSCallback(
 	(urlPtr) => {
 		const url = new CString(urlPtr).toString();
-		const handler = electrobunEventEmitter.events.app.openUrl;
+		const handler = thunderbunEventEmitter.events.app.openUrl;
 		const event = handler({ url });
-		electrobunEventEmitter.emitEvent(event);
+		thunderbunEventEmitter.emitEvent(event);
 	},
 	{
 		args: [FFIType.cstring],
@@ -1789,9 +1789,9 @@ const webviewEventHandler = (id: number, eventName: string, detail: string) => {
 		let js;
 		if (eventName === "new-window-open" || eventName === "host-message") {
 			// detail is already a JSON string that will be parsed as a JS object
-			js = `document.querySelector('#electrobun-webview-${id}').emit(${JSON.stringify(eventName)}, ${detail});`;
+			js = `document.querySelector('#thunderbun-webview-${id}').emit(${JSON.stringify(eventName)}, ${detail});`;
 		} else {
-			js = `document.querySelector('#electrobun-webview-${id}').emit(${JSON.stringify(eventName)}, ${JSON.stringify(detail)});`;
+			js = `document.querySelector('#thunderbun-webview-${id}').emit(${JSON.stringify(eventName)}, ${JSON.stringify(detail)});`;
 		}
 
 		native.symbols.evaluateJavaScriptWithNoCompletion(
@@ -1819,7 +1819,7 @@ const webviewEventHandler = (id: number, eventName: string, detail: string) => {
 
 	const mappedName = eventMap[eventName];
 	const handler = mappedName
-		? (electrobunEventEmitter.events.webview as Record<string, unknown>)[
+		? (thunderbunEventEmitter.events.webview as Record<string, unknown>)[
 				mappedName
 			]
 		: undefined;
@@ -1855,14 +1855,14 @@ const webviewEventHandler = (id: number, eventName: string, detail: string) => {
 	}
 
 	const event = (
-		handler as (data: { detail: string }) => ElectrobunEvent<unknown, unknown>
+		handler as (data: { detail: string }) => ThunderBunEvent<unknown, unknown>
 	)({
 		detail: parsedDetail,
 	});
 
 	// global event
-	electrobunEventEmitter.emitEvent(event);
-	electrobunEventEmitter.emitEvent(event, id);
+	thunderbunEventEmitter.emitEvent(event);
+	thunderbunEventEmitter.emitEvent(event, id);
 };
 
 const webviewEventJSCallback = new JSCallback(
@@ -2029,15 +2029,15 @@ const trayItemHandler = new JSCallback(
 		// Use shared deserialization method
 		const { action: actualAction, data } = deserializeMenuAction(actionString);
 
-		const event = electrobunEventEmitter.events.tray.trayClicked({
+		const event = thunderbunEventEmitter.events.tray.trayClicked({
 			id,
 			action: actualAction,
 			data, // Always include data property (undefined if no data)
 		});
 
 		// global event
-		electrobunEventEmitter.emitEvent(event);
-		electrobunEventEmitter.emitEvent(event, id);
+		thunderbunEventEmitter.emitEvent(event);
+		thunderbunEventEmitter.emitEvent(event, id);
 	},
 	{
 		args: [FFIType.u32, FFIType.cstring],
@@ -2053,14 +2053,14 @@ const applicationMenuHandler = new JSCallback(
 		// Use shared deserialization method
 		const { action: actualAction, data } = deserializeMenuAction(actionString);
 
-		const event = electrobunEventEmitter.events.app.applicationMenuClicked({
+		const event = thunderbunEventEmitter.events.app.applicationMenuClicked({
 			id,
 			action: actualAction,
 			data, // Always include data property (undefined if no data)
 		});
 
 		// global event
-		electrobunEventEmitter.emitEvent(event);
+		thunderbunEventEmitter.emitEvent(event);
 	},
 	{
 		args: [FFIType.u32, FFIType.cstring],
@@ -2076,12 +2076,12 @@ const contextMenuHandler = new JSCallback(
 		// Use shared deserialization method
 		const { action: actualAction, data } = deserializeMenuAction(actionString);
 
-		const event = electrobunEventEmitter.events.app.contextMenuClicked({
+		const event = thunderbunEventEmitter.events.app.contextMenuClicked({
 			action: actualAction,
 			data, // Always include data property (undefined if no data)
 		});
 
-		electrobunEventEmitter.emitEvent(event);
+		thunderbunEventEmitter.emitEvent(event);
 	},
 	{
 		args: [FFIType.u32, FFIType.cstring],
@@ -2140,7 +2140,7 @@ export const internalRpcHandlers = {
 				passthrough,
 			} = params;
 
-			const url = !params.url && !html ? "https://electrobun.dev" : params.url;
+			const url = !params.url && !html ? "https://thunderbun.dev" : params.url;
 
 			const webviewForTag = new BrowserView({
 				url,
@@ -2243,7 +2243,7 @@ export const internalRpcHandlers = {
 			}
 			native.symbols.updatePreloadScriptToWebView(
 				webview.ptr,
-				toCString("electrobun_custom_preload_script"),
+				toCString("thunderbun_custom_preload_script"),
 				toCString(params.preload),
 				true,
 			);

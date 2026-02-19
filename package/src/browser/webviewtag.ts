@@ -9,11 +9,11 @@ type WebviewEventTypes =
 	| "new-window-open";
 
 /**
- * Interface representing an <electrobun-webview> custom element.
+ * Interface representing an <thunderbun-webview> custom element.
  * Use this to properly type webview elements obtained via querySelector.
  *
  * @example
- * const webview = document.querySelector('electrobun-webview') as WebviewTagElement;
+ * const webview = document.querySelector('thunderbun-webview') as WebviewTagElement;
  * webview.loadURL('https://example.com');
  * webview.toggleHidden(false);
  */
@@ -75,10 +75,10 @@ interface WebviewTagElement extends HTMLElement {
 	toggleDevTools(): void;
 }
 
-// Augment global types so querySelector('electrobun-webview') returns WebviewTagElement
+// Augment global types so querySelector('thunderbun-webview') returns WebviewTagElement
 declare global {
 	interface HTMLElementTagNameMap {
-		"electrobun-webview": WebviewTagElement;
+		"thunderbun-webview": WebviewTagElement;
 	}
 }
 

@@ -447,9 +447,9 @@ export function createRPC<
 	};
 }
 
-// ---- Electrobun combined schema ----
+// ---- ThunderBun combined schema ----
 
-export interface ElectrobunRPCSchema {
+export interface ThunderBunRPCSchema {
 	bun: RPCSchema;
 	webview: RPCSchema;
 }
@@ -458,8 +458,8 @@ export interface RPCWithTransport {
 	setTransport: (transport: RPCTransport) => void;
 }
 
-export type ElectrobunRPCConfig<
-	Schema extends ElectrobunRPCSchema,
+export type ThunderBunRPCConfig<
+	Schema extends ThunderBunRPCSchema,
 	Side extends "bun" | "webview",
 > = {
 	maxRequestTime?: number;
@@ -476,14 +476,14 @@ export type ElectrobunRPCConfig<
 	};
 };
 
-// ---- defineElectrobunRPC ----
+// ---- defineThunderBunRPC ----
 
-export function defineElectrobunRPC<
-	Schema extends ElectrobunRPCSchema,
+export function defineThunderBunRPC<
+	Schema extends ThunderBunRPCSchema,
 	Side extends "bun" | "webview" = "bun" | "webview",
 >(
 	_side: Side,
-	config: ElectrobunRPCConfig<Schema, Side> & {
+	config: ThunderBunRPCConfig<Schema, Side> & {
 		extraRequestHandlers?: Record<string, Function>;
 	},
 ) {

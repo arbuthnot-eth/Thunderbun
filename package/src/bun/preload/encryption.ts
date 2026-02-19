@@ -1,5 +1,5 @@
 // Encryption/Decryption for secure RPC
-// Uses per-webview secret key set in window.__electrobunSecretKeyBytes
+// Uses per-webview secret key set in window.__thunderbunSecretKeyBytes
 
 import "./globals.d.ts";
 
@@ -31,7 +31,7 @@ async function generateKeyFromBytes(rawKey: Uint8Array): Promise<CryptoKey> {
 
 export async function initEncryption(): Promise<void> {
 	const secretKey = await generateKeyFromBytes(
-		new Uint8Array(window.__electrobunSecretKeyBytes),
+		new Uint8Array(window.__thunderbunSecretKeyBytes),
 	);
 
 	const encryptString = async (
@@ -81,6 +81,6 @@ export async function initEncryption(): Promise<void> {
 		return decoder.decode(decryptedBuffer);
 	};
 
-	window.__electrobun_encrypt = encryptString;
-	window.__electrobun_decrypt = decryptString;
+	window.__thunderbun_encrypt = encryptString;
+	window.__thunderbun_decrypt = decryptString;
 }

@@ -1,6 +1,6 @@
 // Shared Event Emission for webview lifecycle events
-// Uses __electrobunEventBridge which is available on ALL webviews (including sandboxed)
-// Falls back to __electrobunInternalBridge for backwards compatibility until native code
+// Uses __thunderbunEventBridge which is available on ALL webviews (including sandboxed)
+// Falls back to __thunderbunInternalBridge for backwards compatibility until native code
 // is updated to include the eventBridge handler
 // This is a one-way channel for emitting events to native/bun - no RPC capability
 
@@ -13,13 +13,13 @@ export function emitWebviewEvent(eventName: string, detail: string) {
 		// Prefer eventBridge (available on all webviews), fall back to internalBridge
 		// (for backwards compatibility until native code adds eventBridge handler)
 		const bridge =
-			window.__electrobunEventBridge || window.__electrobunInternalBridge;
+			window.__thunderbunEventBridge || window.__thunderbunInternalBridge;
 		bridge?.postMessage(
 			JSON.stringify({
 				id: "webviewEvent",
 				type: "message",
 				payload: {
-					id: window.__electrobunWebviewId,
+					id: window.__thunderbunWebviewId,
 					eventName,
 					detail,
 				},

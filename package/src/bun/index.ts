@@ -18,14 +18,14 @@ import type {
 } from "./core/Utils";
 import {
 	type RPCSchema,
-	type ElectrobunRPCSchema,
+	type ThunderBunRPCSchema,
 	createRPC,
-	defineElectrobunRPC,
+	defineThunderBunRPC,
 } from "../shared/rpc.js";
-import type ElectrobunEvent from "./events/event";
+import type ThunderBunEvent from "./events/event";
 import * as PATHS from "./core/Paths";
 import * as Socket from "./core/Socket";
-import type { ElectrobunConfig } from "./ElectrobunConfig";
+import type { ThunderBunConfig } from "./ThunderBunConfig";
 import { GlobalShortcut, Screen, Session } from "./proc/native";
 import type {
 	Display,
@@ -42,9 +42,9 @@ import { BuildConfig, type BuildConfigType } from "./core/BuildConfig";
 // Named Exports
 export {
 	type RPCSchema,
-	type ElectrobunRPCSchema,
-	type ElectrobunEvent,
-	type ElectrobunConfig,
+	type ThunderBunRPCSchema,
+	type ThunderBunEvent,
+	type ThunderBunConfig,
 	type BuildConfigType,
 	type WindowOptionsType,
 	type BrowserViewOptions,
@@ -64,7 +64,7 @@ export {
 	type UpdateStatusEntry,
 	type UpdateStatusDetails,
 	createRPC,
-	defineElectrobunRPC,
+	defineThunderBunRPC,
 	BrowserWindow,
 	BrowserView,
 	Tray,
@@ -81,7 +81,7 @@ export {
 };
 
 // Default Export
-const Electrobun = {
+const ThunderBun = {
 	BrowserWindow,
 	BrowserView,
 	Tray,
@@ -98,5 +98,5 @@ const Electrobun = {
 	Socket,
 };
 
-// Electrobun
-export default Electrobun;
+// ThunderBun
+export default ThunderBun;

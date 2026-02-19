@@ -1,7 +1,7 @@
 // RPC Tests - Tests for bidirectional RPC communication
 
 import { defineTest, expect } from "../test-framework/types";
-import { BrowserView } from "electrobun/bun";
+import { BrowserView } from "thunderbun/bun";
 import type { TestHarnessRPC } from "../test-harness/index";
 
 // Create RPC config for test harness
@@ -73,7 +73,7 @@ export const rpcTests = [
       // Execute JS in webview to call bun's add method
       log("Triggering webview to call bun.add({ a: 100, b: 23 })");
       const result = await win.webview.rpc?.request.evaluateJavascriptWithResponse({
-        script: `return window.electrobun.rpc.request.add({ a: 100, b: 23 });`,
+        script: `return window.thunderbun.rpc.request.add({ a: 100, b: 23 });`,
       });
 
       expect(result).toBe(123);
@@ -96,11 +96,11 @@ export const rpcTests = [
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      const testString = "Hello, Electrobun!";
+      const testString = "Hello, ThunderBun!";
       log(`Testing echo with: "${testString}"`);
 
       const result = await win.webview.rpc?.request.evaluateJavascriptWithResponse({
-        script: `return window.electrobun.rpc.request.echo({ value: "${testString}" });`,
+        script: `return window.thunderbun.rpc.request.echo({ value: "${testString}" });`,
       });
 
       expect(result).toBe(testString);
@@ -130,7 +130,7 @@ export const rpcTests = [
       const result = await win.webview.rpc?.request.evaluateJavascriptWithResponse({
         script: `
           const bigData = 'x'.repeat(${size});
-          return window.electrobun.rpc.request.echo({ value: bigData }).then(r => r.length);
+          return window.thunderbun.rpc.request.echo({ value: bigData }).then(r => r.length);
         `,
       });
 

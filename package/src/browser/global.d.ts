@@ -1,12 +1,12 @@
-// Global type declarations for Electrobun browser environment
+// Global type declarations for ThunderBun browser environment
 
-interface ElectrobunEncryptResult {
+interface ThunderBunEncryptResult {
   encryptedData: string;
   iv: string;
   tag: string;
 }
 
-interface ElectrobunBridge {
+interface ThunderBunBridge {
   receiveMessageFromBun: (msg: unknown) => void;
   receiveInternalMessageFromBun: (msg: unknown) => void;
 }
@@ -17,14 +17,14 @@ interface MessageHandler {
 
 declare global {
   interface Window {
-    __electrobunWebviewId: number;
-    __electrobunWindowId: number;
-    __electrobunRpcSocketPort: number;
-    __electrobun?: ElectrobunBridge;
-    __electrobun_encrypt: (msg: string) => Promise<ElectrobunEncryptResult>;
-    __electrobun_decrypt: (encryptedData: string, iv: string, tag: string) => Promise<string>;
-    __electrobunInternalBridge?: MessageHandler;
-    __electrobunBunBridge?: MessageHandler;
+    __thunderbunWebviewId: number;
+    __thunderbunWindowId: number;
+    __thunderbunRpcSocketPort: number;
+    __thunderbun?: ThunderBunBridge;
+    __thunderbun_encrypt: (msg: string) => Promise<ThunderBunEncryptResult>;
+    __thunderbun_decrypt: (encryptedData: string, iv: string, tag: string) => Promise<string>;
+    __thunderbunInternalBridge?: MessageHandler;
+    __thunderbunBunBridge?: MessageHandler;
   }
 }
 

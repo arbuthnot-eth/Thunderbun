@@ -1,6 +1,6 @@
 // Test Harness - A bundled view that tests can use for RPC testing
-import Electrobun, { Electroview } from "electrobun/view";
-import type { RPCSchema } from "electrobun";
+import ThunderBun, { Electroview } from "thunderbun/view";
+import type { RPCSchema } from "thunderbun";
 
 // Generic test harness RPC schema
 export type TestHarnessRPC = {
@@ -83,10 +83,10 @@ const rpc = Electroview.defineRPC<TestHarnessRPC>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 // Expose for debugging
-(window as any).electrobun = electrobun;
+(window as any).thunderbun = thunderbun;
 (window as any).testHarnessReady = true;
 
 console.log("Test harness initialized");

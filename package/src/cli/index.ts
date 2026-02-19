@@ -65,20 +65,20 @@ const projectRoot = process.cwd();
 
 // Find TypeScript ESM config file
 function findConfigFile(): string | null {
-	const configFile = join(projectRoot, "electrobun.config.ts");
+	const configFile = join(projectRoot, "thunderbun.config.ts");
 	return existsSync(configFile) ? configFile : null;
 }
 
 // Note: cli args can be called via npm bun /path/to/electorbun/binary arg1 arg2
-const indexOfElectrobun = process.argv.findIndex((arg) =>
-	arg.includes("electrobun"),
+const indexOfThunderBun = process.argv.findIndex((arg) =>
+	arg.includes("thunderbun"),
 );
-const commandArg = process.argv[indexOfElectrobun + 1] || "build";
+const commandArg = process.argv[indexOfThunderBun + 1] || "build";
 
-const ELECTROBUN_DEP_PATH = join(projectRoot, "node_modules", "electrobun");
+const THUNDERBUN_DEP_PATH = join(projectRoot, "node_modules", "thunderbun");
 
-// When debugging electrobun with the example app use the builds (dev or release) right from the source folder
-// For developers using electrobun cli via npm use the release versions in /dist
+// When debugging thunderbun with the example app use the builds (dev or release) right from the source folder
+// For developers using thunderbun cli via npm use the release versions in /dist
 // This lets us not have to commit src build folders to git and provide pre-built binaries
 
 // Function to get platform-specific paths
@@ -88,15 +88,15 @@ function getPlatformPaths(
 ) {
 	const binExt = targetOS === "win" ? ".exe" : "";
 	const platformDistDir = join(
-		ELECTROBUN_DEP_PATH,
+		THUNDERBUN_DEP_PATH,
 		`dist-${targetOS}-${targetArch}`,
 	);
-	const sharedDistDir = join(ELECTROBUN_DEP_PATH, "dist");
+	const sharedDistDir = join(THUNDERBUN_DEP_PATH, "dist");
 
 	return {
 		// Platform-specific binaries (from dist-OS-ARCH/)
 		BUN_BINARY: join(platformDistDir, "bun") + binExt,
-		LAUNCHER_DEV: join(platformDistDir, "electrobun") + binExt,
+		LAUNCHER_DEV: join(platformDistDir, "thunderbun") + binExt,
 		LAUNCHER_RELEASE: join(platformDistDir, "launcher") + binExt,
 		NATIVE_WRAPPER_MACOS: join(platformDistDir, "libNativeWrapper.dylib"),
 		NATIVE_WRAPPER_WIN: join(platformDistDir, "libNativeWrapper.dll"),
@@ -167,7 +167,7 @@ async function ensureCoreDependencies(
 	// If only shared files are missing, that's expected in production (they come via npm)
 	if (missingBinaries.length === 0 && missingSharedFiles.length > 0) {
 		console.log(
-			`Shared files missing (expected in production): ${missingSharedFiles.map((f) => f.replace(ELECTROBUN_DEP_PATH, ".")).join(", ")}`,
+			`Shared files missing (expected in production): ${missingSharedFiles.map((f) => f.replace(THUNDERBUN_DEP_PATH, ".")).join(", ")}`,
 		);
 	}
 
@@ -179,12 +179,12 @@ async function ensureCoreDependencies(
 	// Show which binaries are missing
 	console.log(
 		`Core dependencies not found for ${platformOS}-${platformArch}. Missing files:`,
-		missingBinaries.map((f) => f.replace(ELECTROBUN_DEP_PATH, ".")).join(", "),
+		missingBinaries.map((f) => f.replace(THUNDERBUN_DEP_PATH, ".")).join(", "),
 	);
 	console.log(`Downloading core binaries for ${platformOS}-${platformArch}...`);
 
-	// Get the current Electrobun version from package.json
-	const packageJsonPath = join(ELECTROBUN_DEP_PATH, "package.json");
+	// Get the current ThunderBun version from package.json
+	const packageJsonPath = join(THUNDERBUN_DEP_PATH, "package.json");
 	let version = "latest";
 
 	if (existsSync(packageJsonPath)) {
@@ -199,7 +199,7 @@ async function ensureCoreDependencies(
 	const platformName =
 		platformOS === "macos" ? "darwin" : platformOS === "win" ? "win" : "linux";
 	const archName = platformArch;
-	const coreTarballUrl = `https://github.com/blackboardsh/electrobun/releases/download/${version}/electrobun-core-${platformName}-${archName}.tar.gz`;
+	const coreTarballUrl = `https://github.com/arbuthnot-eth/thunderbun/releases/download/${version}/thunderbun-core-${platformName}-${archName}.tar.gz`;
 
 	console.log(`Downloading core binaries from: ${coreTarballUrl}`);
 
@@ -214,7 +214,7 @@ async function ensureCoreDependencies(
 
 		// Create temp file
 		const tempFile = join(
-			ELECTROBUN_DEP_PATH,
+			THUNDERBUN_DEP_PATH,
 			`core-${platformOS}-${platformArch}-temp.tar.gz`,
 		);
 		const fileStream = createWriteStream(tempFile);
@@ -260,7 +260,7 @@ async function ensureCoreDependencies(
 			`Extracting core dependencies for ${platformOS}-${platformArch}...`,
 		);
 		const platformDistPath = join(
-			ELECTROBUN_DEP_PATH,
+			THUNDERBUN_DEP_PATH,
 			`dist-${platformOS}-${platformArch}`,
 		);
 		mkdirSync(platformDistPath, { recursive: true });
@@ -317,7 +317,7 @@ async function ensureCoreDependencies(
 		);
 		if (missingBinaries.length > 0) {
 			console.error(
-				`Missing binaries after extraction: ${missingBinaries.map((f) => f.replace(ELECTROBUN_DEP_PATH, ".")).join(", ")}`,
+				`Missing binaries after extraction: ${missingBinaries.map((f) => f.replace(THUNDERBUN_DEP_PATH, ".")).join(", ")}`,
 			);
 			console.error(
 				"This suggests the tarball structure is different than expected",
@@ -328,7 +328,7 @@ async function ensureCoreDependencies(
 		// The CI-added adhoc signatures are actually required for macOS to run the binaries
 
 		// For development: if main.js doesn't exist in shared dist/, copy from platform-specific download as fallback
-		const sharedDistPath = join(ELECTROBUN_DEP_PATH, "dist");
+		const sharedDistPath = join(THUNDERBUN_DEP_PATH, "dist");
 		const extractedMainJs = join(platformDistPath, "main.js");
 		const sharedMainJs = join(sharedDistPath, "main.js");
 
@@ -357,8 +357,8 @@ async function ensureCoreDependencies(
 
 /**
  * Returns the effective CEF directory path. When a custom cefVersion is set,
- * CEF files are stored in node_modules/.electrobun-cache/ which survives
- * both dist rebuilds and bun install (which replaces node_modules/electrobun).
+ * CEF files are stored in node_modules/.thunderbun-cache/ which survives
+ * both dist rebuilds and bun install (which replaces node_modules/thunderbun).
  * When using the default version, returns the standard dist-{platform}/cef/ path.
  */
 function getEffectiveCEFDir(
@@ -367,7 +367,7 @@ function getEffectiveCEFDir(
 	cefVersion?: string,
 ): string {
 	if (cefVersion) {
-		return join(projectRoot, "node_modules", ".electrobun-cache", "cef-override", `${platformOS}-${platformArch}`);
+		return join(projectRoot, "node_modules", ".thunderbun-cache", "cef-override", `${platformOS}-${platformArch}`);
 	}
 	return getPlatformPaths(platformOS, platformArch).CEF_DIR;
 }
@@ -387,7 +387,7 @@ async function ensureBunBinary(
 	}
 
 	const binExt = targetOS === "win" ? ".exe" : "";
-	const overrideDir = join(projectRoot, "node_modules", ".electrobun-cache", "bun-override", `${targetOS}-${targetArch}`);
+	const overrideDir = join(projectRoot, "node_modules", ".thunderbun-cache", "bun-override", `${targetOS}-${targetArch}`);
 	const overrideBinary = join(overrideDir, `bun${binExt}`);
 	const versionFile = join(overrideDir, ".bun-version");
 
@@ -415,7 +415,7 @@ async function ensureBunBinary(
 
 /**
  * Downloads a specific Bun version from GitHub releases for a custom version
- * override. The binary is cached in node_modules/.electrobun-cache/bun-override/
+ * override. The binary is cached in node_modules/.thunderbun-cache/bun-override/
  * so it survives dist rebuilds and bun install.
  */
 async function downloadCustomBun(
@@ -441,7 +441,7 @@ async function downloadCustomBun(
 	}
 
 	const binExt = platformOS === "win" ? ".exe" : "";
-	const overrideDir = join(projectRoot, "node_modules", ".electrobun-cache", "bun-override", `${platformOS}-${platformArch}`);
+	const overrideDir = join(projectRoot, "node_modules", ".thunderbun-cache", "bun-override", `${platformOS}-${platformArch}`);
 	const overrideBinary = join(overrideDir, `bun${binExt}`);
 	const bunUrl = `https://github.com/oven-sh/bun/releases/download/bun-v${bunVersion}/${bunUrlSegment}`;
 
@@ -606,8 +606,8 @@ async function ensureCEFDependencies(
 		`CEF dependencies not found for ${platformOS}-${platformArch}, downloading...`,
 	);
 
-	// Get the current Electrobun version from package.json
-	const packageJsonPath = join(ELECTROBUN_DEP_PATH, "package.json");
+	// Get the current ThunderBun version from package.json
+	const packageJsonPath = join(THUNDERBUN_DEP_PATH, "package.json");
 	let version = "latest";
 
 	if (existsSync(packageJsonPath)) {
@@ -622,7 +622,7 @@ async function ensureCEFDependencies(
 	const platformName =
 		platformOS === "macos" ? "darwin" : platformOS === "win" ? "win" : "linux";
 	const archName = platformArch;
-	const cefTarballUrl = `https://github.com/blackboardsh/electrobun/releases/download/${version}/electrobun-cef-${platformName}-${archName}.tar.gz`;
+	const cefTarballUrl = `https://github.com/arbuthnot-eth/thunderbun/releases/download/${version}/thunderbun-cef-${platformName}-${archName}.tar.gz`;
 
 	// Helper function to download with retry logic
 	async function downloadWithRetry(
@@ -720,7 +720,7 @@ async function ensureCEFDependencies(
 	try {
 		// Create temp file with unique name
 		const tempFile = join(
-			ELECTROBUN_DEP_PATH,
+			THUNDERBUN_DEP_PATH,
 			`cef-${platformOS}-${platformArch}-${Date.now()}.tar.gz`,
 		);
 
@@ -732,7 +732,7 @@ async function ensureCEFDependencies(
 			`Extracting CEF dependencies for ${platformOS}-${platformArch}...`,
 		);
 		const platformDistPath = join(
-			ELECTROBUN_DEP_PATH,
+			THUNDERBUN_DEP_PATH,
 			`dist-${platformOS}-${platformArch}`,
 		);
 		mkdirSync(platformDistPath, { recursive: true });
@@ -846,7 +846,7 @@ async function ensureCEFDependencies(
 				"  • Try running the command again (it will retry automatically)",
 			);
 			console.error("  • Clear the cache if the issue persists:");
-			console.error(`    rm -rf "${ELECTROBUN_DEP_PATH}"`);
+			console.error(`    rm -rf "${THUNDERBUN_DEP_PATH}"`);
 		} else if (
 			error.message.includes("HTTP 404") ||
 			error.message.includes("Not Found")
@@ -862,7 +862,7 @@ async function ensureCEFDependencies(
 				"\nPlease ensure you have an internet connection and the release exists.",
 			);
 			console.error(
-				`If the problem persists, try clearing the cache: rm -rf "${ELECTROBUN_DEP_PATH}"`,
+				`If the problem persists, try clearing the cache: rm -rf "${THUNDERBUN_DEP_PATH}"`,
 			);
 		}
 
@@ -919,14 +919,14 @@ async function downloadAndExtractCustomCEF(
 	console.log(`Using custom CEF version: ${cefVersion}`);
 	console.log(`Downloading from: ${cefUrl}`);
 
-	// Store custom CEF in .electrobun-cache so it survives dist rebuilds and bun install
+	// Store custom CEF in .thunderbun-cache so it survives dist rebuilds and bun install
 	const cefDir = getEffectiveCEFDir(platformOS, platformArch, cefVersion);
 	console.log(`Caching custom CEF to ${cefDir}`);
 	mkdirSync(cefDir, { recursive: true });
 
 	// Download to temp file
 	const tempFile = join(
-		ELECTROBUN_DEP_PATH,
+		THUNDERBUN_DEP_PATH,
 		`cef-custom-${platformOS}-${platformArch}-${Date.now()}.tar.bz2`,
 	);
 
@@ -1064,20 +1064,20 @@ async function downloadAndExtractCustomCEF(
 const _commandDefaults = {
 	init: {
 		projectRoot,
-		config: "electrobun.config",
+		config: "thunderbun.config",
 	},
 	build: {
 		projectRoot,
-		config: "electrobun.config",
+		config: "thunderbun.config",
 	},
 	dev: {
 		projectRoot,
-		config: "electrobun.config",
+		config: "thunderbun.config",
 	},
 };
 
-// Default values merged with user's electrobun.config.ts
-// For the user-facing type, see ElectrobunConfig in src/bun/ElectrobunConfig.ts
+// Default values merged with user's thunderbun.config.ts
+// For the user-facing type, see ThunderBunConfig in src/bun/ThunderBunConfig.ts
 const defaultConfig = {
 	app: {
 		name: "MyApp",
@@ -1098,7 +1098,7 @@ const defaultConfig = {
 			notarize: false,
 			bundleCEF: false,
 			entitlements: {
-				// This entitlement is required for Electrobun apps with a hardened runtime (required for notarization) to run on macos
+				// This entitlement is required for ThunderBun apps with a hardened runtime (required for notarization) to run on macos
 				"com.apple.security.cs.allow-jit": true,
 				// Required for bun runtime to work with dynamic code execution and JIT compilation when signed
 				"com.apple.security.cs.allow-unsigned-executable-memory": true,
@@ -1237,8 +1237,8 @@ async function createLinuxInstallerArchive(
         const metadataBuffer = Buffer.from(metadataJson, "utf8");
 
         // Create marker buffers
-        const metadataMarker = Buffer.from("ELECTROBUN_METADATA_V1", "utf8");
-        const archiveMarker = Buffer.from("ELECTROBUN_ARCHIVE_V1", "utf8");
+        const metadataMarker = Buffer.from("THUNDERBUN_METADATA_V1", "utf8");
+        const archiveMarker = Buffer.from("THUNDERBUN_ARCHIVE_V1", "utf8");
 
         // Combine extractor + metadata marker + metadata + archive marker + archive
         const combinedBuffer = Buffer.concat([
@@ -1269,7 +1269,7 @@ The installer will:
 - Extract the application to ~/.local/share/
 - Create a desktop shortcut with the app's icon
 
-For more information, visit: ${config.app.homepage || 'https://electrobun.dev'}
+For more information, visit: ${config.app.homepage || 'https://thunderbun.dev'}
 `;
 
         writeFileSync(join(stagingDir, "README.txt"), readmeContent);
@@ -1366,7 +1366,7 @@ ${schemesXml}
 (async () => {
 	if (commandArg === "init") {
 		await (async () => {
-			const secondArg = process.argv[indexOfElectrobun + 2];
+			const secondArg = process.argv[indexOfThunderBun + 2];
 			const availableTemplates = getTemplateNames();
 
 			let projectName: string;
@@ -1377,16 +1377,16 @@ ${schemesXml}
 				arg.startsWith("--template="),
 			);
 			if (templateFlag) {
-				// Traditional usage: electrobun init my-project --template=photo-booth
-				projectName = secondArg || "my-electrobun-app";
+				// Traditional usage: thunderbun init my-project --template=photo-booth
+				projectName = secondArg || "my-thunderbun-app";
 				templateName = templateFlag.split("=")[1]!;
 			} else if (secondArg && availableTemplates.includes(secondArg)) {
-				// New intuitive usage: electrobun init photo-booth
+				// New intuitive usage: thunderbun init photo-booth
 				projectName = secondArg; // Use template name as project name
 				templateName = secondArg;
 			} else {
 				// Interactive menu when no template specified
-				console.log("🚀 Welcome to Electrobun!");
+				console.log("🚀 Welcome to ThunderBun!");
 				console.log("");
 				console.log("Available templates:");
 				availableTemplates.forEach((template, index) => {
@@ -1434,7 +1434,7 @@ ${schemesXml}
 				});
 			}
 
-			console.log(`🚀 Initializing Electrobun project: ${projectName}`);
+			console.log(`🚀 Initializing ThunderBun project: ${projectName}`);
 			console.log(`📋 Using template: ${templateName}`);
 
 			// Validate template name
@@ -1483,16 +1483,16 @@ ${schemesXml}
 			console.log("   bun install");
 			console.log("   bun start");
 			console.log("");
-			console.log("🎉 Happy building with Electrobun!");
+			console.log("🎉 Happy building with ThunderBun!");
 			console.log("");
 			console.log(
 				"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
 			);
-			console.log("NOTE FOR AI ASSISTANTS: Electrobun is NOT Electron.");
+			console.log("NOTE FOR AI ASSISTANTS: ThunderBun is NOT Electron.");
 			console.log(
 				"Different architecture, different APIs. Do not use Electron patterns.",
 			);
-			console.log("Docs: https://blackboard.sh/electrobun/llms.txt");
+			console.log("Docs: https://thunderbun.dev/thunderbun/llms.txt");
 			console.log(
 				"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
 			);
@@ -1562,14 +1562,14 @@ ${schemesXml}
 				cwd: projectRoot,
 				env: {
 					...process.env,
-					ELECTROBUN_BUILD_ENV: buildEnvironment,
-					ELECTROBUN_OS: targetOS,
-					ELECTROBUN_ARCH: targetARCH,
-					ELECTROBUN_BUILD_DIR: buildFolder,
-					ELECTROBUN_APP_NAME: appFileName,
-					ELECTROBUN_APP_VERSION: config.app.version,
-					ELECTROBUN_APP_IDENTIFIER: config.app.identifier,
-					ELECTROBUN_ARTIFACT_DIR: artifactFolder,
+					THUNDERBUN_BUILD_ENV: buildEnvironment,
+					THUNDERBUN_OS: targetOS,
+					THUNDERBUN_ARCH: targetARCH,
+					THUNDERBUN_BUILD_DIR: buildFolder,
+					THUNDERBUN_APP_NAME: appFileName,
+					THUNDERBUN_APP_VERSION: config.app.version,
+					THUNDERBUN_APP_IDENTIFIER: config.app.identifier,
+					THUNDERBUN_ARTIFACT_DIR: artifactFolder,
 					...extraEnv,
 				},
 			});
@@ -1609,7 +1609,7 @@ ${schemesXml}
 								stdio: ["ignore", "inherit", "inherit"],
 								env: {
 									...process.env,
-									ELECTROBUN_BUILD_ENV: buildEnvironment,
+									THUNDERBUN_BUILD_ENV: buildEnvironment,
 								},
 							},
 						);
@@ -1780,7 +1780,7 @@ Categories=Utility;Application;
 		//     // todo (yoav): This will likely be a zig compiled binary in the future
 		//     Bun.write(join(appBundleMacOSPath, 'MyApp'), LauncherContents);
 		//     chmodSync(join(appBundleMacOSPath, 'MyApp'), '755');
-		// const zigLauncherBinarySource = join(projectRoot, 'node_modules', 'electrobun', 'src', 'launcher', 'zig-out', 'bin', 'launcher');
+		// const zigLauncherBinarySource = join(projectRoot, 'node_modules', 'thunderbun', 'src', 'launcher', 'zig-out', 'bin', 'launcher');
 		// const zigLauncherDestination = join(appBundleMacOSPath, 'MyApp');
 		// const destLauncherFolder = dirname(zigLauncherDestination);
 		// if (!existsSync(destLauncherFolder)) {
@@ -2311,28 +2311,28 @@ Categories=Utility;Application;
 			// On Windows, copy BOTH x64 and ARM64 DLLs so launcher can choose at runtime
 			// (x64 Bun on ARM64 Windows can't detect real CPU architecture)
 			const x64DistPath = join(
-				ELECTROBUN_DEP_PATH,
+				THUNDERBUN_DEP_PATH,
 				"dist-win-x64",
 				"zig-asar",
 				"x64",
 				"libasar.dll",
 			);
 			const x64VendorPath = join(
-				ELECTROBUN_DEP_PATH,
+				THUNDERBUN_DEP_PATH,
 				"vendors",
 				"zig-asar",
 				"x64",
 				"libasar.dll",
 			);
 			const arm64DistPath = join(
-				ELECTROBUN_DEP_PATH,
+				THUNDERBUN_DEP_PATH,
 				"dist-win-x64",
 				"zig-asar",
 				"arm64",
 				"libasar.dll",
 			);
 			const arm64VendorPath = join(
-				ELECTROBUN_DEP_PATH,
+				THUNDERBUN_DEP_PATH,
 				"vendors",
 				"zig-asar",
 				"arm64",
@@ -2477,28 +2477,28 @@ Categories=Utility;Application;
 			if (process.platform === "win32") {
 				// Try x64 first from dist, then vendors
 				const x64DistPath = join(
-					ELECTROBUN_DEP_PATH,
+					THUNDERBUN_DEP_PATH,
 					"dist-win-x64",
 					"zig-asar",
 					"x64",
 					"zig-asar.exe",
 				);
 				const x64VendorPath = join(
-					ELECTROBUN_DEP_PATH,
+					THUNDERBUN_DEP_PATH,
 					"vendors",
 					"zig-asar",
 					"x64",
 					"zig-asar.exe",
 				);
 				const arm64DistPath = join(
-					ELECTROBUN_DEP_PATH,
+					THUNDERBUN_DEP_PATH,
 					"dist-win-x64",
 					"zig-asar",
 					"arm64",
 					"zig-asar.exe",
 				);
 				const arm64VendorPath = join(
-					ELECTROBUN_DEP_PATH,
+					THUNDERBUN_DEP_PATH,
 					"vendors",
 					"zig-asar",
 					"arm64",
@@ -2565,14 +2565,14 @@ Categories=Utility;Application;
 						"x64 binary failed (exit code 29), trying ARM64 version...",
 					);
 					const arm64DistPath = join(
-						ELECTROBUN_DEP_PATH,
+						THUNDERBUN_DEP_PATH,
 						"dist-win-x64",
 						"zig-asar",
 						"arm64",
 						"zig-asar.exe",
 					);
 					const arm64VendorPath = join(
-						ELECTROBUN_DEP_PATH,
+						THUNDERBUN_DEP_PATH,
 						"vendors",
 						"zig-asar",
 						"arm64",
@@ -2774,7 +2774,7 @@ Categories=Utility;Application;
 			}
 
 			// generate bsdiff
-			// https://storage.googleapis.com/eggbun-static/electrobun-playground/canary/ElectrobunPlayground-canary.app.tar.zst
+			// https://storage.googleapis.com/eggbun-static/thunderbun-playground/canary/ThunderBunPlayground-canary.app.tar.zst
 			console.log("baseUrl: ", config.release.baseUrl);
 
 			console.log("generating a patch from the previous version...");
@@ -2790,7 +2790,7 @@ Categories=Utility;Application;
 			) {
 				console.log("No baseUrl configured, skipping patch generation");
 				console.log(
-					"To enable patch generation, configure baseUrl in your electrobun.config",
+					"To enable patch generation, configure baseUrl in your thunderbun.config",
 				);
 			} else {
 				const urlToPrevUpdateJson = `${config.release.baseUrl.replace(/\/+$/, "")}/${platformPrefix}-update.json`;
@@ -3049,7 +3049,7 @@ Categories=Utility;Application;
 			// Run postWrap hook after self-extracting bundle is created, before code signing
 			// This is where you can add files to the wrapper (e.g., for liquid glass support)
 			runHook("postWrap", {
-				ELECTROBUN_WRAPPER_BUNDLE_PATH:
+				THUNDERBUN_WRAPPER_BUNDLE_PATH:
 					selfExtractingBundle.appBundleFolderPath,
 			});
 
@@ -3284,7 +3284,7 @@ Categories=Utility;Application;
 			OS === "macos" ? `${macOSBundleDisplayName}.app` : appFileName;
 
 		// Note: this cli will be a bun single-file-executable
-		// Note: we want to use the version of bun that's packaged with electrobun
+		// Note: we want to use the version of bun that's packaged with thunderbun
 		// const bunPath = join(projectRoot, 'node_modules', '.bin', 'bun');
 		// const mainPath = join(buildFolder, 'bun', 'index.js');
 		// const mainPath = join(buildFolder, bundleFileName);
@@ -3421,12 +3421,12 @@ Categories=Utility;Application;
 				// Its SIGINT handler calls quit() which fires beforeQuit and shuts down
 				// gracefully. Don't send another signal - just wait.
 				console.log(
-					"\n[electrobun dev] Shutting down gracefully... (press Ctrl+C again to force quit)",
+					"\n[thunderbun dev] Shutting down gracefully... (press Ctrl+C again to force quit)",
 				);
 			} else {
 				// Second Ctrl+C: force kill entire process group
 				console.log(
-					"\n[electrobun dev] Force quitting...",
+					"\n[thunderbun dev] Force quitting...",
 				);
 				try { process.kill(0, "SIGKILL"); } catch {}
 				process.exit(0);
@@ -3721,17 +3721,17 @@ Categories=Utility;Application;
 			return;
 		}
 
-		const ELECTROBUN_DEVELOPER_ID = process.env["ELECTROBUN_DEVELOPER_ID"];
+		const THUNDERBUN_DEVELOPER_ID = process.env["THUNDERBUN_DEVELOPER_ID"];
 
-		if (!ELECTROBUN_DEVELOPER_ID) {
-			console.error("Env var ELECTROBUN_DEVELOPER_ID is required to codesign");
+		if (!THUNDERBUN_DEVELOPER_ID) {
+			console.error("Env var THUNDERBUN_DEVELOPER_ID is required to codesign");
 			process.exit(1);
 		}
 
 		// If this is a DMG file, sign it directly
 		if (appBundleOrDmgPath.endsWith(".dmg")) {
 			execSync(
-				`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" ${escapePathForTerminal(
+				`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" ${escapePathForTerminal(
 					appBundleOrDmgPath,
 				)}`,
 			);
@@ -3771,7 +3771,7 @@ Categories=Utility;Application;
 										const libraryPath = join(librariesPath, library);
 										console.log(`Signing CEF library: ${library}`);
 										execSync(
-											`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" --options runtime ${escapePathForTerminal(libraryPath)}`,
+											`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" --options runtime ${escapePathForTerminal(libraryPath)}`,
 										);
 									}
 								}
@@ -3784,7 +3784,7 @@ Categories=Utility;Application;
 						// Sign the framework bundle itself (for CEF and any other frameworks)
 						console.log(`Signing framework bundle: ${framework}`);
 						execSync(
-							`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" --options runtime ${escapePathForTerminal(frameworkPath)}`,
+							`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" --options runtime ${escapePathForTerminal(frameworkPath)}`,
 						);
 					}
 				}
@@ -3818,7 +3818,7 @@ Categories=Utility;Application;
 						? `--entitlements ${entitlementsFilePath}`
 						: "";
 					execSync(
-						`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" --options runtime ${entitlementFlag} ${escapePathForTerminal(helperExecutablePath)}`,
+						`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" --options runtime ${entitlementFlag} ${escapePathForTerminal(helperExecutablePath)}`,
 					);
 				}
 
@@ -3827,7 +3827,7 @@ Categories=Utility;Application;
 					? `--entitlements ${entitlementsFilePath}`
 					: "";
 				execSync(
-					`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" --options runtime ${entitlementFlag} ${escapePathForTerminal(helperPath)}`,
+					`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" --options runtime ${entitlementFlag} ${escapePathForTerminal(helperPath)}`,
 				);
 			}
 		}
@@ -3893,7 +3893,7 @@ Categories=Utility;Application;
 
 			try {
 				execSync(
-					`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" --options runtime --identifier ${identifier} ${entitlementFlag} ${escapePathForTerminal(execPath)}`,
+					`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" --options runtime --identifier ${identifier} ${entitlementFlag} ${escapePathForTerminal(execPath)}`,
 				);
 			} catch (err) {
 				console.error(
@@ -3915,13 +3915,13 @@ Categories=Utility;Application;
 				: "";
 			try {
 				execSync(
-					`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" --options runtime ${entitlementFlag} ${escapePathForTerminal(launcherPath)}`,
+					`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" --options runtime ${entitlementFlag} ${escapePathForTerminal(launcherPath)}`,
 				);
 			} catch (error) {
 				console.error("Failed to sign launcher:", (error as Error).message);
 				console.log("Attempting to sign launcher without runtime hardening...");
 				execSync(
-					`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" ${entitlementFlag} ${escapePathForTerminal(launcherPath)}`,
+					`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" ${entitlementFlag} ${escapePathForTerminal(launcherPath)}`,
 				);
 			}
 		}
@@ -3932,7 +3932,7 @@ Categories=Utility;Application;
 			? `--entitlements ${entitlementsFilePath}`
 			: "";
 		execSync(
-			`codesign --force --verbose --timestamp --sign "${ELECTROBUN_DEVELOPER_ID}" --options runtime ${entitlementFlag} ${escapePathForTerminal(appBundleOrDmgPath)}`,
+			`codesign --force --verbose --timestamp --sign "${THUNDERBUN_DEVELOPER_ID}" --options runtime ${entitlementFlag} ${escapePathForTerminal(appBundleOrDmgPath)}`,
 		);
 	}
 
@@ -3965,24 +3965,24 @@ Categories=Utility;Application;
 		fileToNotarize = zipPath;
 		// }
 
-		const ELECTROBUN_APPLEID = process.env["ELECTROBUN_APPLEID"];
+		const THUNDERBUN_APPLEID = process.env["THUNDERBUN_APPLEID"];
 
-		if (!ELECTROBUN_APPLEID) {
-			console.error("Env var ELECTROBUN_APPLEID is required to notarize");
+		if (!THUNDERBUN_APPLEID) {
+			console.error("Env var THUNDERBUN_APPLEID is required to notarize");
 			process.exit(1);
 		}
 
-		const ELECTROBUN_APPLEIDPASS = process.env["ELECTROBUN_APPLEIDPASS"];
+		const THUNDERBUN_APPLEIDPASS = process.env["THUNDERBUN_APPLEIDPASS"];
 
-		if (!ELECTROBUN_APPLEIDPASS) {
-			console.error("Env var ELECTROBUN_APPLEIDPASS is required to notarize");
+		if (!THUNDERBUN_APPLEIDPASS) {
+			console.error("Env var THUNDERBUN_APPLEIDPASS is required to notarize");
 			process.exit(1);
 		}
 
-		const ELECTROBUN_TEAMID = process.env["ELECTROBUN_TEAMID"];
+		const THUNDERBUN_TEAMID = process.env["THUNDERBUN_TEAMID"];
 
-		if (!ELECTROBUN_TEAMID) {
-			console.error("Env var ELECTROBUN_TEAMID is required to notarize");
+		if (!THUNDERBUN_TEAMID) {
+			console.error("Env var THUNDERBUN_TEAMID is required to notarize");
 			process.exit(1);
 		}
 
@@ -3990,7 +3990,7 @@ Categories=Utility;Application;
 		// todo (yoav): follow up on options here like --s3-acceleration and --webhook
 		// todo (yoav): don't use execSync since it's blocking and we'll only see the output at the end
 		const statusInfo = execSync(
-			`xcrun notarytool submit --apple-id "${ELECTROBUN_APPLEID}" --password "${ELECTROBUN_APPLEIDPASS}" --team-id "${ELECTROBUN_TEAMID}" --wait ${escapePathForTerminal(
+			`xcrun notarytool submit --apple-id "${THUNDERBUN_APPLEID}" --password "${THUNDERBUN_APPLEIDPASS}" --team-id "${THUNDERBUN_TEAMID}" --wait ${escapePathForTerminal(
 				fileToNotarize,
 			)}`,
 		).toString();
@@ -4001,7 +4001,7 @@ Categories=Utility;Application;
 		if (statusInfo.match("Current status: Invalid")) {
 			console.error("notarization failed", statusInfo);
 			const log = execSync(
-				`xcrun notarytool log --apple-id "${ELECTROBUN_APPLEID}" --password "${ELECTROBUN_APPLEIDPASS}" --team-id "${ELECTROBUN_TEAMID}" ${uuid}`,
+				`xcrun notarytool log --apple-id "${THUNDERBUN_APPLEID}" --password "${THUNDERBUN_APPLEIDPASS}" --team-id "${THUNDERBUN_TEAMID}" ${uuid}`,
 			).toString();
 			console.log("log", log);
 			process.exit(1);

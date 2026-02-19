@@ -1,13 +1,13 @@
-// Electrobun Sandboxed Preload Script (for untrusted webviews)
+// ThunderBun Sandboxed Preload Script (for untrusted webviews)
 // This is compiled to JS and injected into webviews that ARE sandboxed
 //
 // Minimal functionality for security: NO RPC, NO encryption, NO webview tags
 // Only includes: lifecycle events, cmd+click handling, overscroll prevention
 //
 // Before this script runs, the following must be set:
-// - window.__electrobunWebviewId
-// - window.__electrobunWindowId
-// - window.__electrobunEventBridge (event emission only)
+// - window.__thunderbunWebviewId
+// - window.__thunderbunWindowId
+// - window.__thunderbunEventBridge (event emission only)
 
 import "./globals.d.ts";
 import {

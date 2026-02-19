@@ -1,9 +1,9 @@
-import type { ElectrobunConfig } from "electrobun";
+import type { ThunderBunConfig } from "thunderbun";
 
 export default {
 	app: {
 		name: "multitab-browser",
-		identifier: "multitab-browser.electrobun.dev",
+		identifier: "multitab-browser.thunderbun.dev",
 		version: "0.0.1",
 	},
 	build: {
@@ -29,4 +29,4 @@ export default {
 			bundleCEF: true,
 		},
 	},
-} satisfies ElectrobunConfig;
+} satisfies ThunderBunConfig;

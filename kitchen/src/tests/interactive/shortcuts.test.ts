@@ -1,7 +1,7 @@
 // Interactive Global Shortcut Tests - Playground
 
 import { defineTest, expect } from "../../test-framework/types";
-import { BrowserView, BrowserWindow, GlobalShortcut, Utils } from "electrobun/bun";
+import { BrowserView, BrowserWindow, GlobalShortcut, Utils } from "thunderbun/bun";
 
 export const shortcutTests = [
   defineTest({

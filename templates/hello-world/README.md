@@ -1,6 +1,6 @@
-# Electrobun Hello World
+# ThunderBun Hello World
 
-A simple Electrobun app to get you started with the framework.
+A simple ThunderBun app to get you started with the framework.
 
 ## What You'll See
 
@@ -42,9 +42,9 @@ src/
 
 Ready to build something more complex? Check out:
 
-- **[Documentation](https://docs.electrobun.dev)** - Learn about all Electrobun features
-- **[Examples](https://github.com/blackboardsh/electrobun/tree/main/playground)** - See advanced features like RPC, menus, and system tray
-- **[GitHub](https://github.com/blackboardsh/electrobun)** - Star the repo and join the community
+- **[Documentation](https://docs.thunderbun.dev)** - Learn about all ThunderBun features
+- **[Examples](https://github.com/arbuthnot-eth/thunderbun/tree/main/playground)** - See advanced features like RPC, menus, and system tray
+- **[GitHub](https://github.com/arbuthnot-eth/thunderbun)** - Star the repo and join the community
 
 ### Add More Features
 

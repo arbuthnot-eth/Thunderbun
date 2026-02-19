@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 
 const rpc = Electroview.defineRPC<any>({
   maxRequestTime: 600000, // 10 minutes for interactive exploration
@@ -8,7 +8,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 // DOM elements
 let trayTitleInput: HTMLInputElement;
@@ -30,7 +30,7 @@ function init() {
   document.getElementById("stopCounterBtn")?.addEventListener("click", stopCounter);
   document.getElementById("removeTrayBtn")?.addEventListener("click", removeTray);
   document.getElementById("doneBtn")?.addEventListener("click", () => {
-    (electrobun.rpc as any)?.request.closeWindow({});
+    (thunderbun.rpc as any)?.request.closeWindow({});
   });
 }
 
@@ -52,7 +52,7 @@ function addLog(message: string) {
 
 async function createTray() {
   try {
-    await (electrobun.rpc as any)?.request.createTray({
+    await (thunderbun.rpc as any)?.request.createTray({
       title: trayTitleInput.value || "Test Tray",
       showMenu: showMenuCheckbox.checked,
       hasSubmenu: hasSubmenuCheckbox.checked,
@@ -65,7 +65,7 @@ async function createTray() {
 
 async function updateTitle() {
   try {
-    await (electrobun.rpc as any)?.request.updateTitle({
+    await (thunderbun.rpc as any)?.request.updateTitle({
       title: newTitleInput.value,
     });
     addLog(`Updated title to: "${newTitleInput.value}"`);
@@ -76,7 +76,7 @@ async function updateTitle() {
 
 async function startCounter() {
   try {
-    await (electrobun.rpc as any)?.request.startCounter({});
+    await (thunderbun.rpc as any)?.request.startCounter({});
     addLog("Started counter");
   } catch (err) {
     addLog(`Error: ${err}`);
@@ -85,7 +85,7 @@ async function startCounter() {
 
 async function stopCounter() {
   try {
-    await (electrobun.rpc as any)?.request.stopCounter({});
+    await (thunderbun.rpc as any)?.request.stopCounter({});
     addLog("Stopped counter");
   } catch (err) {
     addLog(`Error: ${err}`);
@@ -94,7 +94,7 @@ async function stopCounter() {
 
 async function removeTray() {
   try {
-    await (electrobun.rpc as any)?.request.removeTray({});
+    await (thunderbun.rpc as any)?.request.removeTray({});
     addLog("Removed tray");
   } catch (err) {
     addLog(`Error: ${err}`);

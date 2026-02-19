@@ -1,6 +1,6 @@
 // TODO: have a context specific menu that excludes role
 import { ffi, type ApplicationMenuItemConfig } from "../proc/native";
-import electrobunEventEmitter from "../events/eventEmitter";
+import thunderbunEventEmitter from "../events/eventEmitter";
 import { roleLabelMap } from "./menuRoles";
 
 type NonDividerMenuItem = {
@@ -29,7 +29,7 @@ export const on = (
 	handler: (event: unknown) => void,
 ) => {
 	const specificName = `${name}`;
-	electrobunEventEmitter.on(specificName, handler);
+	thunderbunEventEmitter.on(specificName, handler);
 };
 
 const menuConfigWithDefaults = (

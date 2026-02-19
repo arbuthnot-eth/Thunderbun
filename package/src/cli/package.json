@@ -1,5 +1,5 @@
 {
-	"name": "electrobun-cli",
+	"name": "thunderbun-cli",
 	"module": "index.ts",
 	"type": "module",
 	"devDependencies": {},

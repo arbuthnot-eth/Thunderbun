@@ -1,4 +1,4 @@
-// <electrobun-webview> Custom Element
+// <thunderbun-webview> Custom Element
 // Provides OOPIF (out-of-process iframe) functionality
 
 import "./globals.d.ts";
@@ -28,9 +28,9 @@ type WebviewEventType =
 	| "load-finished";
 
 // Registry for webview instances (for event routing from bun)
-export const webviewRegistry: Record<number, ElectrobunWebviewTag> = {};
+export const webviewRegistry: Record<number, ThunderBunWebviewTag> = {};
 
-export class ElectrobunWebviewTag extends HTMLElement {
+export class ThunderBunWebviewTag extends HTMLElement {
 	webviewId: number | null = null;
 	maskSelectors: Set<string> = new Set();
 	lastRect: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -95,8 +95,8 @@ export class ElectrobunWebviewTag extends HTMLElement {
 
 		try {
 			const webviewId = (await request("webviewTagInit", {
-				hostWebviewId: window.__electrobunWebviewId,
-				windowId: window.__electrobunWindowId,
+				hostWebviewId: window.__thunderbunWebviewId,
+				windowId: window.__thunderbunWindowId,
 				renderer,
 				url,
 				html,
@@ -115,7 +115,7 @@ export class ElectrobunWebviewTag extends HTMLElement {
 			})) as number;
 
 			this.webviewId = webviewId;
-			this.id = `electrobun-webview-${webviewId}`;
+			this.id = `thunderbun-webview-${webviewId}`;
 			webviewRegistry[webviewId] = this;
 
 			this.setupObservers();
@@ -392,16 +392,16 @@ export class ElectrobunWebviewTag extends HTMLElement {
 
 export function initWebviewTag() {
 	// Register the custom element if not already registered
-	if (!customElements.get("electrobun-webview")) {
-		customElements.define("electrobun-webview", ElectrobunWebviewTag);
+	if (!customElements.get("thunderbun-webview")) {
+		customElements.define("thunderbun-webview", ThunderBunWebviewTag);
 	}
 
-	// Add default styles for <electrobun-webview> elements
+	// Add default styles for <thunderbun-webview> elements
 	// These can be easily overridden in the host document
 	const injectStyles = () => {
 		const style = document.createElement("style");
 		style.textContent = `
-electrobun-webview {
+thunderbun-webview {
 	display: block;
 	width: 800px;
 	height: 300px;

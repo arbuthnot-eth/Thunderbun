@@ -1,14 +1,14 @@
 {
-	"name": "electrobun-hello-world",
+	"name": "thunderbun-hello-world",
 	"version": "1.0.0",
-	"description": "A simple Electrobun app showcasing core features",
+	"description": "A simple ThunderBun app showcasing core features",
 	"scripts": {
-		"dev": "electrobun dev",
-		"build": "electrobun build",
+		"dev": "thunderbun dev",
+		"build": "thunderbun build",
 		"start": "bun run build && bun run dev"
 	},
 	"dependencies": {
-		"electrobun": "latest"
+		"thunderbun": "latest"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

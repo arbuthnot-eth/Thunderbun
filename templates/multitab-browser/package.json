@@ -1,15 +1,15 @@
 {
 	"name": "multitab-browser",
 	"version": "0.0.1",
-	"description": "A multi-tab browser demo for Electrobun",
+	"description": "A multi-tab browser demo for ThunderBun",
 	"type": "module",
 	"scripts": {
-		"build": "electrobun build",
-		"dev": "electrobun dev",
+		"build": "thunderbun build",
+		"dev": "thunderbun dev",
 		"start": "bun run build && bun run dev"
 	},
 	"dependencies": {
-		"electrobun": "latest"
+		"thunderbun": "latest"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

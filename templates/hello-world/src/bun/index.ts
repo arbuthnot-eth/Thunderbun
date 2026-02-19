@@ -1,8 +1,8 @@
-import { BrowserWindow, Utils } from "electrobun/bun";
+import { BrowserWindow, Utils } from "thunderbun/bun";
 
 // Create the main application window
 const mainWindow = new BrowserWindow({
-	title: "Hello Electrobun!",
+	title: "Hello ThunderBun!",
 	url: "views://mainview/index.html",
 	frame: {
 		width: 800,
@@ -17,4 +17,4 @@ mainWindow.on("close", () => {
 	Utils.quit();
 });
 
-console.log("Hello Electrobun app started!");
+console.log("Hello ThunderBun app started!");

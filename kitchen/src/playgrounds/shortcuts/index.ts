@@ -1,4 +1,4 @@
-import Electrobun, { Electroview } from "electrobun/view";
+import ThunderBun, { Electroview } from "thunderbun/view";
 
 const rpc = Electroview.defineRPC<any>({
   maxRequestTime: 600000,
@@ -8,7 +8,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const electrobun = new Electrobun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 // DOM elements
 let acceleratorInput: HTMLInputElement;
@@ -37,7 +37,7 @@ function init() {
   unregisterAllBtn.addEventListener("click", unregisterAllShortcuts);
   clearLogBtn.addEventListener("click", clearLog);
   document.getElementById("doneBtn")?.addEventListener("click", () => {
-    (electrobun.rpc as any)?.request.closeWindow({});
+    (thunderbun.rpc as any)?.request.closeWindow({});
   });
 
   // Setup preset buttons
@@ -61,7 +61,7 @@ async function registerShortcut() {
   }
 
   try {
-    const result = await (electrobun.rpc as any)?.request.registerShortcut({ accelerator });
+    const result = await (thunderbun.rpc as any)?.request.registerShortcut({ accelerator });
     if (result.success) {
       registeredShortcuts.set(accelerator, { count: 0 });
       addLog(`Registered: ${accelerator}`, "success");
@@ -84,7 +84,7 @@ async function unregisterCurrent() {
   }
 
   try {
-    await (electrobun.rpc as any)?.request.unregisterShortcut({ accelerator });
+    await (thunderbun.rpc as any)?.request.unregisterShortcut({ accelerator });
     registeredShortcuts.delete(accelerator);
     addLog(`Unregistered: ${accelerator}`, "info");
     updateActiveShortcuts();
@@ -95,7 +95,7 @@ async function unregisterCurrent() {
 
 async function unregisterByAccelerator(accelerator: string) {
   try {
-    await (electrobun.rpc as any)?.request.unregisterShortcut({ accelerator });
+    await (thunderbun.rpc as any)?.request.unregisterShortcut({ accelerator });
     registeredShortcuts.delete(accelerator);
     addLog(`Unregistered: ${accelerator}`, "info");
     updateActiveShortcuts();
@@ -111,7 +111,7 @@ async function unregisterAllShortcuts() {
   }
 
   try {
-    await (electrobun.rpc as any)?.request.unregisterAllShortcuts({});
+    await (thunderbun.rpc as any)?.request.unregisterAllShortcuts({});
     const count = registeredShortcuts.size;
     registeredShortcuts.clear();
     addLog(`Unregistered all ${count} shortcuts`, "success");
@@ -184,7 +184,7 @@ function escapeHtml(str: string): string {
 }
 
 // Listen for shortcut triggers from bun
-(electrobun.rpc as any)?.addMessageListener("shortcutTriggered", (data: { accelerator: string }) => {
+(thunderbun.rpc as any)?.addMessageListener("shortcutTriggered", (data: { accelerator: string }) => {
   const shortcut = registeredShortcuts.get(data.accelerator);
   if (shortcut) {
     shortcut.count++;

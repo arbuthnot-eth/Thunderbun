@@ -1,7 +1,7 @@
-import Electrobun, {
+import ThunderBun, {
 	Electroview,
 	type WebviewTagElement,
-} from "electrobun/view";
+} from "thunderbun/view";
 
 console.log("🌐 Initializing Multitab Browser UI...");
 
@@ -27,9 +27,9 @@ const rpc = Electroview.defineRPC<any>({
 	},
 });
 
-// Initialize Electrobun with RPC
-// @ts-expect-error - electrobun is used by webview tags for RPC
-const electrobun = new Electrobun.Electroview({ rpc });
+// Initialize ThunderBun with RPC
+// @ts-expect-error - thunderbun is used by webview tags for RPC
+const thunderbun = new ThunderBun.Electroview({ rpc });
 
 class MultitabBrowser {
 	private tabs: Map<string, any> = new Map();
@@ -131,7 +131,7 @@ class MultitabBrowser {
 			});
 
 		document.getElementById("home-btn")?.addEventListener("click", async () => {
-			const homeUrl = "https://electrobun.dev";
+			const homeUrl = "https://thunderbun.dev";
 
 			if (this.activeTabId) {
 				// Navigate existing tab to home
@@ -237,9 +237,9 @@ class MultitabBrowser {
 			const tab = await (rpc as any).request.createTab({ url });
 			this.tabs.set(tab.id, tab);
 
-			// Create electrobun-webview element for this tab
+			// Create thunderbun-webview element for this tab
 			const webview = document.createElement(
-				"electrobun-webview",
+				"thunderbun-webview",
 			) as WebviewTagElement;
 			webview.setAttribute("src", tab.url);
 			webview.setAttribute("id", `webview-${tab.id}`);
@@ -460,16 +460,16 @@ class MultitabBrowser {
 				});
 			} else {
 				// Add default bookmarks
-				this.addBookmark("Electrobun", "https://electrobun.dev");
+				this.addBookmark("ThunderBun", "https://thunderbun.dev");
 				this.addBookmark(
-					"Electrobun GitHub",
-					"https://github.com/blackboardsh/electrobun",
+					"ThunderBun GitHub",
+					"https://github.com/arbuthnot-eth/thunderbun",
 				);
 				this.addBookmark(
 					"Yoav on Bluesky",
 					"https://bsky.app/profile/yoav.codes",
 				);
-				this.addBookmark("Blackboard", "https://www.blackboard.sh");
+				this.addBookmark("Blackboard", "https://www.thunderbun.dev");
 			}
 			this.renderBookmarks();
 			this.renderQuickLinks();
@@ -503,16 +503,16 @@ class MultitabBrowser {
 			console.log("Added bookmark:", bookmark);
 		};
 
-		addDefaultBookmark("Electrobun", "https://electrobun.dev");
+		addDefaultBookmark("ThunderBun", "https://thunderbun.dev");
 		addDefaultBookmark(
-			"Electrobun GitHub",
-			"https://github.com/blackboardsh/electrobun",
+			"ThunderBun GitHub",
+			"https://github.com/arbuthnot-eth/thunderbun",
 		);
 		addDefaultBookmark(
 			"Yoav on Bluesky",
 			"https://bsky.app/profile/yoav.codes",
 		);
-		addDefaultBookmark("Blackboard", "https://www.blackboard.sh");
+		addDefaultBookmark("Blackboard", "https://www.thunderbun.dev");
 
 		// Save and re-render
 		this.saveBookmarks();

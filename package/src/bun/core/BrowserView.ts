@@ -1,11 +1,11 @@
 import { native, toCString, ffi } from "../proc/native";
 import * as fs from "fs";
-import electrobunEventEmitter from "../events/eventEmitter";
+import thunderbunEventEmitter from "../events/eventEmitter";
 import {
-	type ElectrobunRPCSchema,
-	type ElectrobunRPCConfig,
+	type ThunderBunRPCSchema,
+	type ThunderBunRPCConfig,
 	type RPCWithTransport,
-	defineElectrobunRPC,
+	defineThunderBunRPC,
 } from "../../shared/rpc.js";
 import { Updater } from "./Updater";
 import { BuildConfig } from "./BuildConfig";
@@ -117,7 +117,7 @@ export class BrowserView<T extends RPCWithTransport = RPCWithTransport> {
 		this.partition = options.partition || null;
 		// todo (yoav): since collisions can crash the app add a function that checks if the
 		// file exists first
-		this.pipePrefix = `/private/tmp/electrobun_ipc_pipe_${hash}_${randomId}_${this.id}`;
+		this.pipePrefix = `/private/tmp/thunderbun_ipc_pipe_${hash}_${randomId}_${this.id}`;
 		this.hostWebviewId = options.hostWebviewId;
 		this.windowId = options.windowId ?? 0;
 		this.autoResize = options.autoResize === false ? false : true;
@@ -198,7 +198,7 @@ export class BrowserView<T extends RPCWithTransport = RPCWithTransport> {
 				? jsonMessage
 				: JSON.stringify(jsonMessage);
 		// todo (yoav): make this a shared const with the browser api
-		const wrappedMessage = `window.__electrobun.receiveMessageFromBun(${stringifiedMessage})`;
+		const wrappedMessage = `window.__thunderbun.receiveMessageFromBun(${stringifiedMessage})`;
 		this.executeJavascript(wrappedMessage);
 	}
 
@@ -208,7 +208,7 @@ export class BrowserView<T extends RPCWithTransport = RPCWithTransport> {
 				? jsonMessage
 				: JSON.stringify(jsonMessage);
 		// todo (yoav): make this a shared const with the browser api
-		const wrappedMessage = `window.__electrobun.receiveInternalMessageFromBun(${stringifiedMessage})`;
+		const wrappedMessage = `window.__thunderbun.receiveInternalMessageFromBun(${stringifiedMessage})`;
 		this.executeJavascript(wrappedMessage);
 	}
 
@@ -297,7 +297,7 @@ export class BrowserView<T extends RPCWithTransport = RPCWithTransport> {
 		handler: (event: unknown) => void,
 	) {
 		const specificName = `${name}-${this.id}`;
-		electrobunEventEmitter.on(specificName, handler);
+		thunderbunEventEmitter.on(specificName, handler);
 	}
 
 	createTransport = () => {
@@ -330,9 +330,9 @@ export class BrowserView<T extends RPCWithTransport = RPCWithTransport> {
 		return Object.values(BrowserViewMap);
 	}
 
-	static defineRPC<Schema extends ElectrobunRPCSchema>(
-		config: ElectrobunRPCConfig<Schema, "bun">,
+	static defineRPC<Schema extends ThunderBunRPCSchema>(
+		config: ThunderBunRPCConfig<Schema, "bun">,
 	) {
-		return defineElectrobunRPC("bun", config);
+		return defineThunderBunRPC("bun", config);
 	}
 }

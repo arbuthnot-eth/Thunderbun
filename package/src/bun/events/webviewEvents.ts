@@ -1,4 +1,4 @@
-import ElectrobunEvent from "./event";
+import ThunderBunEvent from "./event";
 
 type DetailData = { detail: string };
 type NewWindowOpenData = {
@@ -15,25 +15,25 @@ type NewWindowOpenData = {
 
 export default {
 	willNavigate: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("will-navigate", data),
+		new ThunderBunEvent<DetailData, {}>("will-navigate", data),
 	didNavigate: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("did-navigate", data),
+		new ThunderBunEvent<DetailData, {}>("did-navigate", data),
 	didNavigateInPage: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("did-navigate-in-page", data),
+		new ThunderBunEvent<DetailData, {}>("did-navigate-in-page", data),
 	didCommitNavigation: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("did-commit-navigation", data),
+		new ThunderBunEvent<DetailData, {}>("did-commit-navigation", data),
 	domReady: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("dom-ready", data),
+		new ThunderBunEvent<DetailData, {}>("dom-ready", data),
 	newWindowOpen: (data: NewWindowOpenData) =>
-		new ElectrobunEvent<NewWindowOpenData, {}>("new-window-open", data),
+		new ThunderBunEvent<NewWindowOpenData, {}>("new-window-open", data),
 	hostMessage: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("host-message", data),
+		new ThunderBunEvent<DetailData, {}>("host-message", data),
 	downloadStarted: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("download-started", data),
+		new ThunderBunEvent<DetailData, {}>("download-started", data),
 	downloadProgress: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("download-progress", data),
+		new ThunderBunEvent<DetailData, {}>("download-progress", data),
 	downloadCompleted: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("download-completed", data),
+		new ThunderBunEvent<DetailData, {}>("download-completed", data),
 	downloadFailed: (data: DetailData) =>
-		new ElectrobunEvent<DetailData, {}>("download-failed", data),
+		new ThunderBunEvent<DetailData, {}>("download-failed", data),
 };

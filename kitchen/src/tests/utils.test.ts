@@ -1,7 +1,7 @@
 // Utils Tests - Tests for utility functions (clipboard, notifications, etc.)
 
 import { defineTest, expect } from "../test-framework/types";
-import { Utils } from "electrobun/bun";
+import { Utils } from "thunderbun/bun";
 import { mkdtemp, writeFile, access } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join } from "path";
@@ -70,7 +70,7 @@ export const utilsTests = [
       Utils.showNotification({
         title: "Test Notification",
         body: "This is a test notification from the integration tests",
-        subtitle: "Electrobun Tests",
+        subtitle: "ThunderBun Tests",
         silent: true, // Don't make sound during tests
       });
 
@@ -119,7 +119,7 @@ export const utilsTests = [
     description: "Test moving a file to trash",
     async run({ log }) {
       // Create a temp directory and file
-      const tempDir = await mkdtemp(join(tmpdir(), "electrobun-test-"));
+      const tempDir = await mkdtemp(join(tmpdir(), "thunderbun-test-"));
       const testFile = join(tempDir, "test-trash-file.txt");
 
       log(`Creating temp file: ${testFile}`);

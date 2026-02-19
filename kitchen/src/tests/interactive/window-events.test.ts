@@ -1,7 +1,7 @@
 // Interactive Window Event Tests
 
 import { defineTest } from "../../test-framework/types";
-import { BrowserView, BrowserWindow } from "electrobun/bun";
+import { BrowserView, BrowserWindow } from "thunderbun/bun";
 
 export const windowEventTests = [
   defineTest({

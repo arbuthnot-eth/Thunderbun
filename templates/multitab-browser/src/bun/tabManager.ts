@@ -1,4 +1,4 @@
-import { BrowserView } from "electrobun/bun";
+import { BrowserView } from "thunderbun/bun";
 import { type Tab, type Bookmark } from "./types/rpc";
 
 export class TabManager {
@@ -155,7 +155,7 @@ export class TabManager {
 		const tab = this.tabs.get(tabId);
 
 		if (webview && tab) {
-			// Note: These methods might not be available in current Electrobun API
+			// Note: These methods might not be available in current ThunderBun API
 			// This is a placeholder for navigation state management
 			tab.canGoBack = false; // Would need webview.canGoBack()
 			tab.canGoForward = false; // Would need webview.canGoForward()
@@ -193,7 +193,7 @@ export class TabManager {
 		// For demo, we'll start with some default bookmarks
 		this.addBookmark("Google", "https://www.google.com");
 		this.addBookmark("GitHub", "https://github.com");
-		this.addBookmark("Electrobun", "https://electrobun.dev");
+		this.addBookmark("ThunderBun", "https://thunderbun.dev");
 	}
 
 	private saveBookmarks(): void {

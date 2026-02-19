@@ -1,7 +1,7 @@
 // Screen API Tests
 
 import { defineTest, expect } from "../test-framework/types";
-import { Screen } from "electrobun/bun";
+import { Screen } from "thunderbun/bun";
 
 export const screenTests = [
   defineTest({

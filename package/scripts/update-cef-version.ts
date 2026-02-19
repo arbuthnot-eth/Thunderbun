@@ -105,7 +105,7 @@ async function main() {
 			"../src/shared/cef-version.ts",
 		);
 		const newContent = [
-			"// Default CEF version shipped with this Electrobun release.",
+			"// Default CEF version shipped with this ThunderBun release.",
 			"// All platforms use the same version. Update this single pair when bumping CEF.",
 			`export const CEF_VERSION = \`${latest.cef_version}\`;`,
 			`export const CHROMIUM_VERSION = \`${latest.chromium_version}\`;`,

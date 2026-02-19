@@ -1,26 +1,26 @@
-// Electrobun Kitchen Sink - Integration Test Runner
-// Run with: cd /electrobun/package && bun dev
+// ThunderBun Kitchen Sink - Integration Test Runner
+// Run with: cd /thunderbun/package && bun dev
 
-import Electrobun, {
+import ThunderBun, {
 	BrowserWindow,
 	BrowserView,
 	ApplicationMenu,
 	Utils,
 	BuildConfig,
 	Updater,
-} from "electrobun/bun";
+} from "thunderbun/bun";
 import { executor } from "../test-framework/executor";
 import { allTests } from "../tests";
 import type { TestRunnerRPC, UpdateInfo } from "../test-runner/rpc";
 
 console.log("\n");
 console.log("╔════════════════════════════════════════════════════════════╗");
-console.log("║       Electrobun Integration Test Runner                   ║");
+console.log("║       ThunderBun Integration Test Runner                   ║");
 console.log("╠════════════════════════════════════════════════════════════╣");
 console.log("║  Run automated tests: Click 'Run All Automated' button    ║");
 console.log("║  Run interactive tests: Click 'Run Interactive Tests'     ║");
 console.log("║                                                            ║");
-console.log("║  Auto-run tests: AUTO_RUN=1 electrobun dev                 ║");
+console.log("║  Auto-run tests: AUTO_RUN=1 thunderbun dev                 ║");
 console.log("║                                                            ║");
 console.log("║  Results will appear both in the UI and in this terminal  ║");
 console.log("╚════════════════════════════════════════════════════════════╝");
@@ -152,7 +152,7 @@ ApplicationMenu.setApplicationMenu([
 	},
 ]);
 
-Electrobun.events.on("application-menu-clicked", async (e) => {
+ThunderBun.events.on("application-menu-clicked", async (e) => {
 	if (e.data.action === "run-all-automated") {
 		await executor.runAllAutomated();
 	} else if (e.data.action === "run-interactive") {
@@ -226,7 +226,7 @@ const testRunnerRPC = BrowserView.defineRPC<TestRunnerRPC>({
 
 // Create the test runner window
 testRunnerWindow = new BrowserWindow({
-	title: "Electrobun Integration Tests",
+	title: "ThunderBun Integration Tests",
 	url: "views://test-runner/index.html",
 	renderer: "cef",
 	frame: {
@@ -321,7 +321,7 @@ console.log(
 );
 
 // Auto-run tests if AUTO_RUN environment variable is set
-// Usage: AUTO_RUN=1 electrobun dev
+// Usage: AUTO_RUN=1 thunderbun dev
 console.log(`DEBUG: AUTO_RUN env var = "${process.env["AUTO_RUN"]}"`);
 const autoRun = !!process.env["AUTO_RUN"];
 console.log(`DEBUG: autoRun = ${autoRun}`);

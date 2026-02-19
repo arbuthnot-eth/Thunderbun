@@ -1,7 +1,7 @@
 // BrowserWindow Tests - Tests for window creation and management
 
 import { defineTest, expect } from "../test-framework/types";
-import { BrowserWindow } from "electrobun/bun";
+import { BrowserWindow } from "thunderbun/bun";
 
 export const windowTests = [
   defineTest({

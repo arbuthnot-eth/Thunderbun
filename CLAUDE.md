@@ -1,12 +1,12 @@
-# Claude Development Guidelines for Electrobun
+# Claude Development Guidelines for ThunderBun
 
-## Building and Running Electrobun
+## Building and Running ThunderBun
 
 ### IMPORTANT: Build Commands
 
-**NEVER** run electrobun directly from the bin folder or node_modules. The correct way to build and run Electrobun is:
+**NEVER** run thunderbun directly from the bin folder or node_modules. The correct way to build and run ThunderBun is:
 
-1. **From the package folder** (`/home/yoav/code/electrobun/package/`):
+1. **From the package folder** (`/home/yoav/code/thunderbun/package/`):
    - `bun dev` - Builds and runs the kitchen app in dev mode
    - `bun dev:canary` - Builds the kitchen app in canary mode
 
@@ -20,7 +20,7 @@
 
 ## Project Structure
 
-- `/package` - Main Electrobun package source
+- `/package` - Main ThunderBun package source
 - `/kitchen` - Test application (Kitchen Sink)
 - `/package/src/cli` - CLI implementation
 - `/package/src/extractor` - Self-extractor implementation (Zig)
