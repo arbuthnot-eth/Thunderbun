@@ -1,0 +1,12 @@
+[package]
+name = "proof_verifier"
+version = "0.1.0"
+edition = "2024.beta"
+authors = ["ThunderBun Team"]
+description = "Security-auditable ZK proof verification for Sui — Groth16 and Ligetron-ready"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "mainnet" }
+
+[addresses]
+proof_verifier = "0x0"
