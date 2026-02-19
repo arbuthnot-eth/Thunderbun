@@ -37,9 +37,7 @@ function ensureConnectModal(): HTMLElement & { show: () => Promise<void> } {
     const el = document.createElement("mysten-dapp-kit-connect-modal");
     (el as unknown as { instance: typeof dAppKit }).instance = dAppKit;
     (el as unknown as { sortFn?: (a: { name: string }, b: { name: string }) => number }).sortFn = (a, b) => {
-      // Prefer WaaP first
-      if (a.name.toLowerCase().includes("waap")) return -1;
-      if (b.name.toLowerCase().includes("waap")) return 1;
+      // Sort normally, keeping user's installed wallets first
       return a.name.localeCompare(b.name);
     };
     document.body.appendChild(el);

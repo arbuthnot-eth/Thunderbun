@@ -1,14 +1,12 @@
 {
   "name": "thunderbun",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -p tsconfig.json && vite build",
+    "dev": "bun scripts/generate-icons.ts && vite",
+    "build": "bun scripts/generate-icons.ts && bunx tsc -p tsconfig.json && bunx vite build",
     "preview": "vite preview",
-
-    "icons:generate": "bun add -D sharp && bun run scripts/generate-icons.ts",
-
+    "icons:generate": "bun scripts/generate-icons.ts",
     "twa:prereqs": "bash scripts/check-prereqs.sh",
     "twa:setup": "npm install -g @bubblewrap/cli",
     "twa:keystore:debug": "bash scripts/gen-keystore.sh debug",
@@ -17,16 +15,13 @@
     "twa:build": "bubblewrap build --skipPwaValidation",
     "twa:update": "bubblewrap update",
     "twa:assetlinks": "bash scripts/gen-keystore.sh debug",
-
     "worker:typecheck": "tsc -p tsconfig.worker.json --noEmit",
     "worker:dev": "wrangler dev --port 8787",
-
     "deploy": "bun run build && wrangler deploy",
     "deploy:preview": "bun run build && wrangler deploy --env preview",
     "deploy:production": "bun run build && wrangler deploy --env production",
     "deploy:vercel": "npx vercel dist --prod",
     "deploy:netlify": "npx netlify deploy --prod --dir=dist",
-
     "test": "vitest run",
     "test:watch": "vitest",
     "test:playstore": "vitest run --reporter=verbose tests/playstore/",
@@ -40,8 +35,8 @@
     "@mysten/seal": "^1.0.1",
     "@mysten/sui": "^2.4.0",
     "@mysten/suins": "^1.0.2",
-    "@mysten/walrus": "^1.0.3",
     "@mysten/wallet-standard": "^0.20.1",
+    "@mysten/walrus": "^1.0.3",
     "@x402/core": "^2.3.1",
     "@x402/hono": "^2.3.0",
     "agents": "^0.5.0",
@@ -51,11 +46,12 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260219.0",
+    "@resvg/resvg-js": "^2.6.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
-    "vitest": "^4.0.18",
     "vite-plugin-pwa": "^1.2.0",
-    "wrangler": "^4.67.0",
-    "workbox-window": "^7.4.0"
+    "vitest": "^4.0.18",
+    "workbox-window": "^7.4.0",
+    "wrangler": "^4.67.0"
   }
 }

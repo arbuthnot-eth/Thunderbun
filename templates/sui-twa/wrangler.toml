@@ -17,6 +17,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 
 name            = "thunderbun"
+account_id      = "78d00354fe2d2f18838c04823c9d58f5"
 main            = "src/worker.ts"
 compatibility_date  = "2026-02-19"
 compatibility_flags = ["nodejs_compat"]
@@ -50,6 +51,16 @@ NETWORK = "testnet"
 # Production overrides
 [env.production]
 name = "thunderbun"
+routes = [
+  { pattern = "thunderbun.ai", custom_domain = true },
+  { pattern = "www.thunderbun.ai", custom_domain = true },
+]
+[[env.production.durable_objects.bindings]]
+name       = "ProofAgent"
+class_name = "ProofAgent"
+[[env.production.migrations]]
+tag                = "v1"
+new_sqlite_classes = ["ProofAgent"]
 [env.production.vars]
 NETWORK = "mainnet"
 

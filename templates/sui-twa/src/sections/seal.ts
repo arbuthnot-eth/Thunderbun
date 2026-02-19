@@ -15,6 +15,8 @@
 
 import { getSealClient } from "../sui-client";
 import { wallet } from "../wallet";
+import { getSectionSource, getInfraSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 export function renderSeal(container: HTMLElement) {
   const sealClient = getSealClient();
@@ -221,6 +223,14 @@ const plaintext = await sealClient.decrypt({
       </div>
     </div>
   `;
+
+  // Code viewer
+  const src = getSectionSource("seal");
+  if (src) {
+    const cfg = { id: "seal-src", label: "seal.ts", source: src, secondaryLabel: "sui-client.ts", secondarySource: getInfraSource("sui-client.ts") ?? undefined };
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
 
   // ── Seal SDK Encrypt ────────────────────────────────────────────────────
   container.querySelector("#seal-sdk-encrypt-btn")?.addEventListener("click", async () => {

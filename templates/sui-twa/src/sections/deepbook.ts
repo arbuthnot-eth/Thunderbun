@@ -10,6 +10,8 @@
 
 import { wallet } from "../wallet";
 import { getDeepBookClient } from "../sui-client";
+import { getSectionSource, getInfraSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 // Pool key used by the SDK registry (matches SDK constants)
 const POOL_KEY = "SUI_USDC";
@@ -264,6 +266,14 @@ const tx = db.deepBook.placeLimitOrder({
   cleanup(container, unsub);
 
   // ── Build order PTB ─────────────────────────────────────────────────────
+  // Code viewer
+  const src = getSectionSource("deepbook");
+  if (src) {
+    const cfg = { id: "deepbook-src", label: "deepbook.ts", source: src, secondaryLabel: "sui-client.ts", secondarySource: getInfraSource("sui-client.ts") ?? undefined };
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
+
   container.querySelector("#db-order")?.addEventListener("click", () => {
     const price = parseFloat(container.querySelector<HTMLInputElement>("#db-price")!.value);
     const qty   = parseFloat(container.querySelector<HTMLInputElement>("#db-qty")!.value);

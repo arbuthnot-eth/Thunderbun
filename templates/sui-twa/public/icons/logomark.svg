@@ -1,39 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 30 390 460" width="390" height="460">
   <defs>
     <linearGradient id="bunYellow" x1="30%" y1="0%" x2="70%" y2="100%">
       <stop offset="0%" stop-color="#FFD54F"/>
       <stop offset="50%" stop-color="#FFC107"/>
       <stop offset="100%" stop-color="#F9A825"/>
     </linearGradient>
-    <radialGradient id="bg" cx="50%" cy="40%" r="65%">
-      <stop offset="0%" stop-color="#1E2430"/>
-      <stop offset="100%" stop-color="#151920"/>
-    </radialGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
-
-  <!-- Thunder-bunny silhouette: rabbit head + lightning bolt -->
   <g transform="translate(256, 248) scale(1.05)">
-    <!-- Unified shape: two ears, head profile (left-facing), body merges into bolt -->
     <path d="
       M -30,-195
       C -35,-195 -52,-170 -55,-140
       C -57,-120 -48,-100 -40,-90
-
       L -70,-90
       C -80,-88 -100,-75 -108,-55
       C -118,-30 -115,-5 -108,15
       C -102,30 -90,42 -78,48
-
       L -68,50
       C -72,56 -73,60 -70,62
       C -67,64 -62,62 -58,58
-
       L -48,52
       C -35,58 -18,62 0,62
-
       L 30,62
       L -5,130
       L 45,130
@@ -42,31 +29,22 @@
       L 40,-10
       L 80,-10
       L 55,-55
-
       C 50,-65 40,-78 30,-88
       L 30,-90
-
       C 38,-100 45,-120 43,-140
       C 40,-170 23,-195 18,-195
       C 12,-195 5,-170 3,-145
       C 2,-130 4,-115 8,-105
-
       L -5,-95
       C -8,-95 -12,-95 -18,-105
-
       C -16,-115 -14,-130 -15,-145
       C -17,-170 -24,-195 -30,-195
       Z
     " fill="url(#bunYellow)"/>
 
-    <!-- Eye -->
-    <circle cx="-48" cy="-18" r="10" fill="#151920"/>
+    <circle cx="-48" cy="-18" r="10" fill="#161B22"/>
     <circle cx="-44" cy="-22" r="3.5" fill="white"/>
-
-    <!-- Nose -->
     <ellipse cx="-88" cy="25" rx="6" ry="4.5" fill="#E8A000"/>
-
-    <!-- Smile -->
     <path d="M-82,35 Q-72,46 -60,40" fill="none" stroke="#E8A000" stroke-width="3" stroke-linecap="round"/>
   </g>
 </svg>

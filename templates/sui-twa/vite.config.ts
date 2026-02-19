@@ -7,9 +7,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icons/*.png", "icons/*.svg"],
       manifest: {
-        name: "Thunderbun",
+        name: "Thunderbun — Sui SDK Playground",
         short_name: "Thunderbun",
-        description: "Sui-native PWA built with Thunderbun",
+        description: "Live SDK playground for the Sui ecosystem — connect, interact, view source, and build.",
         theme_color: "#4DA2FF",
         background_color: "#0D1117",
         display: "standalone",

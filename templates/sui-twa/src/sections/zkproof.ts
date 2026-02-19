@@ -6,6 +6,8 @@
  */
 
 import { wallet } from "../wallet";
+import { getSectionSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 const PACKAGE_ID = "0x8f96dea09cc8aee22346da38cf018428172a5efcc76b8ca6f3d83886b3f4b0e1";
 const REGISTRY_ID = "0x66c001da96d3f6934f658056c2c9cd83b257dccef35f196f1ddcee11e922b682";
@@ -61,4 +63,11 @@ export function renderZkProof(container: HTMLElement): void {
       </div>
     </div>
   `;
+
+  const src = getSectionSource("zkproof");
+  if (src) {
+    const cfg = { id: "zkproof-src", label: "zkproof.ts", source: src };
+    container.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
 }

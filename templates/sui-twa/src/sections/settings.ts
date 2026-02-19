@@ -6,6 +6,8 @@
  */
 
 import { wallet, type Network } from "../wallet";
+import { getSectionSource, getInfraSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 const NETWORKS: { id: Network; label: string; url: string }[] = [
   { id: "mainnet", label: "Mainnet", url: "https://fullnode.mainnet.sui.io" },
@@ -184,6 +186,14 @@ await wallet.executeSponsoredTx(bytes, [userSignature, sponsorSignature]);</pre>
       </div>
     </div>
   `;
+
+  // Code viewer
+  const src = getSectionSource("settings");
+  if (src) {
+    const cfg = { id: "settings-src", label: "settings.ts", source: src, secondaryLabel: "dapp-kit.ts", secondarySource: getInfraSource("dapp-kit.ts") ?? undefined };
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
 
   // Network switch
   container.querySelectorAll<HTMLElement>(".network-option").forEach((el) => {

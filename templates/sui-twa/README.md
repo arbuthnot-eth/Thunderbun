@@ -1,6 +1,8 @@
 # Thunderbun
 
-Sui dApp as a TWA — run in browser, ship to the Play Store. gRPC-first · dApp Kit · Cloudflare Workers + Agents · PWA-ready.
+Live SDK playground for the Sui ecosystem — run in browser, ship to the Play Store. gRPC-first · dApp Kit · Cloudflare Workers + Agents · PWA-ready.
+
+**Live:** [thunderbun.ai](https://thunderbun.ai)
 
 ---
 
@@ -90,7 +92,7 @@ Edit **`twa-manifest.json`** in the project root (two fields to change):
 ```json
 {
   "packageId": "xyz.sui.thunder",
-  "host":      "thunder.sui.ski"
+  "host":      "thunderbun.ai"
 }
 ```
 
@@ -106,12 +108,12 @@ npx wrangler login          # one-time: opens browser to authenticate
 bun run deploy              # builds + deploys Worker + static assets
 ```
 
-The first deploy creates your Worker. Then add a custom domain (e.g. `thunder.sui.ski`) in Cloudflare Dashboard → Workers & Pages → your Worker → Custom domains.
+The first deploy creates your Worker. Then add a custom domain (e.g. `thunderbun.ai`) in Cloudflare Dashboard → Workers & Pages → your Worker → Custom domains.
 
 Put that domain in `twa-manifest.json` → `host`:
 
 ```json
-"host": "thunder.sui.ski"
+"host": "thunderbun.ai"
 ```
 
 > Update `iconUrl`, `maskableIconUrl`, and `webManifestUrl` in `twa-manifest.json` to match your domain.
@@ -135,7 +137,7 @@ Then **redeploy** so the assetlinks file goes live:
 bun run deploy
 ```
 
-Verify it works: `curl https://thunder.sui.ski/.well-known/assetlinks.json`
+Verify it works: `curl https://thunderbun.ai/.well-known/assetlinks.json`
 
 ---
 
@@ -232,6 +234,8 @@ bun run twa:build         # new .aab
 | `src/dapp-kit.ts` | dApp Kit instance with gRPC transport and MVR enabled |
 | `src/wallet.ts` | WaaP + dApp Kit connect modal + Wallet Standard |
 | `src/sui-client.ts` | Shared SDK client accessors (Seal, DeepBook, Walrus) |
+| `src/source-files.ts` | Raw source loader (Vite `?raw` glob for code viewer) |
+| `src/components/code-viewer.ts` | Collapsible source code viewer component |
 | `src/sections/` | Page sections (each is a vanilla TS render function) |
 | `src/sections/passkeys.ts` | Passkey registration, auth, cross-subdomain iframe demo |
 | `src/worker.ts` | Hono router — agents, gas station, x402 scaffold, static assets |
@@ -240,9 +244,28 @@ bun run twa:build         # new .aab
 
 ---
 
+## Deployment
+
+### thunderbun.ai (production)
+
+```bash
+bun run build
+wrangler deploy --env production   # deploys to thunderbun.ai
+```
+
+Custom domain routes (`thunderbun.ai` + `www.thunderbun.ai`) are configured in `wrangler.toml` under `[env.production]`.
+
+### Preview / staging
+
+```bash
+wrangler deploy --env preview      # deploys to thunderbun-preview.workers.dev
+```
+
+---
+
 ## Links
 
-- [WaaP](https://docs.waap.xyz) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [Sui Docs](https://docs.sui.io) · [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) · [Play Console](https://play.google.com/console)
+- [thunderbun.ai](https://thunderbun.ai) · [WaaP](https://docs.waap.xyz) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [Sui Docs](https://docs.sui.io) · [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) · [Play Console](https://play.google.com/console)
 
 ---
 

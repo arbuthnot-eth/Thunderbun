@@ -11,6 +11,8 @@
  */
 
 import { wallet } from "../wallet";
+import { getSectionSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 interface IkaStatus {
   connected: boolean;
@@ -139,6 +141,14 @@ console.log('Ika system:', system);
       </div>
     </div>
   `;
+
+  // Code viewer
+  const src = getSectionSource("ika");
+  if (src) {
+    const cfg = { id: "ika-src", label: "ika.ts", source: src };
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
 
   // ── Network status via dynamic import ─────────────────────────────────
   async function fetchIkaStatus(): Promise<IkaStatus> {

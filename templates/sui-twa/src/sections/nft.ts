@@ -11,6 +11,8 @@
  */
 
 import { wallet } from "../wallet";
+import { getSectionSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 const TRADEPORT_GRAPHQL = "https://api.tradeport.xyz/graphql";
 
@@ -77,6 +79,14 @@ export function renderNFT(container: HTMLElement) {
       </div>
     </div>
   `;
+
+  // Code viewer
+  const nftSrc = getSectionSource("nft");
+  if (nftSrc) {
+    const cfg = { id: "nft-src", label: "nft.ts", source: nftSrc };
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
 
   const prompt  = container.querySelector<HTMLElement>("#nft-prompt")!;
   const loading = container.querySelector<HTMLElement>("#nft-loading")!;

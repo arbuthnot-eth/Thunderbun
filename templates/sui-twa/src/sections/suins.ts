@@ -12,6 +12,8 @@
 
 import { SuinsClient } from "@mysten/suins";
 import { wallet } from "../wallet";
+import { getSectionSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 let suinsClient: SuinsClient | null = null;
 let lastNetwork = "";
@@ -144,6 +146,13 @@ export function renderSuiNS(container: HTMLElement) {
   if (s.address) addrInput.value = s.address;
 
   attachHandlers(container);
+
+  const src = getSectionSource("suins");
+  if (src) {
+    const cfg = { id: "suins-src", label: "suins.ts", source: src };
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
 }
 
 function attachHandlers(container: HTMLElement) {

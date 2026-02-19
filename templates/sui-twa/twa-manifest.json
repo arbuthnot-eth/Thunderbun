@@ -2,7 +2,7 @@
   "_comment": "Thunderbun TWA manifest — used by bubblewrap to build the Android APK/AAB.",
   "_instructions": [
     "1. Deploy your Worker, then add a custom domain in Cloudflare Dashboard.",
-    "   Example: 'thunder.sui.ski'",
+    "   Example: 'thunderbun.ai'",
     "2. Replace the packageId with your own reverse-domain ID.",
     "   Must be globally unique on Play Store.",
     "3. Run: bun run twa:build",
@@ -10,7 +10,7 @@
   ],
 
   "packageId":         "xyz.sui.thunder",
-  "host":              "thunder.sui.ski",
+  "host":              "thunderbun.ai",
   "name":              "Thunderbun",
   "launcherName":      "Thunderbun",
   "display":           "standalone",
@@ -25,11 +25,11 @@
   "startUrl":          "/",
   "scope":             "/",
 
-  "iconUrl":           "https://thunder.sui.ski/icons/pwa-512x512.png",
-  "maskableIconUrl":   "https://thunder.sui.ski/icons/pwa-512x512.png",
+  "iconUrl":           "https://thunderbun.ai/icons/pwa-512x512.png",
+  "maskableIconUrl":   "https://thunderbun.ai/icons/pwa-512x512.png",
   "monochromeIconUrl": "",
 
-  "webManifestUrl":    "https://thunder.sui.ski/manifest.webmanifest",
+  "webManifestUrl":    "https://thunderbun.ai/manifest.webmanifest",
 
   "shortcuts":         [],
   "features":          {},
@@ -47,7 +47,7 @@
   "enableSiteSettingsShortcut":    true,
   "isSplashScreenFadeOutEnabled":  false,
   "splashScreenFadeOutDuration":   300,
-  "fullScopeUrl":      "https://thunder.sui.ski/",
+  "fullScopeUrl":      "https://thunderbun.ai/",
 
   "_signing_instructions": [
     "For INTERNAL TESTING (no Play Console review), signingMode='none' is fine.",

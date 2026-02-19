@@ -8,6 +8,8 @@
  */
 
 import { getWalrusClient } from "../sui-client";
+import { getSectionSource, getInfraSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 const PUBLISHER  = "https://publisher.walrus-testnet.walrus.space";
 const AGGREGATOR = "https://aggregator.walrus-testnet.walrus.space";
@@ -209,6 +211,14 @@ const { blobId } = await walrus.writeBlob({
   });
 
   // Retrieve — SDK readBlob with HTTP fallback
+  // Code viewer
+  const src = getSectionSource("walrus");
+  if (src) {
+    const cfg = { id: "walrus-src", label: "walrus.ts", source: src, secondaryLabel: "sui-client.ts", secondarySource: getInfraSource("sui-client.ts") ?? undefined };
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
+
   container.querySelector("#retrieve-btn")?.addEventListener("click", async () => {
     const blobId = container.querySelector<HTMLInputElement>("#blob-input")!.value.trim();
     if (!blobId) return;

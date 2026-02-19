@@ -2,10 +2,13 @@
  * Passkeys section — WebAuthn passkey registration + authentication for Sui
  *
  * Uses BrowserPasskeyProvider + PasskeyKeypair from @mysten/sui/keypairs/passkey.
- * Cross-subdomain portability: set rpId to root domain (e.g. sui.ski).
+ * Cross-subdomain portability: set rpId to root domain (e.g. thunderbun.ai).
  *
  * Docs: https://sdk.mystenlabs.com/typescript/cryptography/keypairs/passkey
  */
+
+import { getSectionSource } from "../source-files";
+import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
 
 /** Extract root domain for cross-subdomain passkey portability */
 function getRootDomain(): string {
@@ -37,7 +40,7 @@ export function renderPasskeys(container: HTMLElement) {
         <ul class="small muted" style="margin-bottom:12px;padding-left:18px">
           <li>Credentials are bound to an <strong>RP ID</strong> (relying party identifier)</li>
           <li>By setting <code>rpId</code> to the root domain, passkeys work across subdomains</li>
-          <li>A passkey created on <code>brando.sui.ski</code> works on <code>plankton.sui.ski</code></li>
+          <li>A passkey created on <code>sub.thunderbun.ai</code> works on <code>app.thunderbun.ai</code></li>
         </ul>
         <div style="background:var(--bg);border-radius:var(--r-md);padding:10px 14px;margin-bottom:8px">
           <span class="result-label">Current RP ID</span>
@@ -124,6 +127,14 @@ const signed = await keypair.signWithIntent(txBytes, "TransactionData");</pre>
       </div>
     </div>
   `;
+
+  // Code viewer
+  const src = getSectionSource("passkeys");
+  if (src) {
+    const cfg = { id: "passkeys-src", label: "passkeys.ts", source: src };
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    attachCodeViewer(container, cfg);
+  }
 
   // Register passkey
   container.querySelector("#pk-register")?.addEventListener("click", async () => {
