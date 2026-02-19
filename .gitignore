@@ -11,8 +11,8 @@ build
 .colab.json
 dist
 .cache
-/package/bin/electrobun
-/package/bin/electrobun.exe
+/package/bin/thunderbun
+/package/bin/thunderbun.exe
 electrobun-cef*
 electrobun-core*
 electrobun-cli*
