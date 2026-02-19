@@ -40,7 +40,7 @@ if (!window.__thunderbun) {
 	window.__thunderbun = {
 		receiveInternalMessageFromBun: internalMessageHandler,
 		receiveMessageFromBun: (msg: unknown) => {
-			// Default handler for user RPC - will be overridden if user creates Electroview
+			// Default handler for user RPC - will be overridden if user creates Thunderview
 			console.log("receiveMessageFromBun (no handler):", msg);
 		},
 	};

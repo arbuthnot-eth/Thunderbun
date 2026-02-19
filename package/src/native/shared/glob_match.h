@@ -10,7 +10,7 @@
 #include <string>
 #include <cctype>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Simple case-insensitive glob matcher (supports * wildcard only)
 // Returns true if text matches the glob pattern
@@ -54,6 +54,6 @@ inline bool globMatch(const std::string& pattern, const std::string& text) {
     return p == pattern.size();
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_GLOB_MATCH_H

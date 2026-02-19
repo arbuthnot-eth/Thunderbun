@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const zstd = std.compress.zstd;
 
-// const COMPRESSED_APP_BUNDLE_REL_PATH = "/Users/yoav/code/electrobun/example/build/canary/ElectrobunPlayground-0-0-1-canary.app/Contents/Resources/compressed.tar.zst";
+// const COMPRESSED_APP_BUNDLE_REL_PATH = "/Users/yoav/code/thunderbun/example/build/canary/ThunderBunPlayground-0-0-1-canary.app/Contents/Resources/compressed.tar.zst";
 // const COMPRESSED_APP_BUNDLE_REL_PATH = "../Resources/compressed.tar.zst";
 const BUNLE_RESOURCES_REL_PATH = "../Resources/";
 
@@ -76,7 +76,7 @@ const ProgressIndicator = struct {
 
         const zenity_args = [_][]const u8{
             "zenity",                       "--progress", "--pulsate",    "--no-cancel",
-            "--title=Electrobun Installer", extract_text, "--auto-close",
+            "--title=ThunderBun Installer", extract_text, "--auto-close",
         };
 
         var child = std.process.Child.init(&zenity_args, self.allocator);
@@ -92,7 +92,7 @@ const ProgressIndicator = struct {
 
                 const kdialog_args = [_][]const u8{
                     "kdialog", "--progressbar",        kdialog_text, "0",
-                    "--title", "Electrobun Installer",
+                    "--title", "ThunderBun Installer",
                 };
 
                 var kde_child = std.process.Child.init(&kdialog_args, self.allocator);
@@ -1192,7 +1192,7 @@ fn addWindowsUninstallEntry(allocator: std.mem.Allocator, metadata: AppMetadata,
         \\@="{s}"
         \\"DisplayName"="{s}"
         \\"DisplayVersion"="1.0"
-        \\"Publisher"="Electrobun"
+        \\"Publisher"="ThunderBun"
         \\"InstallLocation"="{s}"
         \\"UninstallString"="cmd.exe /c rmdir /s /q \"{s}\""
         \\"NoModify"=dword:00000001
@@ -1218,7 +1218,7 @@ fn addWindowsUninstallEntry(allocator: std.mem.Allocator, metadata: AppMetadata,
 }
 
 pub fn main() !void {
-    std.debug.print("Electrobun self-extractor v1.3 starting...\n", .{});
+    std.debug.print("ThunderBun self-extractor v1.3 starting...\n", .{});
     var allocator = std.heap.page_allocator;
 
     var startTime = std.time.nanoTimestamp();
@@ -1415,7 +1415,7 @@ pub fn main() !void {
 
     //     }
     // } else |_| {
-    //     // no compressed file found, assume we're the full app bundle and launch the electrobun app
+    //     // no compressed file found, assume we're the full app bundle and launch the thunderbun app
 
     //     std.debug.print("No compressed bundle found: \n", .{});
     // }
@@ -1723,7 +1723,7 @@ fn createWindowsLauncherScript(allocator: std.mem.Allocator, app_dir: []const u8
     // Create launcher batch file content
     const launcher_content = try std.fmt.allocPrint(allocator,
         \\@echo off
-        \\:: Electrobun App Launcher
+        \\:: ThunderBun App Launcher
         \\:: This file launches the current version
         \\
         \\:: Set current version

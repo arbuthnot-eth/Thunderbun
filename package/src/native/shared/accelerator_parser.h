@@ -9,7 +9,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace electrobun {
+namespace thunderbun {
 
 struct AcceleratorParts {
     std::string key;                // The key, lowercased (e.g. "t", "f1", "space")
@@ -67,6 +67,6 @@ inline AcceleratorParts parseAccelerator(const std::string& accelerator) {
     return result;
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_ACCELERATOR_PARSER_H

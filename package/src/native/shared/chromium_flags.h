@@ -18,7 +18,7 @@
 // pulling in the full CEF headers (the call sites already include them).
 #include "include/cef_command_line.h"
 
-namespace electrobun {
+namespace thunderbun {
 
 struct ChromiumFlag {
     std::string name;
@@ -126,7 +126,7 @@ inline std::vector<ChromiumFlag> parseChromiumFlags(const std::string& json) {
 }
 
 // Apply parsed flags to a CefCommandLine. Call this from
-// OnBeforeCommandLineProcessing after Electrobun's own switches.
+// OnBeforeCommandLineProcessing after ThunderBun's own switches.
 inline void applyChromiumFlags(const std::vector<ChromiumFlag>& flags,
                                CefRefPtr<CefCommandLine> command_line) {
     for (const auto& flag : flags) {
@@ -142,6 +142,6 @@ inline void applyChromiumFlags(const std::vector<ChromiumFlag>& flags,
     }
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_CHROMIUM_FLAGS_H

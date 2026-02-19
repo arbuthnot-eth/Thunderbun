@@ -1,5 +1,5 @@
 // Test Harness - A bundled view that tests can use for RPC testing
-import ThunderBun, { Electroview } from "thunderbun/view";
+import ThunderBun, { Thunderview } from "thunderbun/view";
 import type { RPCSchema } from "thunderbun";
 
 // Generic test harness RPC schema
@@ -61,7 +61,7 @@ export type TestHarnessRPC = {
 };
 
 // RPC setup with handlers for webview-side operations
-const rpc = Electroview.defineRPC<TestHarnessRPC>({
+const rpc = Thunderview.defineRPC<TestHarnessRPC>({
   maxRequestTime: 30000,
   handlers: {
     requests: {
@@ -83,7 +83,7 @@ const rpc = Electroview.defineRPC<TestHarnessRPC>({
   },
 });
 
-const thunderbun = new ThunderBun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Thunderview({ rpc });
 
 // Expose for debugging
 (window as any).thunderbun = thunderbun;

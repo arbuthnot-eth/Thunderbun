@@ -11,7 +11,7 @@
 #include <cstring>
 #include <cstdlib>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Create a copy of a string for FFI callbacks
 // The returned string is allocated with malloc/strdup and must be freed by the caller
@@ -127,13 +127,13 @@ public:
 
     // Create FFI string (caller must free)
     char* createFFIString() const {
-        return electrobun::createFFIString(data_);
+        return thunderbun::createFFIString(data_);
     }
 
 private:
     std::string data_;
 };
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_FFI_HELPERS_H

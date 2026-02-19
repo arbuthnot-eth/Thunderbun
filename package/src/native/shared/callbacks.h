@@ -8,7 +8,7 @@
 
 #include <cstdint>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Webview navigation and event callbacks
 // NOTE: Bun's FFIType.true doesn't play well with Objective-C's YES/NO char booleans
@@ -43,6 +43,6 @@ typedef void (*QuitRequestedHandler)();
 typedef const char* (*GetMimeType)(const char* filePath);
 typedef const char* (*GetHTMLForWebviewSync)(uint32_t webviewId);
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_CALLBACKS_H

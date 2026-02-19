@@ -311,8 +311,8 @@ body {
 	display: none;
 }
 
-/* Style for electrobun-webview elements */
-electrobun-webview {
+/* Style for thunderbun-webview elements */
+thunderbun-webview {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -321,7 +321,7 @@ electrobun-webview {
 	display: none;
 }
 
-electrobun-webview.active {
+thunderbun-webview.active {
 	display: block;
 }
 

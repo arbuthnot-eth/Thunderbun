@@ -16,7 +16,7 @@ import "./global.d.ts";
 const WEBVIEW_ID = window.__thunderbunWebviewId;
 const RPC_SOCKET_PORT = window.__thunderbunRpcSocketPort;
 
-class Electroview<T extends RPCWithTransport> {
+class Thunderview<T extends RPCWithTransport> {
 	bunSocket?: WebSocket;
 	// user's custom rpc browser <-> bun
 	rpc?: T;
@@ -172,13 +172,13 @@ export {
 	type ThunderBunRPCSchema,
 	type ThunderBunRPCConfig,
 	createRPC,
-	Electroview,
+	Thunderview,
 	type WebviewTagElement,
 	type WebviewEventTypes,
 };
 
 const ThunderBun = {
-	Electroview,
+	Thunderview,
 };
 
 export default ThunderBun;

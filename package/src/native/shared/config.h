@@ -10,7 +10,7 @@
 #include <string>
 #include <mutex>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Thread-safe configuration singleton
 class Config {
@@ -61,6 +61,6 @@ private:
     std::string name_;
 };
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_CONFIG_H

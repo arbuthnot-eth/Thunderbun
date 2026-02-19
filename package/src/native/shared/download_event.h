@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <sstream>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Download event types
 enum class DownloadEventType {
@@ -192,6 +192,6 @@ private:
     DownloadEvent event_;
 };
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_DOWNLOAD_EVENT_H

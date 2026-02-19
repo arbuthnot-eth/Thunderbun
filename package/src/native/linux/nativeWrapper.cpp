@@ -56,7 +56,7 @@
 #include "../shared/accelerator_parser.h"
 #include "../shared/chromium_flags.h"
 
-using namespace electrobun;
+using namespace thunderbun;
 
 // Global ASAR archive handle (lazy-loaded) with thread-safe initialization
 // ASAR C FFI declarations are in shared/asar.h
@@ -84,10 +84,10 @@ static std::atomic<int> g_activeOperations{0};
 static std::mutex g_cefBrowserMutex;
 
 // Use OperationGuard from shared/shutdown_guard.h
-using electrobun::OperationGuard;
+using thunderbun::OperationGuard;
 
 // CEF includes - always include them even if it marginally increases binary size
-// we want a few binaries that will work whenever an electrobun developer
+// we want a few binaries that will work whenever an thunderbun developer
 // adds CEF into their bundles
 #include "include/cef_app.h"
 #include "include/cef_browser.h"
@@ -165,8 +165,8 @@ static std::map<uint32_t, std::string> webviewHTMLContent;
 static std::mutex webviewHTMLMutex;
 
 // Global variables for CEF cache path isolation
-static std::string g_electrobunChannel = "";
-static std::string g_electrobunIdentifier = "";
+static std::string g_thunderbunChannel = "";
+static std::string g_thunderbunIdentifier = "";
 
 // Forward declarations for HTML content management
 extern "C" ELECTROBUN_EXPORT const char* getWebviewHTMLContent(uint32_t webviewId);
@@ -222,7 +222,7 @@ static void setX11WindowIcon(X11Window* x11win, GdkPixbuf* pixbuf);
 void applyApplicationMenuToX11Window(X11Window* x11win);
 
 // Use parseMenuJson from shared/json_menu_parser.h
-using electrobun::parseMenuJson;
+using thunderbun::parseMenuJson;
 
 // Mask rectangle structure for X11 regions
 struct MaskRect {
@@ -334,8 +334,8 @@ static std::mutex g_webviewMapMutex;
 // Global map to store preload scripts by browser ID (for multi-process CEF)
 static std::map<int, std::string> g_preloadScripts;
 
-CefRefPtr<class ElectrobunApp> g_app;
-std::vector<electrobun::ChromiumFlag> g_userChromiumFlags;
+CefRefPtr<class ThunderBunApp> g_app;
+std::vector<thunderbun::ChromiumFlag> g_userChromiumFlags;
 
 
 // Get the directory of the current executable
@@ -390,17 +390,17 @@ bool isCEFAvailable() {
 
 
 // CEF Response Filter for preload script injection (Mac-style clean approach)
-class ElectrobunResponseFilter : public CefResponseFilter {
+class ThunderBunResponseFilter : public CefResponseFilter {
 private:
-    std::string electrobun_script_;
+    std::string thunderbun_script_;
     std::string custom_script_;
     std::string buffer_;
     bool has_head_;
     bool injected_;
     
 public:
-    ElectrobunResponseFilter(const std::string& electrobunScript, const std::string& customScript)
-        : electrobun_script_(electrobunScript), 
+    ThunderBunResponseFilter(const std::string& thunderbunScript, const std::string& customScript)
+        : thunderbun_script_(thunderbunScript), 
           custom_script_(customScript),
           has_head_(false), 
           injected_(false) {}
@@ -420,8 +420,8 @@ public:
         data_in_read = data_in_size;
         
         // Only inject once and if we have scripts to inject
-        if (!injected_ && (!electrobun_script_.empty() || !custom_script_.empty())) {
-            std::string combined_script = electrobun_script_;
+        if (!injected_ && (!thunderbun_script_.empty() || !custom_script_.empty())) {
+            std::string combined_script = thunderbun_script_;
             if (!custom_script_.empty()) {
                 combined_script += "\n" + custom_script_;
             }
@@ -480,7 +480,7 @@ public:
         return RESPONSE_FILTER_DONE;
     }
     
-    IMPLEMENT_REFCOUNTING(ElectrobunResponseFilter);
+    IMPLEMENT_REFCOUNTING(ThunderBunResponseFilter);
 };
 
 // CEF views:// scheme handler implementation
@@ -696,12 +696,12 @@ private:
     IMPLEMENT_REFCOUNTING(V8MessageHandler);
 };
 
-// ElectrobunApp implementation for Linux
-class ElectrobunApp : public CefApp,
+// ThunderBunApp implementation for Linux
+class ThunderBunApp : public CefApp,
                      public CefBrowserProcessHandler,
                      public CefRenderProcessHandler {
 public:
-    ElectrobunApp() {}
+    ThunderBunApp() {}
     
     void OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line) override {
         command_line->AppendSwitchWithValue("custom-scheme", "views");
@@ -727,7 +727,7 @@ public:
         command_line->AppendSwitch("use-x11");
 
         // Apply user-defined chromium flags from build.json
-        electrobun::applyChromiumFlags(g_userChromiumFlags, command_line);
+        thunderbun::applyChromiumFlags(g_userChromiumFlags, command_line);
     }
     
     void OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) override {
@@ -784,13 +784,13 @@ public:
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunApp);
-    DISALLOW_COPY_AND_ASSIGN(ElectrobunApp);
+    IMPLEMENT_REFCOUNTING(ThunderBunApp);
+    DISALLOW_COPY_AND_ASSIGN(ThunderBunApp);
 };
 
 
-// ElectrobunClient implementation for Linux
-class ElectrobunClient : public CefClient,
+// ThunderBunClient implementation for Linux
+class ThunderBunClient : public CefClient,
                         public CefLoadHandler,
                         public CefRequestHandler,
                         public CefContextMenuHandler,
@@ -810,7 +810,7 @@ private:
     DecideNavigationCallback navigation_callback_;
     bool is_sandboxed_;
 
-    std::string electrobun_script_;
+    std::string thunderbun_script_;
     std::string custom_script_;
     CefRefPtr<CefBrowser> browser_;
     
@@ -830,7 +830,7 @@ private:
     Window parent_window_handle_;
 
 public:
-    ElectrobunClient(uint32_t webviewId,
+    ThunderBunClient(uint32_t webviewId,
                      HandlePostMessage eventBridgeHandler,
                      HandlePostMessage bunBridgeHandler,
                      HandlePostMessage internalBridgeHandler,
@@ -854,7 +854,7 @@ public:
         , parent_window_handle_(0) {}
 
     void AddPreloadScript(const std::string& script, bool mainFrameOnly = false) {
-        electrobun_script_ = script;
+        thunderbun_script_ = script;
     }
 
     void UpdateCustomPreloadScript(const std::string& script) {
@@ -862,7 +862,7 @@ public:
     }
     
     std::string GetCombinedScript() {
-        std::string combined_script = electrobun_script_;
+        std::string combined_script = thunderbun_script_;
         if (!custom_script_.empty()) {
             combined_script += "\n" + custom_script_;
         }
@@ -1072,7 +1072,7 @@ public:
             
             std::string combined_script = GetCombinedScript();
             if (!combined_script.empty()) {
-                return new ElectrobunResponseFilter(electrobun_script_, custom_script_);
+                return new ThunderBunResponseFilter(thunderbun_script_, custom_script_);
             }
         }
         return nullptr;
@@ -1912,12 +1912,12 @@ public:
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunClient);
-    DISALLOW_COPY_AND_ASSIGN(ElectrobunClient);
+    IMPLEMENT_REFCOUNTING(ThunderBunClient);
+    DISALLOW_COPY_AND_ASSIGN(ThunderBunClient);
 };
 
 // Initialize static debounce timestamp for ctrl+click handling
-double ElectrobunClient::lastCtrlClickTime = 0;
+double ThunderBunClient::lastCtrlClickTime = 0;
 
 // Initialize CEF for Linux
 bool initializeCEF() {
@@ -1967,13 +1967,13 @@ bool initializeCEF() {
     }
     
     CefMainArgs main_args(argc, argv);
-    g_app = new ElectrobunApp();
+    g_app = new ThunderBunApp();
 
     // Read user-defined chromium flags from build.json
     std::string buildJsonPath = getExecutableDir() + "/../Resources/build.json";
-    std::string buildJsonContent = electrobun::readFileToString(buildJsonPath);
+    std::string buildJsonContent = thunderbun::readFileToString(buildJsonPath);
     if (!buildJsonContent.empty()) {
-        g_userChromiumFlags = electrobun::parseChromiumFlags(buildJsonContent);
+        g_userChromiumFlags = thunderbun::parseChromiumFlags(buildJsonContent);
     }
 
     CefSettings settings;
@@ -2001,7 +2001,7 @@ bool initializeCEF() {
     char* home = getenv("HOME");
     if (home) {
         std::string basePath = std::string(home) + "/.cache";
-        std::string cachePath = buildAppDataPath(basePath, g_electrobunIdentifier, g_electrobunChannel, "CEF");
+        std::string cachePath = buildAppDataPath(basePath, g_thunderbunIdentifier, g_thunderbunChannel, "CEF");
         std::cout << "[CEF] Using path: " << cachePath << std::endl;
         CefString(&settings.root_cache_path) = cachePath;
     }
@@ -2108,7 +2108,7 @@ public:
             bool isBlockRule = !rule.empty() && rule[0] == '^';
             std::string pattern = isBlockRule ? rule.substr(1) : rule;
 
-            if (electrobun::globMatch(pattern, url)) {
+            if (thunderbun::globMatch(pattern, url)) {
                 allowed = !isBlockRule; // Last match wins
                 fprintf(stderr, "DEBUG: Navigation rule '%s' matched URL '%s', allowed=%d\n", 
                        rule.c_str(), url.c_str(), allowed);
@@ -2169,7 +2169,7 @@ public:
     HandlePostMessage bunBridgeHandler;
     HandlePostMessage internalBridgeHandler;
     bool isSandboxed;
-    std::string electrobunPreloadScript;
+    std::string thunderbunPreloadScript;
     std::string customPreloadScript;
     std::string partition;
     
@@ -2188,7 +2188,7 @@ public:
                       HandlePostMessage eventBridgeHandler,
                       HandlePostMessage bunBridgeHandler,
                       HandlePostMessage internalBridgeHandler,
-                      const char* electrobunPreloadScript,
+                      const char* thunderbunPreloadScript,
                       const char* customPreloadScript,
                       bool sandbox,
                       bool startTransparent,
@@ -2197,7 +2197,7 @@ public:
           eventHandler(webviewEventHandler), eventBridgeHandler(eventBridgeHandler),
           bunBridgeHandler(bunBridgeHandler),
           internalBridgeHandler(internalBridgeHandler), isSandboxed(sandbox),
-          electrobunPreloadScript(electrobunPreloadScript ? electrobunPreloadScript : ""),
+          thunderbunPreloadScript(thunderbunPreloadScript ? thunderbunPreloadScript : ""),
           customPreloadScript(customPreloadScript ? customPreloadScript : ""),
           partition(partitionIdentifier ? partitionIdentifier : "")
     {
@@ -2265,8 +2265,8 @@ public:
         }
         
         // Add preload scripts
-        if (!this->electrobunPreloadScript.empty()) {
-            addPreloadScriptToWebView(this->electrobunPreloadScript.c_str());
+        if (!this->thunderbunPreloadScript.empty()) {
+            addPreloadScriptToWebView(this->thunderbunPreloadScript.c_str());
         }
         if (!this->customPreloadScript.empty()) {
             addPreloadScriptToWebView(this->customPreloadScript.c_str());
@@ -2470,9 +2470,9 @@ public:
             // Remove all custom scripts (we'll track them with a prefix)
             webkit_user_content_manager_remove_all_scripts(manager);
             
-            // Re-add electrobun preload script
-            if (!electrobunPreloadScript.empty()) {
-                WebKitUserScript* script = webkit_user_script_new(electrobunPreloadScript.c_str(), 
+            // Re-add thunderbun preload script
+            if (!thunderbunPreloadScript.empty()) {
+                WebKitUserScript* script = webkit_user_script_new(thunderbunPreloadScript.c_str(), 
                                                                 WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
                                                                 WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
                                                                 nullptr, nullptr);
@@ -3225,7 +3225,7 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
             // Build cache path with identifier/channel structure (consistent with CLI and updater)
             char* home = getenv("HOME");
             std::string basePath = home ? std::string(home) + "/.cache" : "/tmp";
-            std::string cachePath = buildPartitionPath(basePath, g_electrobunIdentifier, g_electrobunChannel, "CEF", partitionName);
+            std::string cachePath = buildPartitionPath(basePath, g_thunderbunIdentifier, g_thunderbunChannel, "CEF", partitionName);
 
             // Create directory
             g_mkdir_with_parents(cachePath.c_str(), 0755);
@@ -3254,12 +3254,12 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
 }
 
 // Forward declaration for X11 event processing
-void processX11EventsForOSR(uint32_t windowId, CefRefPtr<ElectrobunClient> client);
+void processX11EventsForOSR(uint32_t windowId, CefRefPtr<ThunderBunClient> client);
 
 // OSR event handling data structure
 struct OSREventData {
     uint32_t windowId;
-    CefRefPtr<ElectrobunClient> client;
+    CefRefPtr<ThunderBunClient> client;
     bool active;
 };
 
@@ -3267,14 +3267,14 @@ struct OSREventData {
 class CEFWebViewImpl : public AbstractView {
 public:
     CefRefPtr<CefBrowser> browser;
-    CefRefPtr<ElectrobunClient> client;
+    CefRefPtr<ThunderBunClient> client;
     DecideNavigationCallback navigationCallback;
     WebviewEventHandler eventHandler;
     HandlePostMessage eventBridgeHandler;
     HandlePostMessage bunBridgeHandler;
     HandlePostMessage internalBridgeHandler;
     bool isSandboxed;
-    std::string electrobunPreloadScript;
+    std::string thunderbunPreloadScript;
     std::string customPreloadScript;
     std::string partition;
     
@@ -3313,7 +3313,7 @@ public:
                    HandlePostMessage eventBridgeHandler,
                    HandlePostMessage bunBridgeHandler,
                    HandlePostMessage internalBridgeHandler,
-                   const char* electrobunPreloadScript,
+                   const char* thunderbunPreloadScript,
                    const char* customPreloadScript,
                    bool sandbox,
                    bool startTransparent,
@@ -3322,7 +3322,7 @@ public:
           eventHandler(webviewEventHandler), eventBridgeHandler(eventBridgeHandler),
           bunBridgeHandler(bunBridgeHandler),
           internalBridgeHandler(internalBridgeHandler), isSandboxed(sandbox),
-          electrobunPreloadScript(electrobunPreloadScript ? electrobunPreloadScript : ""),
+          thunderbunPreloadScript(thunderbunPreloadScript ? thunderbunPreloadScript : ""),
           customPreloadScript(customPreloadScript ? customPreloadScript : ""),
           partition(partitionIdentifier ? partitionIdentifier : "")
     {
@@ -3409,7 +3409,7 @@ public:
         }
         
         // Create client
-        client = new ElectrobunClient(
+        client = new ThunderBunClient(
             webviewId,
             eventBridgeHandler,
             bunBridgeHandler,
@@ -3511,8 +3511,8 @@ public:
         });
         
         // Add preload scripts to the client
-        if (!electrobunPreloadScript.empty()) {
-            client->AddPreloadScript(electrobunPreloadScript);
+        if (!thunderbunPreloadScript.empty()) {
+            client->AddPreloadScript(thunderbunPreloadScript);
         }
         if (!customPreloadScript.empty()) {
             client->UpdateCustomPreloadScript(customPreloadScript);
@@ -3828,9 +3828,9 @@ public:
     }
     
     void addPreloadScriptToWebView(const char* jsString) override {
-        electrobunPreloadScript = jsString ? jsString : "";
+        thunderbunPreloadScript = jsString ? jsString : "";
         if (client) {
-            client->AddPreloadScript(electrobunPreloadScript);
+            client->AddPreloadScript(thunderbunPreloadScript);
         }
     }
     
@@ -4326,7 +4326,7 @@ public:
           title(title ? title : ""), imagePath(pathToImage ? pathToImage : "") {
         
         // Create unique indicator ID
-        std::string indicatorId = "electrobun-tray-" + std::to_string(id);
+        std::string indicatorId = "thunderbun-tray-" + std::to_string(id);
         
         // Create app indicator
         indicator = app_indicator_new(indicatorId.c_str(), 
@@ -4365,7 +4365,7 @@ public:
     void setImage(const char* newImage) {
         imagePath = newImage ? newImage : "";
         if (indicator && !imagePath.empty()) {
-            app_indicator_set_icon_full(indicator, imagePath.c_str(), "Electrobun Tray Icon");
+            app_indicator_set_icon_full(indicator, imagePath.c_str(), "ThunderBun Tray Icon");
         }
     }
     
@@ -4401,7 +4401,7 @@ private:
     void createDefaultMenu() {
         menu = gtk_menu_new();
         
-        GtkWidget* defaultItem = gtk_menu_item_new_with_label("Electrobun App");
+        GtkWidget* defaultItem = gtk_menu_item_new_with_label("ThunderBun App");
         gtk_widget_set_sensitive(defaultItem, FALSE);
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), defaultItem);
         
@@ -4452,7 +4452,7 @@ static std::map<Window, uint32_t> g_x11_window_to_id;
 static std::mutex g_x11WindowsMutex;
 
 // X11 event processing for OSR windows
-void processX11EventsForOSR(uint32_t windowId, CefRefPtr<ElectrobunClient> client) {
+void processX11EventsForOSR(uint32_t windowId, CefRefPtr<ThunderBunClient> client) {
     // Check if shutting down
     if (g_shuttingDown.load()) return;
     
@@ -5145,8 +5145,8 @@ static WebKitWebContext* getContextForPartition(const char* partitionIdentifier)
             // Build paths with identifier/channel structure (consistent with CLI and updater)
             char* home = getenv("HOME");
             std::string homeStr = home ? std::string(home) : "/tmp";
-            std::string dataPath = buildPartitionPath(homeStr + "/.local/share", g_electrobunIdentifier, g_electrobunChannel, "WebKit", partitionName);
-            std::string cachePath = buildPartitionPath(homeStr + "/.cache", g_electrobunIdentifier, g_electrobunChannel, "WebKit", partitionName);
+            std::string dataPath = buildPartitionPath(homeStr + "/.local/share", g_thunderbunIdentifier, g_thunderbunChannel, "WebKit", partitionName);
+            std::string cachePath = buildPartitionPath(homeStr + "/.cache", g_thunderbunIdentifier, g_thunderbunChannel, "WebKit", partitionName);
 
             g_mkdir_with_parents(dataPath.c_str(), 0755);
             g_mkdir_with_parents(cachePath.c_str(), 0755);
@@ -5539,8 +5539,8 @@ void* createX11Window(uint32_t windowId, double x, double y, double width, doubl
             
             // Set WM_CLASS for proper taskbar icon matching
             XClassHint class_hint;
-            class_hint.res_name = (char*)"ElectrobunKitchenSink-dev";
-            class_hint.res_class = (char*)"ElectrobunKitchenSink-dev";
+            class_hint.res_name = (char*)"ThunderBunKitchenSink-dev";
+            class_hint.res_class = (char*)"ThunderBunKitchenSink-dev";
             XSetClassHint(display, x11_window, &class_hint);
             
             // Set window protocols for close button
@@ -5644,7 +5644,7 @@ ELECTROBUN_EXPORT void* createGTKWindow(uint32_t windowId, double x, double y, d
         gtk_window_set_title(GTK_WINDOW(window), title);
         
         // Set WM_CLASS for proper taskbar icon matching
-        gtk_window_set_wmclass(GTK_WINDOW(window), "ElectrobunKitchenSink-dev", "ElectrobunKitchenSink-dev");
+        gtk_window_set_wmclass(GTK_WINDOW(window), "ThunderBunKitchenSink-dev", "ThunderBunKitchenSink-dev");
         
         gtk_window_set_default_size(GTK_WINDOW(window), (int)width, (int)height);
        
@@ -5850,7 +5850,7 @@ AbstractView* initCEFWebview(uint32_t webviewId,
                          HandlePostMessage eventBridgeHandler,
                          HandlePostMessage bunBridgeHandler,
                          HandlePostMessage internalBridgeHandler,
-                         const char* electrobunPreloadScript,
+                         const char* thunderbunPreloadScript,
                          const char* customPreloadScript,
                          bool sandbox,
                          bool startTransparent,
@@ -5865,7 +5865,7 @@ AbstractView* initCEFWebview(uint32_t webviewId,
                 url, x, y, width, height, autoResize,
                 partitionIdentifier, navigationCallback, webviewEventHandler,
                 eventBridgeHandler, bunBridgeHandler, internalBridgeHandler,
-                electrobunPreloadScript, customPreloadScript, sandbox,
+                thunderbunPreloadScript, customPreloadScript, sandbox,
                 startTransparent, startPassthrough
             );
             
@@ -5949,7 +5949,7 @@ AbstractView* initGTKWebkitWebview(uint32_t webviewId,
                          HandlePostMessage eventBridgeHandler,
                          HandlePostMessage bunBridgeHandler,
                          HandlePostMessage internalBridgeHandler,
-                         const char* electrobunPreloadScript,
+                         const char* thunderbunPreloadScript,
                          const char* customPreloadScript,
                          bool sandbox,
                          bool startTransparent,
@@ -5965,7 +5965,7 @@ AbstractView* initGTKWebkitWebview(uint32_t webviewId,
                 url, x, y, width, height, autoResize,
                 partitionIdentifier, navigationCallback, webviewEventHandler,
                 eventBridgeHandler, bunBridgeHandler, internalBridgeHandler,
-                electrobunPreloadScript, customPreloadScript, sandbox,
+                thunderbunPreloadScript, customPreloadScript, sandbox,
                 startTransparent, startPassthrough
             );
             
@@ -6019,7 +6019,7 @@ ELECTROBUN_EXPORT AbstractView* initWebview(uint32_t webviewId,
                          HandlePostMessage eventBridgeHandler,
                          HandlePostMessage bunBridgeHandler,
                          HandlePostMessage internalBridgeHandler,
-                         const char* electrobunPreloadScript,
+                         const char* thunderbunPreloadScript,
                          const char* customPreloadScript,
                          bool transparent,
                          bool sandbox) {
@@ -6044,13 +6044,13 @@ ELECTROBUN_EXPORT AbstractView* initWebview(uint32_t webviewId,
         view = initCEFWebview(webviewId, window, renderer, url, x, y, width, height, autoResize,
                               partitionIdentifier, navigationCallback, webviewEventHandler,
                               eventBridgeHandler, bunBridgeHandler, internalBridgeHandler,
-                              electrobunPreloadScript, customPreloadScript, sandbox,
+                              thunderbunPreloadScript, customPreloadScript, sandbox,
                               startTransparent, startPassthrough);
     } else {
         view = initGTKWebkitWebview(webviewId, window, renderer, url, x, y, width, height, autoResize,
                                     partitionIdentifier, navigationCallback, webviewEventHandler,
                                     eventBridgeHandler, bunBridgeHandler, internalBridgeHandler,
-                                    electrobunPreloadScript, customPreloadScript, sandbox,
+                                    thunderbunPreloadScript, customPreloadScript, sandbox,
                                     startTransparent, startPassthrough);
     }
 
@@ -7362,10 +7362,10 @@ ELECTROBUN_EXPORT void startEventLoop(const char* identifier, const char* name, 
 
     // Store identifier and channel globally for use in CEF initialization
     if (identifier && identifier[0]) {
-        g_electrobunIdentifier = std::string(identifier);
+        g_thunderbunIdentifier = std::string(identifier);
     }
     if (channel && channel[0]) {
-        g_electrobunChannel = std::string(channel);
+        g_thunderbunChannel = std::string(channel);
     }
 
     // Linux uses runEventLoop instead
@@ -8390,7 +8390,7 @@ static KeySym getKeySym(const std::string& key) {
 // Parse modifiers from accelerator string for X11 shortcuts using the
 // shared cross-platform parser. Returns X11 modifier mask.
 static unsigned int parseX11Modifiers(const std::string& accelerator, std::string& outKey) {
-    auto parts = electrobun::parseAccelerator(accelerator);
+    auto parts = thunderbun::parseAccelerator(accelerator);
     outKey = parts.key;
 
     unsigned int modifiers = 0;
@@ -8771,8 +8771,8 @@ static WebKitWebsiteDataManager* getDataManagerForPartition(const char* partitio
             // Build paths with identifier/channel structure (consistent with CLI and updater)
             char* home = getenv("HOME");
             std::string homeStr = home ? std::string(home) : "/tmp";
-            std::string dataPath = buildPartitionPath(homeStr + "/.local/share", g_electrobunIdentifier, g_electrobunChannel, "WebKit", partitionName);
-            std::string cachePath = buildPartitionPath(homeStr + "/.cache", g_electrobunIdentifier, g_electrobunChannel, "WebKit", partitionName);
+            std::string dataPath = buildPartitionPath(homeStr + "/.local/share", g_thunderbunIdentifier, g_thunderbunChannel, "WebKit", partitionName);
+            std::string cachePath = buildPartitionPath(homeStr + "/.cache", g_thunderbunIdentifier, g_thunderbunChannel, "WebKit", partitionName);
 
             g_mkdir_with_parents(dataPath.c_str(), 0755);
             g_mkdir_with_parents(cachePath.c_str(), 0755);

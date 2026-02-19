@@ -9,7 +9,7 @@
 
 #include <string>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Get MIME type from a URL or file path based on extension
 // Returns "application/octet-stream" as default for unknown types
@@ -96,6 +96,6 @@ inline std::string getMimeTypeFromUrl(const std::string& url) {
     return "application/octet-stream"; // default
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_MIME_TYPES_H

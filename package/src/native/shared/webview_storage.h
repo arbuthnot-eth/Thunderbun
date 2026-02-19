@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <cstring>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Thread-safe storage for webview HTML content
 // Replaces the duplicated webviewHTMLContent maps across platforms
@@ -86,6 +86,6 @@ inline const char* getWebviewHTMLContentShared(uint32_t webviewId) {
     return WebviewContentStorage::getInstance().getContentForFFI(webviewId);
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_WEBVIEW_STORAGE_H

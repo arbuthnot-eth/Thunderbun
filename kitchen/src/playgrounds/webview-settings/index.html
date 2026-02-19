@@ -35,7 +35,7 @@
                     </select>
                 </label>
                 <label>src:
-                    <input type="text" id="optSrc" value="https://electrobun.dev" style="width: 260px;">
+                    <input type="text" id="optSrc" value="https://thunderbun.dev" style="width: 260px;">
                 </label>
             </div>
             <div class="option-row">
@@ -95,7 +95,7 @@
             document.getElementById('webviewList').appendChild(card);
 
             // Create the webview element
-            const wv = document.createElement('electrobun-webview');
+            const wv = document.createElement('thunderbun-webview');
             wv.setAttribute('renderer', renderer);
             wv.setAttribute('src', src);
             wv.style.width = width + 'px';
@@ -122,7 +122,7 @@
         function toggleAttr(id, attr) {
             const container = document.getElementById('container-' + id);
             if (!container) return;
-            const wv = container.querySelector('electrobun-webview');
+            const wv = container.querySelector('thunderbun-webview');
             if (!wv) return;
 
             if (attr === 'transparent') {

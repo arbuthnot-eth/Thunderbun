@@ -10,7 +10,7 @@
 #include <map>
 #include <mutex>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Represents a preload script to be injected into webviews
 struct PreloadScript {
@@ -66,6 +66,6 @@ private:
     std::map<int, std::string> scripts_;
 };
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_PRELOAD_SCRIPT_H

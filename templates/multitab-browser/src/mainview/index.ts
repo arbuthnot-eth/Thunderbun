@@ -1,12 +1,12 @@
 import ThunderBun, {
-	Electroview,
+	Thunderview,
 	type WebviewTagElement,
 } from "thunderbun/view";
 
 console.log("🌐 Initializing Multitab Browser UI...");
 
 // Create RPC client
-const rpc = Electroview.defineRPC<any>({
+const rpc = Thunderview.defineRPC<any>({
 	maxRequestTime: 10000,
 	handlers: {
 		requests: {},
@@ -29,7 +29,7 @@ const rpc = Electroview.defineRPC<any>({
 
 // Initialize ThunderBun with RPC
 // @ts-expect-error - thunderbun is used by webview tags for RPC
-const thunderbun = new ThunderBun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Thunderview({ rpc });
 
 class MultitabBrowser {
 	private tabs: Map<string, any> = new Map();

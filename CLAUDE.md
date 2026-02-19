@@ -1,58 +1,82 @@
 # Claude Development Guidelines for ThunderBun
 
-## Building and Running ThunderBun
-
-### IMPORTANT: Build Commands
-
-**NEVER** run thunderbun directly from the bin folder or node_modules. The correct way to build and run ThunderBun is:
-
-1. **From the package folder** (`/home/yoav/code/thunderbun/package/`):
-   - `bun dev` - Builds and runs the kitchen app in dev mode
-   - `bun dev:canary` - Builds the kitchen app in canary mode
-
-2. **Build Process Flow**:
-   - Always run build commands from the `package` folder
-   - The build process will automatically:
-     - Build the native wrappers
-     - Compile the TypeScript code
-     - Build the CLI
-     - Switch to the kitchen folder and build/run the app
-
 ## Project Structure
 
-- `/package` - Main ThunderBun package source
-- `/kitchen` - Test application (Kitchen Sink)
-- `/package/src/cli` - CLI implementation
-- `/package/src/extractor` - Self-extractor implementation (Zig)
-- `/package/src/native` - Native wrappers for each platform
-- `/templates/sui-twa` - Sui TWA template (dApp Kit + WaaP + ecosystem SDKs)
+- `/package` — ThunderBun framework + CLI source
+- `/kitchen` — Kitchen Sink desktop test app
+- `/templates/` — App templates (hello-world, react-tailwind-vite, svelte, photo-booth, multitab-browser, sui-twa)
+- `/move/ligetron-verifier` — Sui Move: Groth16 verifier + attestation contracts
+- `/contracts/proof-verifier` — Sui Move: general-purpose Groth16 framework
+- `/docs/` — Internal docs (BUILD.md, CEF.md, BETA_RELEASE.md)
 
-## CRITICAL: Sui RPC Deprecation Timeline
+## Building and Running
 
-**JSON-RPC is being sunset.** Do NOT write new code using JSON-RPC unless there is no alternative.
+### Desktop framework (from `package/`)
 
-| Date | Milestone |
-|------|-----------|
-| Sep–Oct 2025 | JSON-RPC enters deprecation |
-| Dec 2025 | GraphQL RPC + Indexer reach GA |
-| **April 2026** | **JSON-RPC shuts down entirely** |
+**NEVER** run thunderbun directly from `bin/` or `node_modules/`.
 
-### Migration Priority
+```bash
+cd package
+bun dev              # Build framework + CLI, then build + run kitchen app (dev mode)
+bun dev:canary       # Same but canary channel
+bun build.ts         # Full build (all platforms)
+bun build.ts --release  # Release build
+bun run build:cli    # CLI binary only
+bun run test:unit    # Unit tests (src/shared)
+```
 
-1. **gRPC** (`SuiGrpcClient` from `@mysten/sui/grpc`) — replaces JSON-RPC on full nodes, generally available NOW. Use for all new direct node communication. Public endpoints: `https://fullnode.{mainnet,testnet,devnet}.sui.io:443`
-2. **GraphQL RPC** (`SuiGraphQLClient` from `@mysten/sui/graphql`) — alternative to gRPC, better for complex queries. Requires self-hosted or provider-hosted GraphQL+Indexer stack.
-3. **JSON-RPC** (`SuiJsonRpcClient` from `@mysten/sui/jsonRpc`) — DEPRECATED. Only use as fallback when ecosystem SDKs require it.
+The build process vendors Bun, Zig, and CEF, compiles native wrappers, builds the CLI, then switches to the kitchen folder to build and run the test app.
+
+### Sui TWA template (from `templates/sui-twa/`)
+
+```bash
+cd templates/sui-twa
+bun install
+bun run dev          # Vite dev server → localhost:5173
+bun run build        # Production build
+bun run deploy       # Cloudflare Workers deploy
+bun run twa:init     # Bubblewrap wizard (Android)
+bun run twa:build    # Android .aab for Play Store
+```
+
+### Move contracts
+
+```bash
+cd move/ligetron-verifier
+sui move build
+sui move test        # All tests should pass
+sui client publish --gas-budget 100000000
+```
+
+## Sui RPC: gRPC Only
+
+**JSON-RPC shuts down April 2026.** Do NOT write new code using JSON-RPC.
+
+| Priority | Transport | When to use |
+|----------|-----------|-------------|
+| 1 | `SuiGrpcClient` from `@mysten/sui/grpc` | All new code. Public endpoints: `https://fullnode.{network}.sui.io:443` |
+| 2 | `SuiGraphQLClient` from `@mysten/sui/graphql` | Complex queries needing GraphQL+Indexer |
+| 3 | `SuiJsonRpcClient` from `@mysten/sui/jsonRpc` | DEPRECATED. Only when a third-party SDK requires it |
 
 ### Current state (sui-twa template)
 
-- `dapp-kit.ts` uses `SuiGrpcClient` from `@mysten/sui/grpc`. All Mysten ecosystem SDKs (`dapp-kit-core`, `deepbook-v3`, `seal`, `walrus`, `suins`) accept `ClientWithCoreApi` and are fully compatible with gRPC.
-- `@human.tech/waap-sdk@1.2.0` and `@ika.xyz/sdk@0.2.7` are still pinned to `@mysten/sui@^1.x` (both at latest published versions). This does not affect the main client — WaaP only does Wallet Standard registration (client-agnostic), and Ika creates its own isolated JSON-RPC client via dynamic import.
-- The `@ika.xyz/sdk` bundles its own `@mysten/sui@1.45.2` (pre-v2) and expects `SuiClient` (alias for `SuiJsonRpcClient`). Pass via `as never` for type compatibility.
+- `dapp-kit.ts` uses `SuiGrpcClient` with MVR (`mvr: {}`). All Mysten SDKs (dapp-kit-core, deepbook-v3, seal, walrus, suins) accept `ClientWithCoreApi` — fully gRPC compatible.
+- `@human.tech/waap-sdk` — client-agnostic (Wallet Standard only).
+- `@ika.xyz/sdk` — bundles its own `@mysten/sui@1.45.2`, creates isolated JSON-RPC client via dynamic import. Pass clients via `as never` for type compatibility. Does not affect main app client.
 
-## Sui TWA Template: SDK Client Architecture
+## SDK Client Architecture (sui-twa)
 
 - `src/sui-client.ts` provides lazy, network-aware singletons for SealClient, DeepBookClient, WalrusClient
 - All clients auto-invalidate on network switch
-- DeepBook uses `address: "0x0"` for read-only queries; real address needed for order execution
-- Seal key servers are only configured for testnet; `getSealClient()` returns null on other networks
-- Walrus SDK `writeBlob()` requires a `Signer` keypair (not available in browser wallet context); use HTTP publisher for writes, SDK for reads
+- DeepBook uses `address: "0x0"` for read-only queries
+- Seal key servers only configured for testnet — `getSealClient()` returns null on other networks
+- Walrus SDK `writeBlob()` requires `Signer` keypair (not available in browser) — use HTTP publisher for writes, SDK for reads
+
+## Coding Conventions
+
+- **Vanilla TypeScript** in sui-twa sections — no React components, `innerHTML` + event handlers
+- **No Tailwind** — vanilla CSS with design tokens
+- **Move 2024.beta edition** — method syntax, named error constants
+- **No narration comments** — only explain non-obvious intent
+- **Explicit return types** on exported functions
+- **Pipeline functions** accept config objects, never hardcode URLs or IDs

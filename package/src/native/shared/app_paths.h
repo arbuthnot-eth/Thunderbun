@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace electrobun {
+namespace thunderbun {
 
 /**
  * Build the app data path using identifier/channel structure.
@@ -11,7 +11,7 @@ namespace electrobun {
  * the CLI and updater conventions.
  *
  * @param basePath The base application support/data path (e.g., ~/Library/Application Support)
- * @param identifier The app identifier (e.g., "sh.blackboard.electrobun-kitchen")
+ * @param identifier The app identifier (e.g., "sh.blackboard.thunderbun-kitchen")
  * @param channel The release channel (e.g., "dev", "canary", "stable")
  * @param suffix Optional suffix to append (e.g., "CEF", "WebView2")
  * @param pathSeparator The path separator to use ('/' for Unix, '\\' for Windows)
@@ -24,7 +24,7 @@ inline std::string buildAppDataPath(
     const std::string& suffix = "",
     char pathSeparator = '/'
 ) {
-    std::string appId = !identifier.empty() ? identifier : "Electrobun";
+    std::string appId = !identifier.empty() ? identifier : "ThunderBun";
     std::string channelPath = !channel.empty() ? channel : "default";
 
     std::string result = basePath;
@@ -68,6 +68,6 @@ inline std::string buildPartitionPath(
     return base;
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_APP_PATHS_H

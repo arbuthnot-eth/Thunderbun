@@ -1,176 +1,142 @@
-# ThunderBun ⚡
+# ThunderBun
 
-**Sui-native TWA framework — gRPC-first, Cloudflare Workers + Agents, Play Store in one scaffold.**
+Cross-platform desktop app framework built on [Bun](https://bun.sh). Build fast, tiny native apps with TypeScript.
 
-The first Sui dApp template built entirely on `SuiGrpcClient`. JSON-RPC shuts down April 2026 — ThunderBun is already migrated.
+ThunderBun packages your app with native webview wrappers (CEF or system WebKit/WebView2), a Bun runtime, and a self-extracting installer — all from a single `thunderbun.config.ts`.
 
----
+## Web3 & Web4 Native
 
-## JSON-RPC → gRPC Migration
+Unlike other lightweight Electron alternatives, **ThunderBun** is built from the ground up to be highly composable with modern decentralized tech. It is shipped with first-class support for:
+- **Agents SDK** (`npm i agents`) for AI-driven multi-agent systems
+- **WaaP** (`@human.tech/waap-sdk`) for seamless Wallet as a Service
+- **Ika** (`@ika.xyz/sdk`) for MPC and dWallets
+- **x402** (`@x402/core` & `@x402/hono`) for frictionless HTTP 402 AI micropayments
 
-Sui is deprecating JSON-RPC. ThunderBun ships with the full migration already done:
-
-| Layer | Before (deprecated) | After (ThunderBun) |
-|-------|--------------------|--------------------|
-| **Client** | `SuiClient` / `SuiJsonRpcClient` | `SuiGrpcClient` from `@mysten/sui/grpc` |
-| **Endpoint** | `getFullnodeUrl("testnet")` | `https://fullnode.testnet.sui.io:443` |
-| **Name resolution** | MVR over JSON-RPC | MVR over gRPC (`mvr: {}`) |
-| **Balance** | `res.totalBalance` | `res.balance.balance` |
-| **Object listing** | `getOwnedObjects` + `showDisplay` | `listOwnedObjects` + `include: { json: true }` |
-| **Object fields** | `o.data?.display?.data?.name` | `o.json?.name` |
-| **SuiNS forward** | `resolveNameServiceAddress` | `SuinsClient.getNameRecord()` |
-| **SuiNS reverse** | `resolveNameServiceNames` (paginated) | `defaultNameServiceName()` (single default) |
-| **Transaction exec** | `executeTransactionBlock` | `executeTransaction` |
-
-### How ThunderBun handles it
-
-```ts
-// src/dapp-kit.ts — the core client
-import { SuiGrpcClient } from "@mysten/sui/grpc";
-
-const client = new SuiGrpcClient({
-  baseUrl: `https://fullnode.${network}.sui.io:443`,
-  network,
-  mvr: {},  // Move Registry name resolution
-});
-```
-
-All Mysten ecosystem SDKs accept `ClientWithCoreApi` and work with gRPC out of the box:
-
-- `@mysten/dapp-kit-core` — connect modal, wallet standard
-- `@mysten/deepbook-v3` — order book queries
-- `@mysten/seal` — threshold encryption
-- `@mysten/walrus` — blob storage
-- `@mysten/suins` — name service
-
-### Migrating your existing dApp
-
-1. Replace `SuiClient` → `SuiGrpcClient` (from `@mysten/sui/grpc`)
-2. Replace `url:` → `baseUrl:` in constructor
-3. Replace `getFullnodeUrl()` → `https://fullnode.${network}.sui.io:443`
-4. Add `network` and `mvr: {}` to constructor options
-5. Update response destructuring (`totalBalance` → `balance.balance`, etc.)
-6. Replace `getOwnedObjects` → `listOwnedObjects` with `include: { json: true }`
-
-### Third-party SDK compatibility
-
-| SDK | Status | Notes |
-|-----|--------|-------|
-| `@human.tech/waap-sdk` | Works | Wallet Standard only — client-agnostic |
-| `@ika.xyz/sdk` | Isolated | Bundles own `@mysten/sui@1.x`, uses dynamic import — does not touch main client |
-| `@x402/core` + `@x402/hono` | Works | HTTP-level protocol, no Sui client dependency |
+The included `sui-twa` template provides a comprehensive starting point to leverage these packages immediately while remaining tiny and cross-platform.
 
 ---
 
 ## Quick Start
 
 ```bash
-npx thunderbun init
-
-cd thunder
+npx thunderbun init    # scaffold from a template
+cd my-app
 bun install
-bun run dev       # Opens at localhost:5173
+bun run dev
 ```
 
----
+## Templates
 
-## What's Included
+| Template | Description |
+|----------|-------------|
+| `hello-world` | Minimal starter |
+| `react-tailwind-vite` | React + Tailwind + Vite |
+| `svelte` | Svelte app |
+| `photo-booth` | Camera / media capture demo |
+| `multitab-browser` | Tabbed browser shell |
+| `sui-twa` | Sui blockchain TWA — gRPC, dApp Kit, WaaP, ZK proofs, Cloudflare Workers |
 
-| Category | Feature | SDK / Tool |
-|----------|---------|------------|
-| **Transport** | gRPC + MVR name resolution | `@mysten/sui/grpc` |
-| **Connect** | dApp Kit connect modal | `@mysten/dapp-kit-core` |
-| **Wallet** | WaaP embedded wallet | `@human.tech/waap-sdk` |
-| **Wallet** | Passkeys (WebAuthn, cross-subdomain) | `@mysten/sui/keypairs/passkey` |
-| **Wallet** | Sponsored transactions (client + gas station) | `@mysten/sui` native |
-| **Names** | SuiNS forward + reverse lookup | `@mysten/suins` |
-| **Storage** | Walrus blob read/write | `@mysten/walrus` |
-| **Trading** | DeepBook v3 order book queries | `@mysten/deepbook-v3` |
-| **Encryption** | Seal threshold encryption | `@mysten/seal` |
-| **MPC** | Ika 2PC / dWallets | `@ika.xyz/sdk` |
-| **NFTs** | TradePort browsing | REST API |
-| **Proofs** | ZK proof verifier | Groth16 / Ligetron |
-| **Payments** | x402 scaffold (ready for `@x402/sui`) | `@x402/core` + `@x402/hono` |
-| **Workers** | Hono router + static assets | `hono` + Cloudflare Workers |
-| **Agents** | ProofAgent Durable Object | `agents` SDK |
-| **PWA** | Service worker, offline-ready | `vite-plugin-pwa` |
+## Platform Support
 
----
+| Platform | Architectures | Webview |
+|----------|---------------|---------|
+| macOS | ARM64 (Apple Silicon), x64 (Intel) | CEF or WebKit (weak-linked) |
+| Windows | x64 (ARM runs via emulation) | CEF or WebView2 |
+| Linux | x64, ARM64 | CEF or WebKitGTK (dual-binary) |
 
-## Cloudflare Workers + Agents
+CEF is optional — set `bundleCEF: false` in your config to ship a smaller binary using the system webview.
 
-The Worker (`src/worker.ts`) is a Hono app that handles everything:
+## Architecture
 
 ```
-/agents/*        → Durable Object routing (WebSocket + RPC)
-/api/sponsor     → Gas station (opt-in, Ed25519 signing)
-/api/paid/*      → x402 paywalled routes (scaffold)
-/*               → Static PWA assets (Vite build)
+thunderbun/
+├── package/              CLI + framework source
+│   ├── src/cli/          CLI — `npx thunderbun init`, build, package
+│   ├── src/native/       Native wrappers (macOS, Windows, Linux)
+│   ├── src/extractor/    Self-extracting installer (Zig)
+│   ├── src/bun/          Bun-side runtime API
+│   ├── src/browser/      Browser-side runtime API
+│   └── build.ts          Build orchestrator (vendors Bun, Zig, CEF)
+├── kitchen/              Kitchen Sink test app
+├── templates/            App templates (embedded into CLI)
+│   ├── hello-world/
+│   ├── react-tailwind-vite/
+│   ├── svelte/
+│   ├── photo-booth/
+│   ├── multitab-browser/
+│   └── sui-twa/          Sui blockchain TWA template
+├── move/                 Sui Move smart contracts
+│   └── ligetron-verifier/
+├── contracts/            Additional on-chain contracts
+│   └── proof-verifier/
+└── docs/                 Internal documentation
 ```
 
-### Deploy
+## Building from Source
+
+All build commands run from the `package/` directory:
 
 ```bash
-wrangler login             # one-time
-bun run deploy             # builds + deploys Worker + static assets
+cd package
+bun install
+
+bun dev              # build + run kitchen sink app (dev mode)
+bun build.ts         # full build (all platforms)
+bun build.ts --release  # release build
+bun run build:cli    # CLI binary only
 ```
 
-### Gas Station (opt-in)
+The build system vendors Bun, Zig, and optionally CEF, then compiles native wrappers for the target platform.
+
+## Sui TWA Template
+
+The `sui-twa` template is a Sui-native PWA/TWA wired to the full Mysten ecosystem, ready for Play Store distribution via Bubblewrap.
+
+**Transport**: `SuiGrpcClient` from `@mysten/sui/grpc` — fully migrated off JSON-RPC (shuts down April 2026).
+
+Included SDKs:
+
+| Category | SDK |
+|----------|-----|
+| Connect | `@mysten/dapp-kit-core` |
+| Wallet | `@human.tech/waap-sdk` (embedded) + passkeys |
+| Names | `@mysten/suins` |
+| Storage | `@mysten/walrus` |
+| Trading | `@mysten/deepbook-v3` |
+| Encryption | `@mysten/seal` |
+| MPC | `@ika.xyz/sdk` |
+| Workers | Hono + Cloudflare Workers + Agents SDK |
+| Payments | x402 scaffold |
 
 ```bash
-wrangler secret put SPONSOR_PRIVATE_KEY   # Bech32 suiprivkey1q...
-wrangler secret put MAX_GAS_BUDGET        # optional, default 50_000_000 (0.05 SUI)
+cd templates/sui-twa
+bun install
+bun run dev          # localhost:5173
+bun run deploy       # Cloudflare Workers
+bun run twa:build    # Android .aab for Play Store
 ```
 
-### ProofAgent
-
-Each user gets a persistent Durable Object with SQLite storage, real-time WebSocket state sync, and `@callable` RPC methods:
-
-```ts
-// Browser
-const agent = new AgentClient({ agent: "ProofAgent", name: suiAddress });
-const { proofId } = await agent.call("recordProof", [{ programDigest, txDigest }]);
-const history = await agent.call("getHistory", [{ limit: 20 }]);
-```
-
----
-
-## TWA → Play Store
+## Publishing
 
 ```bash
-bun run build
-bun run deploy             # deploy to Cloudflare Workers
-
-bun run twa:init           # bubblewrap wizard
-bun run twa:build          # outputs app-release.aab
-# Upload .aab to Google Play Console
+cd package
+bun run npm:publish         # stable release
+bun run npm:publish:beta    # beta release
 ```
 
-**Prerequisites:** Java 17+ · `npm i -g @bubblewrap/cli`
+## Docs
 
----
-
-## Project Layout
-
-| Path | Purpose |
-|------|---------|
-| `src/dapp-kit.ts` | `SuiGrpcClient` instance with MVR — the core gRPC client |
-| `src/worker.ts` | Hono router — agents, gas station, x402, static assets |
-| `src/agents/ProofAgent.ts` | Durable Object with SQLite + WebSocket state sync |
-| `src/wallet.ts` | WaaP + connect modal + sponsored tx helpers |
-| `src/sui-client.ts` | Lazy singletons for Seal, DeepBook, Walrus (all via gRPC) |
-| `src/sections/` | Page sections (vanilla TS render functions) |
-| `wrangler.toml` | Worker config, Durable Object bindings, env vars |
-| `vite.config.ts` | PWA manifest, Workbox caching |
-
----
+- [AI Agent Guide](AGENTS.md) — codebase overview for AI coding agents
+- [Build System](docs/BUILD.md) — cross-platform compilation, native wrappers
+- [CEF Management](docs/CEF.md) — versioning, caching, custom CEF builds
+- [Beta Releases](docs/BETA_RELEASE.md) — beta workflow for maintainers
 
 ## Links
 
-- [Sui gRPC Migration](https://docs.sui.io) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [WaaP](https://docs.waap.xyz)
-- [Cloudflare Workers](https://developers.cloudflare.com/workers/) · [Agents SDK](https://github.com/cloudflare/agents)
-- [Hono](https://hono.dev) · [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)
+- [thunderbun.dev](https://thunderbun.dev)
+- [GitHub](https://github.com/arbuthnot-eth/thunderbun)
+- [Sui gRPC Docs](https://docs.sui.io) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [WaaP](https://docs.waap.xyz)
 
 ---
 
-MIT · [ThunderBun](https://github.com/arbuthnot-eth/thunderbun)
+MIT

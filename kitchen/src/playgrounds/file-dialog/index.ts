@@ -1,7 +1,7 @@
-import ThunderBun, { Electroview } from "thunderbun/view";
+import ThunderBun, { Thunderview } from "thunderbun/view";
 
 // RPC setup - use long timeout since file dialogs can take a while
-const rpc = Electroview.defineRPC<any>({
+const rpc = Thunderview.defineRPC<any>({
   maxRequestTime: 600000, // 10 minutes - users can browse for a while
   handlers: {
     requests: {},
@@ -9,7 +9,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const thunderbun = new ThunderBun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Thunderview({ rpc });
 
 // DOM elements
 let startingFolderInput: HTMLInputElement;

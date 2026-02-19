@@ -13,7 +13,7 @@
 #include <optional>
 #include <vector>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Thread-safe wrapper around std::map
 // Provides synchronized access to key-value storage
@@ -133,6 +133,6 @@ private:
     std::map<KeyType, ValueType> map_;
 };
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_THREAD_SAFE_MAP_H

@@ -54,7 +54,7 @@
             color: #aaa;
             margin-bottom: 15px;
         }
-        electrobun-webview {
+        thunderbun-webview {
             width: 100%;
             height: 180px;
             border: 2px solid #3a3a5a;
@@ -93,10 +93,10 @@
     <div class="section">
         <h2>Nested Webview</h2>
         <div class="info">
-            <p>The webview below uses <code>__electrobunSendToHost()</code> to send messages to this parent view.</p>
+            <p>The webview below uses <code>__thunderbunSendToHost()</code> to send messages to this parent view.</p>
             <p>Click the buttons in the webview to test. Messages will appear in the log below.</p>
         </div>
-        <electrobun-webview
+        <thunderbun-webview
             id="testWebview"
             renderer="cef"
             src="views://playgrounds/webviewtag/host-message-test.html"
@@ -104,14 +104,14 @@
                 (function() {
                     window.addEventListener('load', function() {
                         document.getElementById('sendBtn').onclick = () => {
-                            window.__electrobunSendToHost({
+                            window.__thunderbunSendToHost({
                                 type: 'button-click',
                                 message: 'Hello from nested webview!',
                                 timestamp: Date.now()
                             });
                         };
                         document.addEventListener('keydown', (e) => {
-                            window.__electrobunSendToHost({
+                            window.__thunderbunSendToHost({
                                 type: 'keydown',
                                 key: e.key,
                                 code: e.code,
@@ -124,11 +124,11 @@
                             });
                         });
                         // Send initial load message
-                        window.__electrobunSendToHost({ type: 'loaded', timestamp: Date.now() });
+                        window.__thunderbunSendToHost({ type: 'loaded', timestamp: Date.now() });
                     });
                 })();
             ">
-        </electrobun-webview>
+        </thunderbun-webview>
     </div>
 
     <div class="section">

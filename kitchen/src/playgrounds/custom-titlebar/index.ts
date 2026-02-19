@@ -1,6 +1,6 @@
-import ThunderBun, { Electroview } from "thunderbun/view";
+import ThunderBun, { Thunderview } from "thunderbun/view";
 
-const rpc = Electroview.defineRPC<any>({
+const rpc = Thunderview.defineRPC<any>({
   maxRequestTime: 600000,
   handlers: {
     requests: {},
@@ -8,7 +8,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const thunderbun = new ThunderBun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Thunderview({ rpc });
 
 document.addEventListener("DOMContentLoaded", () => {
   // Custom window control buttons

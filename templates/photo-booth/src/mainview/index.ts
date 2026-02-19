@@ -1,8 +1,8 @@
-import ThunderBun, { Electroview } from "thunderbun/view";
+import ThunderBun, { Thunderview } from "thunderbun/view";
 import type { PhotoBoothRPC } from "../bun/index";
 
 // Create RPC client
-const rpc = Electroview.defineRPC<PhotoBoothRPC>({
+const rpc = Thunderview.defineRPC<PhotoBoothRPC>({
 	maxRequestTime: 5000,
 	handlers: {
 		requests: {},
@@ -11,7 +11,7 @@ const rpc = Electroview.defineRPC<PhotoBoothRPC>({
 });
 
 // Initialize ThunderBun with RPC
-const thunderbun = new ThunderBun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Thunderview({ rpc });
 
 interface Photo {
 	id: string;

@@ -12,7 +12,7 @@
 #include <thread>
 #include <chrono>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Singleton for managing global shutdown state
 // Allows code to check if shutdown is in progress and avoid race conditions
@@ -129,6 +129,6 @@ inline void initiateShutdown() {
     ShutdownManager::getInstance().initiateShutdown();
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_SHUTDOWN_GUARD_H

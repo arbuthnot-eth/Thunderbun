@@ -1,4 +1,4 @@
-import ThunderBun, { Electroview } from "thunderbun/view";
+import ThunderBun, { Thunderview } from "thunderbun/view";
 
 interface MenuConfig {
   id: string;
@@ -111,7 +111,7 @@ const menuConfigs: MenuConfig[] = [
   },
 ];
 
-const rpc = Electroview.defineRPC<any>({
+const rpc = Thunderview.defineRPC<any>({
   maxRequestTime: 600000,
   handlers: {
     requests: {},
@@ -127,7 +127,7 @@ const rpc = Electroview.defineRPC<any>({
   },
 });
 
-const thunderbun = new ThunderBun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Thunderview({ rpc });
 
 let currentMenuId = "menu1";
 

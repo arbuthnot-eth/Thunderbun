@@ -21,3 +21,5 @@ dist-*
 /package/src/bun/preload/.generated
 *.tar.gz
 settings.local.json
+.env
+.env.*

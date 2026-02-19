@@ -13,7 +13,7 @@
 #include <mutex>
 #include <utility>
 
-namespace electrobun {
+namespace thunderbun {
 
 enum class PermissionType {
     USER_MEDIA,
@@ -113,6 +113,6 @@ inline void cachePermission(const std::string& origin, PermissionType type, Perm
     PermissionCache::getInstance().set(origin, type, status);
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_PERMISSIONS_H

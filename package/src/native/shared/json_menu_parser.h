@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace electrobun {
+namespace thunderbun {
 
 // Represents a parsed menu item from JSON
 struct MenuItemJson {
@@ -218,6 +218,6 @@ inline std::vector<MenuItemJson> parseMenuJson(const std::string& jsonStr) {
     return items;
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_JSON_MENU_PARSER_H

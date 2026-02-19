@@ -57,7 +57,7 @@
 #include "../shared/accelerator_parser.h"
 #include "../shared/chromium_flags.h"
 
-using namespace electrobun;
+using namespace thunderbun;
 
 // Simple ASAR reader implementation for Windows (no external dependency)
 #include <fstream>
@@ -402,9 +402,9 @@ static GetMimeType g_getMimeType = nullptr;
 static GetHTMLForWebviewSync g_getHTMLForWebviewSync = nullptr;
 
 // Global variables for CEF cache path isolation
-static std::string g_electrobunChannel = "";
-static std::string g_electrobunIdentifier = "";
-static std::string g_electrobunName = "";
+static std::string g_thunderbunChannel = "";
+static std::string g_thunderbunIdentifier = "";
+static std::string g_thunderbunName = "";
 
 // Webview content storage (replaces JSCallback approach)
 static std::map<uint32_t, std::string> webviewHTMLContent;
@@ -513,7 +513,7 @@ static int FindAvailableRemoteDebugPort(int startPort, int endPort) {
 // CEF global variables
 static bool g_cef_initialized = false;
 static CefRefPtr<CefApp> g_cef_app;
-static std::vector<electrobun::ChromiumFlag> g_userChromiumFlags;
+static std::vector<thunderbun::ChromiumFlag> g_userChromiumFlags;
 static HANDLE g_job_object = nullptr;  // Job object to track all child processes
 
 // Quit/shutdown coordination
@@ -523,7 +523,7 @@ static std::atomic<bool> g_eventLoopStopping{false};
 static DWORD g_mainThreadId = 0;
 
 // Simple CEF App class for minimal implementation
-class ElectrobunCefApp : public CefApp, public CefBrowserProcessHandler {
+class ThunderBunCefApp : public CefApp, public CefBrowserProcessHandler {
 public:
     CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
         return this;
@@ -539,7 +539,7 @@ public:
         command_line->AppendSwitch("allow-insecure-localhost");
 
         // Apply user-defined chromium flags from build.json
-        electrobun::applyChromiumFlags(g_userChromiumFlags, command_line);
+        thunderbun::applyChromiumFlags(g_userChromiumFlags, command_line);
     }
 
     void OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) override {
@@ -553,24 +553,24 @@ public:
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunCefApp);
+    IMPLEMENT_REFCOUNTING(ThunderBunCefApp);
 };
 
 // Forward declaration for CEF client (needed for load handler)
-class ElectrobunCefClient;
+class ThunderBunCefClient;
 
 // CEF Load Handler for debugging navigation
-class ElectrobunLoadHandler : public CefLoadHandler {
+class ThunderBunLoadHandler : public CefLoadHandler {
 public:
     uint32_t webview_id_ = 0;
     WebviewEventHandler webview_event_handler_ = nullptr;
-    CefRefPtr<ElectrobunCefClient> client_ = nullptr;
+    CefRefPtr<ThunderBunCefClient> client_ = nullptr;
 
-    ElectrobunLoadHandler() {}
+    ThunderBunLoadHandler() {}
 
     void SetWebviewId(uint32_t id) { webview_id_ = id; }
     void SetWebviewEventHandler(WebviewEventHandler handler) { webview_event_handler_ = handler; }
-    void SetClient(CefRefPtr<ElectrobunCefClient> client) { client_ = client; }
+    void SetClient(CefRefPtr<ThunderBunCefClient> client) { client_ = client; }
 
     void OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, TransitionType transition_type) override;
     void OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) override;
@@ -581,19 +581,19 @@ public:
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunLoadHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunLoadHandler);
 };
 
 // Global map to store CEF clients for browser connection
-static std::map<HWND, CefRefPtr<ElectrobunCefClient>> g_cefClients;
+static std::map<HWND, CefRefPtr<ThunderBunCefClient>> g_cefClients;
 
 // Forward declaration for helper functions (defined after class definitions)
-void SetBrowserOnClient(CefRefPtr<ElectrobunCefClient> client, CefRefPtr<CefBrowser> browser);
+void SetBrowserOnClient(CefRefPtr<ThunderBunCefClient> client, CefRefPtr<CefBrowser> browser);
 void SetBrowserOnCEFView(HWND parentWindow, CefRefPtr<CefBrowser> browser);
 void SetWebViewOnWebView2View(HWND containerWindow, void* webview);
 
 // CEF Life Span Handler for async browser creation
-class ElectrobunLifeSpanHandler : public CefLifeSpanHandler {
+class ThunderBunLifeSpanHandler : public CefLifeSpanHandler {
 public:
     void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
         // Note: Browser setup is now handled synchronously during CreateBrowserSync
@@ -633,11 +633,11 @@ public:
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunLifeSpanHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunLifeSpanHandler);
 };
 
 // Forward declaration for DevTools callback
-class ElectrobunCefClient;
+class ThunderBunCefClient;
 typedef void (*RemoteDevToolsClosedCallback)(void* ctx, int target_id);
 void RemoteDevToolsClosed(void* ctx, int target_id);
 
@@ -673,7 +673,7 @@ struct DevToolsWindowContext {
 };
 
 static std::once_flag g_devtoolsClassRegistered;
-static const char* DEVTOOLS_WINDOW_CLASS = "ElectrobunDevToolsClass";
+static const char* DEVTOOLS_WINDOW_CLASS = "ThunderBunDevToolsClass";
 
 static LRESULT CALLBACK DevToolsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     DevToolsWindowContext* dtCtx = nullptr;
@@ -733,9 +733,9 @@ std::string loadViewsFile(const std::string& path);
 std::string getMimeTypeForFile(const std::string& path);
 
 // CEF Resource Handler for views:// scheme (based on Mac implementation)
-class ElectrobunSchemeHandler : public CefResourceHandler {
+class ThunderBunSchemeHandler : public CefResourceHandler {
 public:
-    ElectrobunSchemeHandler() : offset_(0), hasResponse_(false) {}
+    ThunderBunSchemeHandler() : offset_(0), hasResponse_(false) {}
 
     bool Open(CefRefPtr<CefRequest> request, bool& handle_request, CefRefPtr<CefCallback> callback) override {
         handle_request = true;
@@ -784,27 +784,27 @@ private:
     std::vector<char> responseData_;
     bool hasResponse_;
     size_t offset_;
-    IMPLEMENT_REFCOUNTING(ElectrobunSchemeHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunSchemeHandler);
 };
 
 // CEF Scheme Handler Factory
-class ElectrobunSchemeHandlerFactory : public CefSchemeHandlerFactory {
+class ThunderBunSchemeHandlerFactory : public CefSchemeHandlerFactory {
 public:
     CefRefPtr<CefResourceHandler> Create(CefRefPtr<CefBrowser> browser,
                                        CefRefPtr<CefFrame> frame,
                                        const CefString& scheme_name,
                                        CefRefPtr<CefRequest> request) override {
-        return new ElectrobunSchemeHandler();
+        return new ThunderBunSchemeHandler();
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunSchemeHandlerFactory);
+    IMPLEMENT_REFCOUNTING(ThunderBunSchemeHandlerFactory);
 };
 
 // CEF Response Filter for script injection
-class ElectrobunResponseFilter : public CefResponseFilter {
+class ThunderBunResponseFilter : public CefResponseFilter {
 public:
-    ElectrobunResponseFilter(const std::string& script) : script_(script) {}
+    ThunderBunResponseFilter(const std::string& script) : script_(script) {}
 
     bool InitFilter() override {
         return true;
@@ -877,18 +877,18 @@ private:
     std::string processed_data_;
     size_t output_offset_ = 0;
     bool processed_ = false;
-    IMPLEMENT_REFCOUNTING(ElectrobunResponseFilter);
+    IMPLEMENT_REFCOUNTING(ThunderBunResponseFilter);
 };
 
-// Forward declaration for ElectrobunCefClient
-class ElectrobunCefClient;
+// Forward declaration for ThunderBunCefClient
+class ThunderBunCefClient;
 
 // CEF Resource Request Handler to inject preload scripts via response filter
-class ElectrobunResourceRequestHandler : public CefResourceRequestHandler {
+class ThunderBunResourceRequestHandler : public CefResourceRequestHandler {
 public:
-    CefRefPtr<ElectrobunCefClient> client_ = nullptr;
+    CefRefPtr<ThunderBunCefClient> client_ = nullptr;
 
-    ElectrobunResourceRequestHandler(CefRefPtr<ElectrobunCefClient> client) : client_(client) {}
+    ThunderBunResourceRequestHandler(CefRefPtr<ThunderBunCefClient> client) : client_(client) {}
 
     // Response filter to inject preload scripts into HTML before parsing
     // This ensures scripts execute BEFORE any page JavaScript
@@ -898,26 +898,26 @@ public:
         CefRefPtr<CefRequest> request,
         CefRefPtr<CefResponse> response) override;
 
-    IMPLEMENT_REFCOUNTING(ElectrobunResourceRequestHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunResourceRequestHandler);
 };
 
 // CEF Request Handler for views:// scheme support
-class ElectrobunRequestHandler : public CefRequestHandler {
+class ThunderBunRequestHandler : public CefRequestHandler {
 public:
     uint32_t webview_id_ = 0;
     WebviewEventHandler webview_event_handler_ = nullptr;
     AbstractView* abstract_view_ = nullptr;
-    CefRefPtr<ElectrobunCefClient> client_ = nullptr;
+    CefRefPtr<ThunderBunCefClient> client_ = nullptr;
 
     // Static debounce timestamp for ctrl+click handling
     static double lastCtrlClickTime;
 
-    ElectrobunRequestHandler() {}
+    ThunderBunRequestHandler() {}
 
     void SetWebviewId(uint32_t id) { webview_id_ = id; }
     void SetWebviewEventHandler(WebviewEventHandler handler) { webview_event_handler_ = handler; }
     void SetAbstractView(AbstractView* view) { abstract_view_ = view; }
-    void SetClient(CefRefPtr<ElectrobunCefClient> client) { client_ = client; }
+    void SetClient(CefRefPtr<ThunderBunCefClient> client) { client_ = client; }
 
     // Return resource request handler to enable response filtering
     CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(
@@ -930,7 +930,7 @@ public:
         bool& disable_default_handling) override {
 
         if (client_) {
-            return new ElectrobunResourceRequestHandler(client_);
+            return new ThunderBunResourceRequestHandler(client_);
         }
         return nullptr;
     }
@@ -1009,16 +1009,16 @@ public:
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunRequestHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunRequestHandler);
 };
 
 // Initialize static debounce timestamp
-double ElectrobunRequestHandler::lastCtrlClickTime = 0;
+double ThunderBunRequestHandler::lastCtrlClickTime = 0;
 
 // CEF Context Menu Handler for devtools support
-class ElectrobunContextMenuHandler : public CefContextMenuHandler {
+class ThunderBunContextMenuHandler : public CefContextMenuHandler {
 public:
-    ElectrobunContextMenuHandler() {}
+    ThunderBunContextMenuHandler() {}
     
     void OnBeforeContextMenu(CefRefPtr<CefBrowser> browser,
                            CefRefPtr<CefFrame> frame,
@@ -1029,7 +1029,7 @@ public:
         model->AddItem(26501, "Inspect Element");
     }
     
-    // Defined out-of-line after ElectrobunCefClient (needs full class definition)
+    // Defined out-of-line after ThunderBunCefClient (needs full class definition)
     bool OnContextMenuCommand(CefRefPtr<CefBrowser> browser,
                             CefRefPtr<CefFrame> frame,
                             CefRefPtr<CefContextMenuParams> params,
@@ -1037,11 +1037,11 @@ public:
                             EventFlags event_flags) override;
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunContextMenuHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunContextMenuHandler);
 };
 
 // CEF Permission Handler for user media and other permissions
-class ElectrobunPermissionHandler : public CefPermissionHandler {
+class ThunderBunPermissionHandler : public CefPermissionHandler {
 public:
     bool OnRequestMediaAccessPermission(
         CefRefPtr<CefBrowser> browser,
@@ -1173,7 +1173,7 @@ public:
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunPermissionHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunPermissionHandler);
 };
 
 // Helper functions for string conversion
@@ -1222,7 +1222,7 @@ std::string WStringToString(const std::wstring& wstr) {
 }
 
 // CEF Dialog Handler for file dialogs
-class ElectrobunDialogHandler : public CefDialogHandler {
+class ThunderBunDialogHandler : public CefDialogHandler {
 public:
     bool OnFileDialog(CefRefPtr<CefBrowser> browser,
                       FileDialogMode mode,
@@ -1369,13 +1369,13 @@ public:
     }
     
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunDialogHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunDialogHandler);
 };
 
 // CEF Download handler for Windows
-class ElectrobunDownloadHandler : public CefDownloadHandler {
+class ThunderBunDownloadHandler : public CefDownloadHandler {
 public:
-    ElectrobunDownloadHandler() {}
+    ThunderBunDownloadHandler() {}
 
     bool OnBeforeDownload(CefRefPtr<CefBrowser> browser,
                           CefRefPtr<CefDownloadItem> download_item,
@@ -1448,7 +1448,7 @@ public:
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunDownloadHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunDownloadHandler);
 };
 
 // OSR (Off-Screen Rendering) Window for transparent CEF windows
@@ -1647,9 +1647,9 @@ private:
 };
 
 // CEF Render Handler for off-screen rendering (OSR) mode
-class ElectrobunRenderHandler : public CefRenderHandler {
+class ThunderBunRenderHandler : public CefRenderHandler {
 public:
-    ElectrobunRenderHandler() : view_width_(800), view_height_(600), osr_window_(nullptr) {}
+    ThunderBunRenderHandler() : view_width_(800), view_height_(600), osr_window_(nullptr) {}
 
     void SetOSRWindow(OSRWindow* window) {
         osr_window_ = window;
@@ -1680,31 +1680,31 @@ private:
     int view_height_;
     OSRWindow* osr_window_;
 
-    IMPLEMENT_REFCOUNTING(ElectrobunRenderHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunRenderHandler);
 };
 
 // Forward declaration
 void handleApplicationMenuSelection(UINT menuId);
 
 // CEF Keyboard Handler for menu accelerators
-class ElectrobunKeyboardHandler : public CefKeyboardHandler {
+class ThunderBunKeyboardHandler : public CefKeyboardHandler {
 public:
-    // Defined out-of-line after ElectrobunCefClient (needs full class definition)
+    // Defined out-of-line after ThunderBunCefClient (needs full class definition)
     bool OnPreKeyEvent(CefRefPtr<CefBrowser> browser,
                       const CefKeyEvent& event,
                       CefEventHandle os_event,
                       bool* is_keyboard_shortcut) override;
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunKeyboardHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunKeyboardHandler);
 };
 
 // CEF Client class with load and life span handlers
-class ElectrobunCefClient : public CefClient, public CefDisplayHandler {
+class ThunderBunCefClient : public CefClient, public CefDisplayHandler {
 public:
     WebviewEventHandler webview_event_handler_ = nullptr;
 
-    ElectrobunCefClient(uint32_t webviewId,
+    ThunderBunCefClient(uint32_t webviewId,
                        HandlePostMessage eventBridgeHandler,
                        HandlePostMessage bunBridgeHandler,
                        HandlePostMessage internalBridgeHandler,
@@ -1715,23 +1715,23 @@ public:
           webview_tag_handler_(internalBridgeHandler),
           is_sandboxed_(sandbox),
           osr_enabled_(false) {
-        m_loadHandler = new ElectrobunLoadHandler();
+        m_loadHandler = new ThunderBunLoadHandler();
         m_loadHandler->SetClient(this); // Set client reference for load handler
-        m_lifeSpanHandler = new ElectrobunLifeSpanHandler();
-        m_requestHandler = new ElectrobunRequestHandler();
+        m_lifeSpanHandler = new ThunderBunLifeSpanHandler();
+        m_requestHandler = new ThunderBunRequestHandler();
         m_requestHandler->SetWebviewId(webviewId);
         m_requestHandler->SetClient(this); // Set client reference for response filter
-        m_contextMenuHandler = new ElectrobunContextMenuHandler();
-        m_permissionHandler = new ElectrobunPermissionHandler();
-        m_dialogHandler = new ElectrobunDialogHandler();
-        m_downloadHandler = new ElectrobunDownloadHandler();
-        m_keyboardHandler = new ElectrobunKeyboardHandler();
+        m_contextMenuHandler = new ThunderBunContextMenuHandler();
+        m_permissionHandler = new ThunderBunPermissionHandler();
+        m_dialogHandler = new ThunderBunDialogHandler();
+        m_downloadHandler = new ThunderBunDownloadHandler();
+        m_keyboardHandler = new ThunderBunKeyboardHandler();
         m_renderHandler = nullptr; // Created only when OSR is enabled
     }
 
     void EnableOSR(int width, int height) {
         osr_enabled_ = true;
-        m_renderHandler = new ElectrobunRenderHandler();
+        m_renderHandler = new ThunderBunRenderHandler();
         m_renderHandler->SetViewSize(width, height);
     }
 
@@ -1763,7 +1763,7 @@ public:
     }
 
     void AddPreloadScript(const std::string& script) {
-        electrobun_script_ = script;
+        thunderbun_script_ = script;
     }
 
     void UpdateCustomPreloadScript(const std::string& script) {
@@ -1848,7 +1848,7 @@ public:
     std::string GetCombinedScript() const {
         // Inject webviewId into global scope before other scripts
         std::string combined_script = "window.webviewId = " + std::to_string(webview_id_) + ";\n";
-        combined_script += electrobun_script_;
+        combined_script += thunderbun_script_;
         if (!custom_script_.empty()) {
             combined_script += "\n" + custom_script_;
         }
@@ -1897,12 +1897,12 @@ public:
         int port = g_remoteDebugPort;
 
         // Keep ref to self for the background thread
-        CefRefPtr<ElectrobunCefClient> self(this);
+        CefRefPtr<ThunderBunCefClient> self(this);
 
         // Fetch /json on a background thread
         std::thread([self, target_id, targetUrl, targetTitle, port]() {
             // WinHTTP synchronous GET to http://127.0.0.1:{port}/json
-            HINTERNET hSession = WinHttpOpen(L"Electrobun/DevTools",
+            HINTERNET hSession = WinHttpOpen(L"ThunderBun/DevTools",
                                               WINHTTP_ACCESS_TYPE_NO_PROXY,
                                               WINHTTP_NO_PROXY_NAME,
                                               WINHTTP_NO_PROXY_BYPASS, 0);
@@ -2022,13 +2022,13 @@ public:
             // Post back to the UI thread via CefPostTask
             class CreateDevToolsTask : public CefTask {
             public:
-                CreateDevToolsTask(CefRefPtr<ElectrobunCefClient> client, int tid, const std::string& url)
+                CreateDevToolsTask(CefRefPtr<ThunderBunCefClient> client, int tid, const std::string& url)
                     : client_(client), target_id_(tid), url_(url) {}
                 void Execute() override {
                     client_->CreateRemoteDevToolsWindow(target_id_, url_);
                 }
             private:
-                CefRefPtr<ElectrobunCefClient> client_;
+                CefRefPtr<ThunderBunCefClient> client_;
                 int target_id_;
                 std::string url_;
                 IMPLEMENT_REFCOUNTING(CreateDevToolsTask);
@@ -2134,18 +2134,18 @@ private:
     HandlePostMessage bun_bridge_handler_;
     HandlePostMessage webview_tag_handler_;
     bool is_sandboxed_;
-    std::string electrobun_script_;
+    std::string thunderbun_script_;
     std::string custom_script_;
     CefRefPtr<CefBrowser> browser_;
-    CefRefPtr<ElectrobunLoadHandler> m_loadHandler;
-    CefRefPtr<ElectrobunLifeSpanHandler> m_lifeSpanHandler;
-    CefRefPtr<ElectrobunRequestHandler> m_requestHandler;
-    CefRefPtr<ElectrobunContextMenuHandler> m_contextMenuHandler;
-    CefRefPtr<ElectrobunPermissionHandler> m_permissionHandler;
-    CefRefPtr<ElectrobunDialogHandler> m_dialogHandler;
-    CefRefPtr<ElectrobunDownloadHandler> m_downloadHandler;
-    CefRefPtr<ElectrobunKeyboardHandler> m_keyboardHandler;
-    CefRefPtr<ElectrobunRenderHandler> m_renderHandler;
+    CefRefPtr<ThunderBunLoadHandler> m_loadHandler;
+    CefRefPtr<ThunderBunLifeSpanHandler> m_lifeSpanHandler;
+    CefRefPtr<ThunderBunRequestHandler> m_requestHandler;
+    CefRefPtr<ThunderBunContextMenuHandler> m_contextMenuHandler;
+    CefRefPtr<ThunderBunPermissionHandler> m_permissionHandler;
+    CefRefPtr<ThunderBunDialogHandler> m_dialogHandler;
+    CefRefPtr<ThunderBunDownloadHandler> m_downloadHandler;
+    CefRefPtr<ThunderBunKeyboardHandler> m_keyboardHandler;
+    CefRefPtr<ThunderBunRenderHandler> m_renderHandler;
     bool osr_enabled_;
     std::function<void()> load_end_callback_;  // Callback for page load completion
 
@@ -2160,27 +2160,27 @@ private:
     std::map<int, DevToolsHost> devtools_hosts_;
     std::string last_title_;
 
-    IMPLEMENT_REFCOUNTING(ElectrobunCefClient);
+    IMPLEMENT_REFCOUNTING(ThunderBunCefClient);
 };
 
-// Free function callback for RemoteDevToolsClient -> ElectrobunCefClient
+// Free function callback for RemoteDevToolsClient -> ThunderBunCefClient
 void RemoteDevToolsClosed(void* ctx, int target_id) {
     if (!ctx) return;
-    static_cast<ElectrobunCefClient*>(ctx)->OnRemoteDevToolsClosed(target_id);
+    static_cast<ThunderBunCefClient*>(ctx)->OnRemoteDevToolsClosed(target_id);
 }
 
-// Out-of-line definitions for handlers that need ElectrobunCefClient to be fully defined
+// Out-of-line definitions for handlers that need ThunderBunCefClient to be fully defined
 
-bool ElectrobunContextMenuHandler::OnContextMenuCommand(
+bool ThunderBunContextMenuHandler::OnContextMenuCommand(
     CefRefPtr<CefBrowser> browser,
     CefRefPtr<CefFrame> frame,
     CefRefPtr<CefContextMenuParams> params,
     int command_id,
     EventFlags event_flags) {
     if (command_id == 26501) {
-        // Open remote DevTools via the owning ElectrobunCefClient
+        // Open remote DevTools via the owning ThunderBunCefClient
         CefRefPtr<CefClient> client = browser->GetHost()->GetClient();
-        ElectrobunCefClient* ebClient = static_cast<ElectrobunCefClient*>(client.get());
+        ThunderBunCefClient* ebClient = static_cast<ThunderBunCefClient*>(client.get());
         if (ebClient) {
             ebClient->OpenRemoteDevToolsFrontend(browser);
         }
@@ -2189,7 +2189,7 @@ bool ElectrobunContextMenuHandler::OnContextMenuCommand(
     return false;
 }
 
-bool ElectrobunKeyboardHandler::OnPreKeyEvent(
+bool ThunderBunKeyboardHandler::OnPreKeyEvent(
     CefRefPtr<CefBrowser> browser,
     const CefKeyEvent& event,
     CefEventHandle os_event,
@@ -2206,7 +2206,7 @@ bool ElectrobunKeyboardHandler::OnPreKeyEvent(
                          (event.modifiers & EVENTFLAG_SHIFT_DOWN));
     if (isF12 || isCtrlShiftI) {
         CefRefPtr<CefClient> client = browser->GetHost()->GetClient();
-        ElectrobunCefClient* ebClient = static_cast<ElectrobunCefClient*>(client.get());
+        ThunderBunCefClient* ebClient = static_cast<ThunderBunCefClient*>(client.get());
         if (ebClient) {
             ebClient->OpenRemoteDevToolsFrontend(browser);
         }
@@ -2238,8 +2238,8 @@ bool ElectrobunKeyboardHandler::OnPreKeyEvent(
     return false;
 }
 
-// ElectrobunRenderHandler::OnPaint implementation
-void ElectrobunRenderHandler::OnPaint(CefRefPtr<CefBrowser> browser,
+// ThunderBunRenderHandler::OnPaint implementation
+void ThunderBunRenderHandler::OnPaint(CefRefPtr<CefBrowser> browser,
                                        PaintElementType type,
                                        const RectList& dirtyRects,
                                        const void* buffer,
@@ -2250,8 +2250,8 @@ void ElectrobunRenderHandler::OnPaint(CefRefPtr<CefBrowser> browser,
     }
 }
 
-// Helper function implementation (defined after ElectrobunCefClient class)
-void SetBrowserOnClient(CefRefPtr<ElectrobunCefClient> client, CefRefPtr<CefBrowser> browser) {
+// Helper function implementation (defined after ThunderBunCefClient class)
+void SetBrowserOnClient(CefRefPtr<ThunderBunCefClient> client, CefRefPtr<CefBrowser> browser) {
     if (client && browser) {
         client->SetBrowser(browser);
         // Store preload scripts for this browser ID so load handler can access them
@@ -2262,13 +2262,13 @@ void SetBrowserOnClient(CefRefPtr<ElectrobunCefClient> client, CefRefPtr<CefBrow
     }
 }
 
-// ElectrobunLoadHandler method implementations (defined after ElectrobunCefClient class)
-void ElectrobunLoadHandler::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, TransitionType transition_type) {
+// ThunderBunLoadHandler method implementations (defined after ThunderBunCefClient class)
+void ThunderBunLoadHandler::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, TransitionType transition_type) {
     // NOTE: OnLoadStart is now a fallback - primary injection happens via GetResourceResponseFilter
     // This ensures preload scripts are in the HTML before parsing, guaranteeing execution order
 }
 
-void ElectrobunLoadHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) {
+void ThunderBunLoadHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) {
     // Fire did-navigate event
     if (frame->IsMain() && webview_event_handler_) {
         std::string url = frame->GetURL().ToString();
@@ -2281,8 +2281,8 @@ void ElectrobunLoadHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<C
     }
 }
 
-// ElectrobunResourceRequestHandler method implementations (defined after ElectrobunCefClient class)
-CefRefPtr<CefResponseFilter> ElectrobunResourceRequestHandler::GetResourceResponseFilter(
+// ThunderBunResourceRequestHandler method implementations (defined after ThunderBunCefClient class)
+CefRefPtr<CefResponseFilter> ThunderBunResourceRequestHandler::GetResourceResponseFilter(
     CefRefPtr<CefBrowser> browser,
     CefRefPtr<CefFrame> frame,
     CefRefPtr<CefRequest> request,
@@ -2305,7 +2305,7 @@ CefRefPtr<CefResponseFilter> ElectrobunResourceRequestHandler::GetResourceRespon
 
         if (!combinedScript.empty()) {
             std::cout << "[CEF] Installing response filter to inject preload scripts into HTML" << std::endl;
-            return new ElectrobunResponseFilter(combinedScript);
+            return new ThunderBunResponseFilter(combinedScript);
         }
     }
 
@@ -2804,7 +2804,7 @@ public:
             bool isBlockRule = !rule.empty() && rule[0] == '^';
             std::string pattern = isBlockRule ? rule.substr(1) : rule;
 
-            if (electrobun::globMatch(pattern, url)) {
+            if (thunderbun::globMatch(pattern, url)) {
                 allowed = !isBlockRule; // Last match wins
             }
         }
@@ -2906,7 +2906,7 @@ private:
 
 public:
     std::string pendingUrl;
-    std::string electrobunScript;
+    std::string thunderbunScript;
     std::string customScript;
     bool isCreationComplete = false;
     WebviewEventHandler webviewEventHandler = nullptr;
@@ -3360,7 +3360,7 @@ double WebView2View::lastCtrlClickTime = 0;
 class CEFView : public AbstractView {
 private:
     CefRefPtr<CefBrowser> browser;
-    CefRefPtr<ElectrobunCefClient> client;
+    CefRefPtr<ThunderBunCefClient> client;
     OSRWindow* osr_window;
     bool is_osr_mode;
 
@@ -3516,7 +3516,7 @@ public:
         }
     }
     
-    void setClient(CefRefPtr<ElectrobunCefClient> cl) {
+    void setClient(CefRefPtr<ThunderBunCefClient> cl) {
         client = cl;
     }
     
@@ -3524,7 +3524,7 @@ public:
         return browser;
     }
     
-    CefRefPtr<ElectrobunCefClient> getClient() {
+    CefRefPtr<ThunderBunCefClient> getClient() {
         return client;
     }
     
@@ -4868,7 +4868,7 @@ static UINT getMenuVirtualKeyCode(const std::string& key) {
 // Parse modifiers from accelerator string for menu accelerators using the
 // shared cross-platform parser. Returns FCONTROL, FALT, FSHIFT flags.
 static BYTE parseMenuModifiers(const std::string& accelerator, std::string& outKey) {
-    auto parts = electrobun::parseAccelerator(accelerator);
+    auto parts = thunderbun::parseAccelerator(accelerator);
     outKey = parts.key;
 
     BYTE modifiers = FVIRTKEY;
@@ -5429,11 +5429,11 @@ ELECTROBUN_EXPORT bool initCEF() {
     std::string userDataDir;
     char* localAppData = getenv("LOCALAPPDATA");
     if (localAppData) {
-        userDataDir = buildAppDataPath(localAppData, g_electrobunIdentifier, g_electrobunChannel, "CEF", '\\');
+        userDataDir = buildAppDataPath(localAppData, g_thunderbunIdentifier, g_thunderbunChannel, "CEF", '\\');
         std::cout << "[CEF] Using path: " << userDataDir << std::endl;
     } else {
         // Fallback to executable directory if LOCALAPPDATA not available
-        userDataDir = buildAppDataPath(exePath, g_electrobunIdentifier, g_electrobunChannel, "cef_cache", '\\');
+        userDataDir = buildAppDataPath(exePath, g_thunderbunIdentifier, g_thunderbunChannel, "cef_cache", '\\');
     }
 
     // Create cache directory if it doesn't exist
@@ -5443,13 +5443,13 @@ ELECTROBUN_EXPORT bool initCEF() {
     CefMainArgs main_args(GetModuleHandle(NULL));
     
     // Create the app
-    g_cef_app = new ElectrobunCefApp();
+    g_cef_app = new ThunderBunCefApp();
 
     // Read user-defined chromium flags from build.json
     std::string buildJsonPath = std::string(exePath) + "\\..\\Resources\\build.json";
-    std::string buildJsonContent = electrobun::readFileToString(buildJsonPath);
+    std::string buildJsonContent = thunderbun::readFileToString(buildJsonPath);
     if (!buildJsonContent.empty()) {
-        g_userChromiumFlags = electrobun::parseChromiumFlags(buildJsonContent);
+        g_userChromiumFlags = thunderbun::parseChromiumFlags(buildJsonContent);
     }
 
     // CEF settings
@@ -5487,7 +5487,7 @@ ELECTROBUN_EXPORT bool initCEF() {
     if (success) {
         g_cef_initialized = true;
         // Register the views:// scheme handler factory
-        CefRegisterSchemeHandlerFactory("views", "", new ElectrobunSchemeHandlerFactory());
+        CefRegisterSchemeHandlerFactory("views", "", new ThunderBunSchemeHandlerFactory());
         
         // We'll start the message pump timer when we create the first browser
     } else {
@@ -5510,7 +5510,7 @@ static std::shared_ptr<WebView2View> createWebView2View(uint32_t webviewId,
                                                  HandlePostMessage eventBridgeHandler,
                                                  HandlePostMessage bunBridgeHandler,
                                                  HandlePostMessage internalBridgeHandler,
-                                                 const char *electrobunPreloadScript,
+                                                 const char *thunderbunPreloadScript,
                                                  const char *customPreloadScript,
                                                  bool transparent,
                                                  bool sandbox) {
@@ -5530,7 +5530,7 @@ static std::shared_ptr<WebView2View> createWebView2View(uint32_t webviewId,
     
     // Make safe copies of string parameters to avoid memory corruption in lambda captures
     std::string urlString = url ? std::string(url) : "";
-    std::string electrobunScript = electrobunPreloadScript ? std::string(electrobunPreloadScript) : "";
+    std::string thunderbunScript = thunderbunPreloadScript ? std::string(thunderbunPreloadScript) : "";
     std::string customScript = customPreloadScript ? std::string(customPreloadScript) : "";
     std::string partitionStr = partitionIdentifier ? std::string(partitionIdentifier) : "";
 
@@ -5541,7 +5541,7 @@ static std::shared_ptr<WebView2View> createWebView2View(uint32_t webviewId,
 
     // Store URL and scripts in view to survive async callbacks
     view->pendingUrl = urlString;
-    view->electrobunScript = electrobunScript;
+    view->thunderbunScript = thunderbunScript;
     view->customScript = customScript;
 
     // Create WebView2 on main thread
@@ -5752,8 +5752,8 @@ static std::shared_ptr<WebView2View> createWebView2View(uint32_t webviewId,
                             
                             // Add preload scripts - TEST ADDITION
                             std::string combinedScript;
-                            if (!view->electrobunScript.empty()) {
-                                combinedScript += view->electrobunScript;
+                            if (!view->thunderbunScript.empty()) {
+                                combinedScript += view->thunderbunScript;
                             }
                             if (!view->customScript.empty()) {
                                 if (!combinedScript.empty()) {
@@ -6204,7 +6204,7 @@ static std::shared_ptr<WebView2View> createWebView2View(uint32_t webviewId,
             std::wstring userDataFolder;
             char* localAppData = getenv("LOCALAPPDATA");
             if (localAppData) {
-                std::string userDataPath = buildAppDataPath(localAppData, g_electrobunIdentifier, g_electrobunChannel, "WebView2", '\\');
+                std::string userDataPath = buildAppDataPath(localAppData, g_thunderbunIdentifier, g_thunderbunChannel, "WebView2", '\\');
 
                 // Handle partition-specific storage
                 if (!partitionStr.empty()) {
@@ -6284,7 +6284,7 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
             } else {
                 // Build path with identifier/channel structure (consistent with CLI and updater)
                 // Structure: %LOCALAPPDATA%\{identifier}\{channel}\CEF\Partitions\{partitionName}
-                std::string cachePath = buildPartitionPath(localAppData, g_electrobunIdentifier, g_electrobunChannel, "CEF", partitionName, '\\');
+                std::string cachePath = buildPartitionPath(localAppData, g_thunderbunIdentifier, g_thunderbunChannel, "CEF", partitionName, '\\');
 
                 // Create directory if it doesn't exist
                 std::wstring wideCachePath(cachePath.begin(), cachePath.end());
@@ -6308,7 +6308,7 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
 
     // Register scheme handler factory for this request context
     // Note: Each CefRequestContext needs its own registration - it's not global
-    static CefRefPtr<ElectrobunSchemeHandlerFactory> schemeFactory = new ElectrobunSchemeHandlerFactory();
+    static CefRefPtr<ThunderBunSchemeHandlerFactory> schemeFactory = new ThunderBunSchemeHandlerFactory();
     bool registered = context->RegisterSchemeHandlerFactory("views", "", schemeFactory);
     printf("DEBUG CEF: Registered scheme handler factory for partition '%s' - success: %s\n",
            partitionIdentifier ? partitionIdentifier : "(default)", registered ? "yes" : "no");
@@ -6329,7 +6329,7 @@ static std::shared_ptr<CEFView> createCEFView(uint32_t webviewId,
                                        HandlePostMessage eventBridgeHandler,
                                        HandlePostMessage bunBridgeHandler,
                                        HandlePostMessage internalBridgeHandler,
-                                       const char *electrobunPreloadScript,
+                                       const char *thunderbunPreloadScript,
                                        const char *customPreloadScript,
                                        bool transparent,
                                        bool sandbox) {
@@ -6371,7 +6371,7 @@ static std::shared_ptr<CEFView> createCEFView(uint32_t webviewId,
         }
 
         // Create CEF client with bridge handlers
-        auto client = new ElectrobunCefClient(webviewId, eventBridgeHandler, bunBridgeHandler, internalBridgeHandler, sandbox);
+        auto client = new ThunderBunCefClient(webviewId, eventBridgeHandler, bunBridgeHandler, internalBridgeHandler, sandbox);
 
         // Configure OSR mode for transparent windows
         if (transparent) {
@@ -6392,8 +6392,8 @@ static std::shared_ptr<CEFView> createCEFView(uint32_t webviewId,
         }
         
         // Set up preload scripts
-        if (electrobunPreloadScript && strlen(electrobunPreloadScript) > 0) {
-            client->AddPreloadScript(std::string(electrobunPreloadScript));
+        if (thunderbunPreloadScript && strlen(thunderbunPreloadScript) > 0) {
+            client->AddPreloadScript(std::string(thunderbunPreloadScript));
         }
         if (customPreloadScript && strlen(customPreloadScript) > 0) {
             client->UpdateCustomPreloadScript(std::string(customPreloadScript));
@@ -6540,13 +6540,13 @@ ELECTROBUN_EXPORT void startEventLoop(const char* identifier, const char* name, 
 
     // Store identifier, name, and channel globally for use in CEF initialization
     if (identifier && identifier[0]) {
-        g_electrobunIdentifier = std::string(identifier);
+        g_thunderbunIdentifier = std::string(identifier);
     }
     if (name && name[0]) {
-        g_electrobunName = std::string(name);
+        g_thunderbunName = std::string(name);
     }
     if (channel && channel[0]) {
-        g_electrobunChannel = std::string(channel);
+        g_thunderbunChannel = std::string(channel);
     }
 
     // Set up console control handler for graceful shutdown on Ctrl+C
@@ -6692,7 +6692,7 @@ ELECTROBUN_EXPORT AbstractView* initWebview(uint32_t webviewId,
                          HandlePostMessage eventBridgeHandler,
                          HandlePostMessage bunBridgeHandler,
                          HandlePostMessage internalBridgeHandler,
-                         const char *electrobunPreloadScript,
+                         const char *thunderbunPreloadScript,
                          const char *customPreloadScript,
                          bool transparent,
                          bool sandbox) {
@@ -6715,13 +6715,13 @@ ELECTROBUN_EXPORT AbstractView* initWebview(uint32_t webviewId,
         auto cefView = createCEFView(webviewId, hwnd, url, x, y, width, height, autoResize,
                                     partitionIdentifier, navigationCallback, webviewEventHandler,
                                     eventBridgeHandler, bunBridgeHandler, internalBridgeHandler,
-                                    electrobunPreloadScript, customPreloadScript, transparent, sandbox);
+                                    thunderbunPreloadScript, customPreloadScript, transparent, sandbox);
         view = cefView.get();
     } else {
         auto webview2View = createWebView2View(webviewId, hwnd, url, x, y, width, height, autoResize,
                                               partitionIdentifier, navigationCallback, webviewEventHandler,
                                               eventBridgeHandler, bunBridgeHandler, internalBridgeHandler,
-                                              electrobunPreloadScript, customPreloadScript, transparent, sandbox);
+                                              thunderbunPreloadScript, customPreloadScript, transparent, sandbox);
         view = webview2View.get();
     }
 
@@ -9198,7 +9198,7 @@ static UINT getVirtualKeyCode(const std::string& key) {
 // Parse modifiers from accelerator string for global shortcuts using the
 // shared cross-platform parser. Returns MOD_CONTROL, MOD_ALT, MOD_SHIFT flags.
 static UINT parseModifiers(const std::string& accelerator, std::string& outKey) {
-    auto parts = electrobun::parseAccelerator(accelerator);
+    auto parts = thunderbun::parseAccelerator(accelerator);
     outKey = parts.key;
 
     UINT modifiers = 0;
@@ -9261,11 +9261,11 @@ static void hotkeyMessageLoop() {
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc = HotkeyWndProc;
     wc.hInstance = GetModuleHandle(NULL);
-    wc.lpszClassName = L"ElectrobunHotkeyWindow";
+    wc.lpszClassName = L"ThunderBunHotkeyWindow";
 
     RegisterClassExW(&wc);
 
-    g_hotkeyWindow = CreateWindowExW(0, L"ElectrobunHotkeyWindow", L"",
+    g_hotkeyWindow = CreateWindowExW(0, L"ThunderBunHotkeyWindow", L"",
         0, 0, 0, 0, 0, HWND_MESSAGE, NULL, GetModuleHandle(NULL), NULL);
 
     if (!g_hotkeyWindow) {

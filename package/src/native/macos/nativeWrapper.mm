@@ -61,7 +61,7 @@
 #include "../shared/accelerator_parser.h"
 #include "../shared/chromium_flags.h"
 
-using namespace electrobun;
+using namespace thunderbun;
 
 /*
  * =============================================================================
@@ -76,8 +76,8 @@ static std::once_flag g_asarArchiveInitFlag;
 
 CGFloat OFFSCREEN_OFFSET = -20000;
 BOOL useCEF = false;
-std::string g_electrobunChannel = "";
-std::string g_electrobunIdentifier = "";
+std::string g_thunderbunChannel = "";
+std::string g_thunderbunIdentifier = "";
 
 static BOOL isMovingWindow = NO;
 static NSWindow *targetWindow = nil;
@@ -89,7 +89,7 @@ static id mouseUpMonitor = nil;
 static int g_remoteDebugPort = 9222;
 
 // Menu role to selector mapping
-// This maps Electrobun role strings to their corresponding Objective-C selectors.
+// This maps ThunderBun role strings to their corresponding Objective-C selectors.
 // Roles are grouped by category for easier maintenance.
 static NSDictionary<NSString*, NSString*>* getMenuRoleToSelectorMap() {
     static NSDictionary<NSString*, NSString*>* map = nil;
@@ -297,9 +297,9 @@ class CefApp;
 class CefClient;
 class CefLifeSpanHandler;
 class CefBrowser;
-class ElectrobunSchemeHandler;
-class ElectrobunSchemeHandlerFactory;
-class ElectrobunClient;
+class ThunderBunSchemeHandler;
+class ThunderBunSchemeHandlerFactory;
+class ThunderBunClient;
 
 typedef void (*RemoteDevToolsClosedCallback)(void* ctx, int target_id);
 void RemoteDevToolsClosed(void* ctx, int target_id);
@@ -801,7 +801,7 @@ static NSMutableDictionary<NSNumber *, AbstractView *> *globalAbstractViews = ni
                 eventBridgeHandler:(HandlePostMessage)eventBridgeHandler
                 bunBridgeHandler:(HandlePostMessage)bunBridgeHandler
                 internalBridgeHandler:(HandlePostMessage)internalBridgeHandler
-                electrobunPreloadScript:(const char *)electrobunPreloadScript
+                thunderbunPreloadScript:(const char *)thunderbunPreloadScript
                 customPreloadScript:(const char *)customPreloadScript
                 transparent:(bool)transparent
                 sandbox:(bool)sandbox;
@@ -811,7 +811,7 @@ static NSMutableDictionary<NSNumber *, AbstractView *> *globalAbstractViews = ni
 
 // ----------------------- Application & Window Delegates -----------------------
 
-@interface ElectrobunNSApplication : NSApplication <CefAppProtocol> {
+@interface ThunderBunNSApplication : NSApplication <CefAppProtocol> {
     @private
     BOOL handlingSendEvent_;
     }
@@ -896,7 +896,7 @@ static NSString *keyEquivalentFromString(NSString *key) {
 
 // Convert shared AcceleratorParts to macOS NSEventModifierFlags.
 // On macOS, CommandOrControl and Command both map to the Command key.
-static NSEventModifierFlags modifierFlagsFromAccelerator(const electrobun::AcceleratorParts& parts) {
+static NSEventModifierFlags modifierFlagsFromAccelerator(const thunderbun::AcceleratorParts& parts) {
     NSEventModifierFlags flags = 0;
     if (parts.commandOrControl || parts.command) flags |= NSEventModifierFlagCommand;
     if (parts.control)                           flags |= NSEventModifierFlagControl;
@@ -911,7 +911,7 @@ static NSEventModifierFlags modifierFlagsFromAccelerator(const electrobun::Accel
 static void parseMenuAccelerator(NSString *accelerator,
                                  NSString **outKeyEquivalent,
                                  NSEventModifierFlags *outModifiers) {
-    auto parts = electrobun::parseAccelerator([accelerator UTF8String]);
+    auto parts = thunderbun::parseAccelerator([accelerator UTF8String]);
 
     *outModifiers = modifierFlagsFromAccelerator(parts);
 
@@ -1078,7 +1078,7 @@ NSArray<NSValue *> *addOverlapRects(NSArray<NSDictionary *> *rectsArray, CGFloat
 
     - (void)evaluateJavaScriptWithNoCompletion:(const char*)jsString { [self doesNotRecognizeSelector:_cmd]; }
     - (void)callAsyncJavascript:(const char*)messageId jsString:(const char*)jsString webviewId:(uint32_t)webviewId hostWebviewId:(uint32_t)hostWebviewId completionHandler:(callAsyncJavascriptCompletionHandler)completionHandler { [self doesNotRecognizeSelector:_cmd]; }
-    // todo: we don't need this to be public since it's only used to set the internal electrobun preview script
+    // todo: we don't need this to be public since it's only used to set the internal thunderbun preview script
     - (void)addPreloadScriptToWebView:(const char*)jsString { [self doesNotRecognizeSelector:_cmd]; }
     - (void)updateCustomPreloadScript:(const char*)jsString { [self doesNotRecognizeSelector:_cmd]; }
 
@@ -1231,7 +1231,7 @@ NSArray<NSValue *> *addOverlapRects(NSArray<NSDictionary *> *rectsArray, CGFloat
             NSString *pattern = isBlockRule ? [rule substringFromIndex:1] : rule;
             std::string patternStr = [pattern UTF8String] ?: "";
 
-            if (electrobun::globMatch(patternStr, urlStr)) {
+            if (thunderbun::globMatch(patternStr, urlStr)) {
                 allowed = !isBlockRule; // Last match wins
             }
         }
@@ -2269,7 +2269,7 @@ runOpenPanelWithParameters:(WKOpenPanelParameters *)parameters
                 eventBridgeHandler:(HandlePostMessage)eventBridgeHandler
                 bunBridgeHandler:(HandlePostMessage)bunBridgeHandler
                 internalBridgeHandler:(HandlePostMessage)internalBridgeHandler
-                electrobunPreloadScript:(const char *)electrobunPreloadScript
+                thunderbunPreloadScript:(const char *)thunderbunPreloadScript
                 customPreloadScript:(const char *)customPreloadScript
                 transparent:(bool)transparent
                 sandbox:(bool)sandbox
@@ -2398,7 +2398,7 @@ runOpenPanelWithParameters:(WKOpenPanelParameters *)parameters
                     [self setPassthrough:YES];
                 }
 
-                [self addPreloadScriptToWebView:electrobunPreloadScript];
+                [self addPreloadScriptToWebView:thunderbunPreloadScript];
                 
                 // Note: For custom preload scripts we support either inline js or a views:// style
                 // url to a js file in the bundled views folder.
@@ -2619,7 +2619,7 @@ runOpenPanelWithParameters:(WKOpenPanelParameters *)parameters
 
     - (void)updateCustomPreloadScript:(const char*)jsString {    
         WKUserContentController *contentController = self.webView.configuration.userContentController;
-        NSString *identifierComment = [NSString stringWithFormat:@"// %@\n", [NSString stringWithUTF8String:"electrobun_custom_preload_script"]];
+        NSString *identifierComment = [NSString stringWithFormat:@"// %@\n", [NSString stringWithUTF8String:"thunderbun_custom_preload_script"]];
         NSString *newScriptSource = [identifierComment stringByAppendingString:[NSString stringWithUTF8String:jsString ?: ""]];
         NSMutableArray *newScripts = [NSMutableArray array];
         for (WKUserScript *userScript in contentController.userScripts) {
@@ -2756,7 +2756,7 @@ runOpenPanelWithParameters:(WKOpenPanelParameters *)parameters
 
 // ----------------------- CEF and NSApplication Setup (C++ and ObjC) -----------------------
 
-@implementation ElectrobunNSApplication
+@implementation ThunderBunNSApplication
     - (BOOL)isHandlingSendEvent {
         return handlingSendEvent_;
     }
@@ -2796,19 +2796,19 @@ runOpenPanelWithParameters:(WKOpenPanelParameters *)parameters
 // C++ classes for CEF:
 
 
-class ElectrobunHandler : public CefClient,
+class ThunderBunHandler : public CefClient,
                          public CefDisplayHandler,
                          public CefLifeSpanHandler,
                          public CefLoadHandler {
 public:
-    static ElectrobunHandler* GetInstance() {
+    static ThunderBunHandler* GetInstance() {
         return g_instance;
     }
-    ElectrobunHandler() {
+    ThunderBunHandler() {
         DCHECK(!g_instance);
         g_instance = this;
     }
-    ~ElectrobunHandler() {
+    ~ThunderBunHandler() {
         g_instance = nullptr;
     }
 
@@ -2841,24 +2841,24 @@ public:
     }
 
 private:
-    static ElectrobunHandler* g_instance;
+    static ThunderBunHandler* g_instance;
     typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
     BrowserList browser_list_;
     bool is_closing_ = false;
 
-    IMPLEMENT_REFCOUNTING(ElectrobunHandler);
-    DISALLOW_COPY_AND_ASSIGN(ElectrobunHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunHandler);
+    DISALLOW_COPY_AND_ASSIGN(ThunderBunHandler);
 };
 
-ElectrobunHandler* ElectrobunHandler::g_instance = nullptr;
+ThunderBunHandler* ThunderBunHandler::g_instance = nullptr;
 
-std::vector<electrobun::ChromiumFlag> g_userChromiumFlags;
+std::vector<thunderbun::ChromiumFlag> g_userChromiumFlags;
 
-class ElectrobunApp : public CefApp,
+class ThunderBunApp : public CefApp,
                      public CefBrowserProcessHandler,
                      public CefRenderProcessHandler {
 public:
-    ElectrobunApp() {
+    ThunderBunApp() {
         
     }
     void OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line) override {
@@ -2880,7 +2880,7 @@ public:
         // which is enabled when transparent:true is set in the window options
 
         // Apply user-defined chromium flags from build.json
-        electrobun::applyChromiumFlags(g_userChromiumFlags, command_line);
+        thunderbun::applyChromiumFlags(g_userChromiumFlags, command_line);
     }
     void OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) override {        
         registrar->AddCustomScheme("views", 
@@ -2921,30 +2921,30 @@ public:
         // CefRegisterSchemeHandlerFactory("views", "", nullptr);
     }
     CefRefPtr<CefClient> GetDefaultClient() override {
-        return ElectrobunHandler::GetInstance();
+        return ThunderBunHandler::GetInstance();
     }
 
 private:
-    IMPLEMENT_REFCOUNTING(ElectrobunApp);
-    DISALLOW_COPY_AND_ASSIGN(ElectrobunApp);
+    IMPLEMENT_REFCOUNTING(ThunderBunApp);
+    DISALLOW_COPY_AND_ASSIGN(ThunderBunApp);
 };
 
 // PreloadScript struct is now defined in shared/preload_script.h
 
-class ElectrobunResponseFilter : public CefResponseFilter {
+class ThunderBunResponseFilter : public CefResponseFilter {
 private:
     std::string buffer_;
     bool has_head_;
     bool injected_;
-    PreloadScript electrobun_script_;
+    PreloadScript thunderbun_script_;
     PreloadScript custom_script_;
 
 public:
-    ElectrobunResponseFilter(const PreloadScript& electrobunScript, 
+    ThunderBunResponseFilter(const PreloadScript& thunderbunScript, 
                            const PreloadScript& customScript)
         : has_head_(false), 
           injected_(false),
-          electrobun_script_(electrobunScript),
+          thunderbun_script_(thunderbunScript),
           custom_script_(customScript) {}
     
     virtual FilterStatus Filter(void* data_in,
@@ -2955,7 +2955,7 @@ public:
                                size_t& data_out_written) override {
 
         // Check if we have scripts to inject
-        if (electrobun_script_.code.empty() && custom_script_.code.empty()) {
+        if (thunderbun_script_.code.empty() && custom_script_.code.empty()) {
             // Nothing to inject, just copy the data
             size_t copy_size = std::min(data_in_size, data_out_size);
             memcpy(data_out, data_in, copy_size);
@@ -2992,7 +2992,7 @@ public:
                 
                 // Inject our scripts after the <head> tag
                 std::string scripts = "<script>\n";
-                scripts += electrobun_script_.code;
+                scripts += thunderbun_script_.code;
                 scripts += "\n</script>\n";
                 
                 if (!custom_script_.code.empty()) {
@@ -3013,7 +3013,7 @@ public:
             if (html_pos != std::string::npos) {
                 // Inject after <html> tag
                 std::string scripts = "<head>\n<script>\n";
-                scripts += electrobun_script_.code;
+                scripts += thunderbun_script_.code;
                 scripts += "\n</script>\n";
                 
                 if (!custom_script_.code.empty() ) {
@@ -3028,7 +3028,7 @@ public:
             } else {
                 // As a last resort, inject at the beginning
                 std::string scripts = "<script>\n";
-                scripts += electrobun_script_.code;
+                scripts += thunderbun_script_.code;
                 scripts += "\n</script>\n";
                 
                 if (!custom_script_.code.empty() ) {
@@ -3060,12 +3060,12 @@ public:
         return true;
     }
     
-    IMPLEMENT_REFCOUNTING(ElectrobunResponseFilter);
+    IMPLEMENT_REFCOUNTING(ThunderBunResponseFilter);
 };
 
-CefRefPtr<ElectrobunApp> g_app;
+CefRefPtr<ThunderBunApp> g_app;
 
-class ElectrobunClient : public CefClient,
+class ThunderBunClient : public CefClient,
                         public CefRenderHandler,
                         public CefLoadHandler,
                         public CefRequestHandler,
@@ -3091,7 +3091,7 @@ private:
     int view_height_ = 600;
     bool osr_enabled_ = false;
 
-    PreloadScript electrobun_script_;
+    PreloadScript thunderbun_script_;
     PreloadScript custom_script_;
     static const int MENU_ID_DEV_TOOLS = 1;
 
@@ -3343,7 +3343,7 @@ public:
         }
     }
 
-    ElectrobunClient(uint32_t webviewId,
+    ThunderBunClient(uint32_t webviewId,
                      HandlePostMessage eventBridgeHandler,
                      HandlePostMessage bunBridgeHandler,
                      HandlePostMessage internalBridgeHandler,
@@ -3359,7 +3359,7 @@ public:
         , is_sandboxed_(sandbox) {}    
 
     void AddPreloadScript(const std::string& script, bool mainFrameOnly = false) {
-        electrobun_script_ = {script, false};
+        thunderbun_script_ = {script, false};
     }
 
     void UpdateCustomPreloadScript(const std::string& script) {
@@ -3655,7 +3655,7 @@ public:
         if (frame->IsMain() && 
             response->GetMimeType().ToString().find("html") != std::string::npos) {
             NSLog(@"Creating response filter for HTML content");
-            return new ElectrobunResponseFilter(electrobun_script_, custom_script_);
+            return new ThunderBunResponseFilter(thunderbun_script_, custom_script_);
         }
         
         return nullptr;
@@ -3668,7 +3668,7 @@ public:
         std::string frameUrl = frame->GetURL().ToString();
         std::string scriptUrl = GetScriptExecutionUrl(frameUrl);
 
-        // NSLog(@"OnLoadStart %s", frameUrl.c_str());//, electrobun_script_.code.c_str());           
+        // NSLog(@"OnLoadStart %s", frameUrl.c_str());//, thunderbun_script_.code.c_str());           
     }   
 
     void OnLoadEnd(CefRefPtr<CefBrowser> browser,
@@ -3754,7 +3754,7 @@ public:
             OpenRemoteDevToolsFrontend(browser);
 
             CefPoint inspect_at(params->GetXCoord(), params->GetYCoord());
-            CefRefPtr<ElectrobunClient> self(this);
+            CefRefPtr<ThunderBunClient> self(this);
             CefRefPtr<CefBrowser> browser_ref(browser);
             dispatch_async(dispatch_get_main_queue(), ^{
                 // Disabled for now due to crash in CEF 144 on macOS.
@@ -3831,7 +3831,7 @@ public:
                 (event.modifiers & EVENTFLAG_COMMAND_DOWN) &&
                 (event.modifiers & EVENTFLAG_ALT_DOWN)) {
                 CefPoint inspect_at(0, 0);
-                CefRefPtr<ElectrobunClient> self(this);
+                CefRefPtr<ThunderBunClient> self(this);
                 CefRefPtr<CefBrowser> browser_ref(browser);
                 dispatch_async(dispatch_get_main_queue(), ^{
                     self->ShowDevToolsWindow(browser_ref, inspect_at);
@@ -4185,25 +4185,25 @@ public:
         }
     }
 
-    IMPLEMENT_REFCOUNTING(ElectrobunClient);
-    DISALLOW_COPY_AND_ASSIGN(ElectrobunClient);
+    IMPLEMENT_REFCOUNTING(ThunderBunClient);
+    DISALLOW_COPY_AND_ASSIGN(ThunderBunClient);
 };
 
 // Initialize static debounce timestamp for cmd+click handling
-NSTimeInterval ElectrobunClient::lastCmdClickTime = 0;
+NSTimeInterval ThunderBunClient::lastCmdClickTime = 0;
 
 void RemoteDevToolsClosed(void* ctx, int target_id) {
     if (!ctx) {
         return;
     }
-    static_cast<ElectrobunClient*>(ctx)->OnRemoteDevToolsClosed(target_id);
+    static_cast<ThunderBunClient*>(ctx)->OnRemoteDevToolsClosed(target_id);
 }
 
 @interface CEFWebViewImpl : AbstractView
     // @property (nonatomic, strong) WKWebView *webView;
 
     @property (nonatomic, assign) CefRefPtr<CefBrowser> browser;
-    @property (nonatomic, assign) CefRefPtr<ElectrobunClient> client;
+    @property (nonatomic, assign) CefRefPtr<ThunderBunClient> client;
     @property (nonatomic, strong) CEFOSRView *osrView;  // For transparent/OSR mode
     @property (nonatomic, assign) BOOL isOSRMode;
 
@@ -4219,7 +4219,7 @@ void RemoteDevToolsClosed(void* ctx, int target_id) {
                 eventBridgeHandler:(HandlePostMessage)eventBridgeHandler
                 bunBridgeHandler:(HandlePostMessage)bunBridgeHandler
                 internalBridgeHandler:(HandlePostMessage)internalBridgeHandler
-                electrobunPreloadScript:(const char *)electrobunPreloadScript
+                thunderbunPreloadScript:(const char *)thunderbunPreloadScript
                 customPreloadScript:(const char *)customPreloadScript
                 transparent:(bool)transparent
                 sandbox:(bool)sandbox;
@@ -4230,8 +4230,8 @@ bool initializeCEF() {
     static bool initialized = false;
     if (initialized) return true;
     
-    [ElectrobunNSApplication sharedApplication];
-    if (![NSApp isKindOfClass:[ElectrobunNSApplication class]]) {        
+    [ThunderBunNSApplication sharedApplication];
+    if (![NSApp isKindOfClass:[ThunderBunNSApplication class]]) {        
         return false;
     }
 
@@ -4244,13 +4244,13 @@ bool initializeCEF() {
     }
     
     CefMainArgs main_args(argc, argv);
-    g_app = new ElectrobunApp();
+    g_app = new ThunderBunApp();
 
     // Read user-defined chromium flags from build.json
     NSString* buildJsonPath = [[NSBundle mainBundle] pathForResource:@"build" ofType:@"json"];
     if (buildJsonPath) {
-        std::string buildJsonContent = electrobun::readFileToString([buildJsonPath UTF8String]);
-        g_userChromiumFlags = electrobun::parseChromiumFlags(buildJsonContent);
+        std::string buildJsonContent = thunderbun::readFileToString([buildJsonPath UTF8String]);
+        g_userChromiumFlags = thunderbun::parseChromiumFlags(buildJsonContent);
     }
 
     CefSettings settings;
@@ -4290,14 +4290,14 @@ bool initializeCEF() {
     }
     
     // Add cache path to prevent warnings and potential issues
-     // Use app-specific cache directory to allow multiple Electrobun apps to run simultaneously
+     // Use app-specific cache directory to allow multiple ThunderBun apps to run simultaneously
     NSString* appSupportPath = [NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES) firstObject];
 
     // Build path with identifier/channel structure (consistent with CLI and updater)
     std::string cachePathStr = buildAppDataPath(
         [appSupportPath UTF8String],
-        g_electrobunIdentifier,
-        g_electrobunChannel,
+        g_thunderbunIdentifier,
+        g_thunderbunChannel,
         "CEF"
     );
     NSString* cachePath = [NSString stringWithUTF8String:cachePathStr.c_str()];
@@ -4315,7 +4315,7 @@ bool initializeCEF() {
     CefString(&settings.accept_language_list) = "en-US,en";
     
     // Register custom scheme
-    // CefRegisterSchemeHandlerFactory("views", "", new ElectrobunSchemeHandlerFactory(assetFileLoader, 0));
+    // CefRegisterSchemeHandlerFactory("views", "", new ThunderBunSchemeHandlerFactory(assetFileLoader, 0));
     
     // Make CEF aware of the custom scheme
     // CefCommandLine::GetGlobalCommandLine()->AppendSwitch("register-scheme-handler");
@@ -4345,9 +4345,9 @@ bool initializeCEF() {
 
 
 // The main scheme handler class
-class ElectrobunSchemeHandler : public CefResourceHandler {
+class ThunderBunSchemeHandler : public CefResourceHandler {
 public:
-     ElectrobunSchemeHandler(uint32_t webviewId)
+     ThunderBunSchemeHandler(uint32_t webviewId)
     : webviewId_(webviewId), hasResponse_(false), offset_(0) {}
 
   bool Open(CefRefPtr<CefRequest> request,
@@ -4482,8 +4482,8 @@ public:
     bool hasResponse_;
     size_t offset_;
 
-    IMPLEMENT_REFCOUNTING(ElectrobunSchemeHandler);
-    DISALLOW_COPY_AND_ASSIGN(ElectrobunSchemeHandler);
+    IMPLEMENT_REFCOUNTING(ThunderBunSchemeHandler);
+    DISALLOW_COPY_AND_ASSIGN(ThunderBunSchemeHandler);
 };
 
 
@@ -4492,9 +4492,9 @@ static std::map<int, uint32_t> browserToWebviewMap;
 static std::mutex browserMapMutex;
 
 // The factory class that creates scheme handlers
-class ElectrobunSchemeHandlerFactory : public CefSchemeHandlerFactory {
+class ThunderBunSchemeHandlerFactory : public CefSchemeHandlerFactory {
 public:
-  ElectrobunSchemeHandlerFactory() {}
+  ThunderBunSchemeHandlerFactory() {}
 
   CefRefPtr<CefResourceHandler> Create(CefRefPtr<CefBrowser> browser,
                                          CefRefPtr<CefFrame> frame,
@@ -4517,11 +4517,11 @@ public:
         NSLog(@"  Browser %d -> Webview %u", pair.first, pair.second);
     }
     
-    return new ElectrobunSchemeHandler(webviewId);
+    return new ThunderBunSchemeHandler(webviewId);
   }
   
-  IMPLEMENT_REFCOUNTING(ElectrobunSchemeHandlerFactory);
-  DISALLOW_COPY_AND_ASSIGN(ElectrobunSchemeHandlerFactory);
+  IMPLEMENT_REFCOUNTING(ThunderBunSchemeHandlerFactory);
+  DISALLOW_COPY_AND_ASSIGN(ThunderBunSchemeHandlerFactory);
 };
 
 
@@ -4549,8 +4549,8 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
       // Build path with identifier/channel structure to match root_cache_path logic
       std::string cachePathStr = buildPartitionPath(
           [appSupportPath UTF8String],
-          g_electrobunIdentifier,
-          g_electrobunChannel,
+          g_thunderbunIdentifier,
+          g_thunderbunChannel,
           "CEF",
           partitionName
       );
@@ -4570,7 +4570,7 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
 
   // Register scheme handler factory for this request context
   // Note: Each CefRequestContext needs its own registration - it's not global
-  static CefRefPtr<ElectrobunSchemeHandlerFactory> schemeFactory = new ElectrobunSchemeHandlerFactory();
+  static CefRefPtr<ThunderBunSchemeHandlerFactory> schemeFactory = new ThunderBunSchemeHandlerFactory();
   bool registered = context->RegisterSchemeHandlerFactory("views", "", schemeFactory);
   NSLog(@"DEBUG CEF: Registered scheme handler factory for partition '%s' - success: %s",
         partitionIdentifier ? partitionIdentifier : "(default)", registered ? "yes" : "no");
@@ -4594,7 +4594,7 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
                 eventBridgeHandler:(HandlePostMessage)eventBridgeHandler
                 bunBridgeHandler:(HandlePostMessage)bunBridgeHandler
             internalBridgeHandler:(HandlePostMessage)internalBridgeHandler
-            electrobunPreloadScript:(const char *)electrobunPreloadScript
+            thunderbunPreloadScript:(const char *)thunderbunPreloadScript
             customPreloadScript:(const char *)customPreloadScript
             transparent:(bool)transparent
             sandbox:(bool)sandbox
@@ -4656,7 +4656,7 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
 
                 // Global scheme handler is already registered in getOrCreateRequestContext()
 
-                self.client = new ElectrobunClient(
+                self.client = new ThunderBunClient(
                     webviewId,
                     eventBridgeHandler,
                     bunBridgeHandler,
@@ -4673,7 +4673,7 @@ CefRefPtr<CefRequestContext> CreateRequestContextForPartition(const char* partit
                 }                
 
                 // store the script values
-                [self addPreloadScriptToWebView:electrobunPreloadScript];
+                [self addPreloadScriptToWebView:thunderbunPreloadScript];
                 
                 // Note: For custom preload scripts we support either inline js or a views:// style
                 // url to a js file in the bundled views folder.
@@ -5105,10 +5105,10 @@ extern "C" void startEventLoop(const char* identifier, const char* name, const c
 
     // Store identifier and channel globally for use in CEF initialization
     if (identifier && identifier[0]) {
-        g_electrobunIdentifier = std::string(identifier);
+        g_thunderbunIdentifier = std::string(identifier);
     }
     if (channel && channel[0]) {
-        g_electrobunChannel = std::string(channel);
+        g_thunderbunChannel = std::string(channel);
     }
 
     useCEF = isCEFAvailable();    
@@ -5281,7 +5281,7 @@ extern "C" AbstractView* initWebview(uint32_t webviewId,
                         HandlePostMessage eventBridgeHandler,
                         HandlePostMessage bunBridgeHandler,
                         HandlePostMessage internalBridgeHandler,
-                        const char *electrobunPreloadScript,
+                        const char *thunderbunPreloadScript,
                         const char *customPreloadScript,
                         bool transparent,
                         bool sandbox ) {
@@ -5327,7 +5327,7 @@ extern "C" AbstractView* initWebview(uint32_t webviewId,
                                         eventBridgeHandler:eventBridgeHandler
                                         bunBridgeHandler:bunBridgeHandler
                                         internalBridgeHandler:internalBridgeHandler
-                                        electrobunPreloadScript:strdup(electrobunPreloadScript)
+                                        thunderbunPreloadScript:strdup(thunderbunPreloadScript)
                                         customPreloadScript:strdup(customPreloadScript)
                                         transparent:transparent
                                         sandbox:sandbox];
@@ -6553,7 +6553,7 @@ extern "C" void setJSUtils(GetMimeType getMimeType, GetHTMLForWebviewSync getHTM
     // create a dispatch queue on the current thread (worker thread) that
     // can later be called from main
     dispatch_queue_attr_t attr = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_DEFAULT, 0);
-    jsWorkerQueue = dispatch_queue_create("com.electrobun.jsworker", attr);    
+    jsWorkerQueue = dispatch_queue_create("com.thunderbun.jsworker", attr);    
 
     NSLog(@"setJSUtils called but using map-based approach instead of callbacks");
     
@@ -6616,7 +6616,7 @@ static NSLock *g_globalShortcutsLock = nil;
 // Helper to parse modifier flags from accelerator string using the shared
 // cross-platform parser from accelerator_parser.h.
 static NSEventModifierFlags parseModifiers(NSString *accelerator, NSString **outKey) {
-    auto parts = electrobun::parseAccelerator([accelerator UTF8String]);
+    auto parts = thunderbun::parseAccelerator([accelerator UTF8String]);
     *outKey = [NSString stringWithUTF8String:parts.key.c_str()];
     return modifierFlagsFromAccelerator(parts);
 }

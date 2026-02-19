@@ -11,7 +11,7 @@
 #include <vector>
 #include "glob_match.h"
 
-namespace electrobun {
+namespace thunderbun {
 
 // Represents a single navigation rule
 // Rules starting with "^" are block rules (inverts the match)
@@ -93,6 +93,6 @@ inline bool checkNavigationRulesForUrl(const std::string& rulesString,
     return checkNavigationRulesForUrl(rules, url, defaultAllow);
 }
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_NAVIGATION_RULES_H

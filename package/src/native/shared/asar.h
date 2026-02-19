@@ -23,13 +23,13 @@ extern "C" {
     void asar_free_buffer(const uint8_t* buffer, size_t size);
 }
 
-namespace electrobun {
+namespace thunderbun {
 
 // Global ASAR archive handle (lazy-loaded) with thread-safe initialization
 // Each platform should define these in their nativeWrapper implementation
 // as: static AsarArchive* g_asarArchive = nullptr;
 //     static std::once_flag g_asarArchiveInitFlag;
 
-} // namespace electrobun
+} // namespace thunderbun
 
 #endif // ELECTROBUN_ASAR_H

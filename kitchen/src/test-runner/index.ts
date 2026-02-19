@@ -1,9 +1,9 @@
-import ThunderBun, { Electroview } from "thunderbun/view";
+import ThunderBun, { Thunderview } from "thunderbun/view";
 import type { TestRunnerRPC, TestInfo, UpdateInfo, UpdateStatusEntry } from "./rpc";
 import type { TestResult, TestStatus } from "../test-framework/types";
 
 // RPC setup
-const rpc = Electroview.defineRPC<TestRunnerRPC>({
+const rpc = Thunderview.defineRPC<TestRunnerRPC>({
   maxRequestTime: 300000, // 5 minutes for long test runs
   handlers: {
     requests: {},
@@ -49,7 +49,7 @@ const rpc = Electroview.defineRPC<TestRunnerRPC>({
   },
 });
 
-const thunderbun = new ThunderBun.Electroview({ rpc });
+const thunderbun = new ThunderBun.Thunderview({ rpc });
 
 // State
 let tests: TestInfo[] = [];
