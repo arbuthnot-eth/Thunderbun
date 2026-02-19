@@ -1,7 +1,7 @@
 {
-  "name": "ThunderBun",
-  "short_name": "ThunderBun",
-  "description": "A Sui-native PWA built with ThunderBun",
+  "name": "Thunderbun",
+  "short_name": "Thunderbun",
+  "description": "A Sui-native PWA built with Thunderbun",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

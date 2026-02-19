@@ -1,5 +1,5 @@
 {
-  "_comment": "ThunderBun TWA manifest — used by bubblewrap to build the Android APK/AAB.",
+  "_comment": "Thunderbun TWA manifest — used by bubblewrap to build the Android APK/AAB.",
   "_instructions": [
     "1. Replace YOUR_APP_DOMAIN_HERE with your deployed domain (no https://, no trailing slash).",
     "   Example: 'thunderbun-abc123.vercel.app'",
@@ -11,8 +11,8 @@
 
   "packageId":         "com.thunderbun.app",
   "host":              "YOUR_APP_DOMAIN_HERE",
-  "name":              "ThunderBun",
-  "launcherName":      "ThunderBun",
+  "name":              "Thunderbun",
+  "launcherName":      "Thunderbun",
   "display":           "standalone",
   "orientation":       "portrait",
 
