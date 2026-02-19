@@ -24,18 +24,18 @@ export function renderDeepBook(container: HTMLElement) {
     <div class="section">
       <div class="section-top">
         <div>
-          <h1 class="section-title">DeepBook 📖</h1>
+          <h1 class="section-title">DeepBook</h1>
           <p class="section-desc">On-chain CLOB on Sui. Query pools and build limit/market orders.</p>
         </div>
-        <div class="row gap-2">
+        <div class="inline-group--tight">
           <span class="badge ${dbClient ? "badge-green" : "badge-yellow"}">${dbClient ? "SDK" : "No pools (" + network + ")"}</span>
-          <a href="https://docs.sui.io/standards/deepbook" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+          <a href="https://docs.sui.io/standards/deepbook" target="_blank" rel="noopener" class="btn btn-secondary btn--compact">Docs ↗</a>
         </div>
       </div>
 
       <!-- Pool stats -->
       <div class="card">
-        <div class="row-between" style="margin-bottom:14px">
+        <div class="spread-row" style="margin-bottom:14px">
           <div class="card-title" style="margin:0">SUI/USDC Pool</div>
           <span class="badge badge-blue">DeepBook v3</span>
         </div>
@@ -45,7 +45,7 @@ export function renderDeepBook(container: HTMLElement) {
           <div class="stat-box"><div class="stat-label">Best Ask</div><div class="stat-value" id="db-ask">—</div></div>
           <div class="stat-box"><div class="stat-label">Spread</div><div class="stat-value" id="db-spread">—</div></div>
         </div>
-        <button id="db-refresh" class="btn btn-secondary btn-full mt-4" ${!dbClient ? "disabled" : ""}>
+        <button id="db-refresh" class="btn btn-secondary btn--block spaced-top" ${!dbClient ? "disabled" : ""}>
           ${dbClient ? "↻ Refresh" : "Switch to mainnet or testnet"}
         </button>
       </div>
@@ -66,8 +66,8 @@ export function renderDeepBook(container: HTMLElement) {
       <!-- Order book (5 ticks from mid) -->
       <div class="card">
         <div class="card-title">Order Book (5 ticks from mid)</div>
-        <div id="db-orderbook" class="small mono" style="max-height:200px;overflow-y:auto">
-          <div class="muted">Loading…</div>
+        <div id="db-orderbook" class="code-text" style="font-size:12px;max-height:200px;overflow-y:auto">
+          <div class="status-hint">Loading…</div>
         </div>
       </div>
 
@@ -94,13 +94,13 @@ export function renderDeepBook(container: HTMLElement) {
           <div class="result-value" id="db-total"></div>
         </div>
 
-        <button id="db-order" class="btn btn-primary btn-full mt-3" disabled>
+        <button id="db-order" class="btn btn-primary btn--block spaced-top" disabled>
           Connect wallet to trade
         </button>
 
         <div class="result-box" id="db-ptb-result">
           <div class="result-label">PTB preview</div>
-          <pre class="small" id="db-ptb-code" style="max-height:150px;overflow:auto"></pre>
+          <pre id="db-ptb-code" style="font-size:12px;max-height:150px;overflow:auto"></pre>
         </div>
         <div class="error-msg" id="db-order-err"></div>
       </div>
@@ -176,7 +176,7 @@ const tx = db.deepBook.placeLimitOrder({
       // Render order book
       const obEl = container.querySelector<HTMLElement>("#db-orderbook")!;
       let html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px 8px;font-size:11px">';
-      html += '<div class="muted">Price</div><div class="muted">Qty</div><div class="muted">Side</div>';
+      html += '<div class="status-hint">Price</div><div class="status-hint">Qty</div><div class="status-hint">Side</div>';
 
       for (let i = book.ask_prices.length - 1; i >= 0; i--) {
         html += `<div style="color:var(--red)">${book.ask_prices[i].toFixed(4)}</div>`;
@@ -208,7 +208,7 @@ const tx = db.deepBook.placeLimitOrder({
       container.querySelector("#db-bid")!.textContent = "Error";
       container.querySelector("#db-ask")!.textContent = "Error";
       container.querySelector<HTMLElement>("#db-orderbook")!.innerHTML =
-        `<div class="muted">${err instanceof Error ? err.message : "Failed to load"}</div>`;
+        `<div class="status-hint">${err instanceof Error ? err.message : "Failed to load"}</div>`;
     } finally {
       btn.disabled = false;
       btn.textContent = "↻ Refresh";

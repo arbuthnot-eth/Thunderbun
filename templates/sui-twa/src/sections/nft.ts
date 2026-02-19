@@ -28,33 +28,33 @@ export function renderNFT(container: HTMLElement) {
     <div class="section">
       <div class="section-top">
         <div>
-          <h1 class="section-title">NFTs 🖼</h1>
+          <h1 class="section-title">NFTs</h1>
           <p class="section-desc">Browse your Sui NFTs and query TradePort collection data.</p>
         </div>
-        <a href="https://www.tradeport.xyz/docs" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+        <a href="https://www.tradeport.xyz/docs" target="_blank" rel="noopener" class="btn btn-secondary btn--compact">Docs ↗</a>
       </div>
 
-      <div id="nft-prompt" class="card hidden">
-        <p class="small muted" style="text-align:center;padding:24px 0">Connect your wallet to view your NFTs.</p>
+      <div id="nft-prompt" class="card is-hidden">
+        <p class="card-description" style="text-align:center;padding:24px 0;margin-bottom:0">Connect your wallet to view your NFTs.</p>
       </div>
 
-      <div id="nft-loading" class="loading-center hidden">
+      <div id="nft-loading" class="loading-center is-hidden">
         <div class="spinner"></div>
         <p>Loading NFTs…</p>
       </div>
 
-      <div id="nft-empty" class="card hidden" style="text-align:center;padding:40px 20px">
+      <div id="nft-empty" class="card is-hidden" style="text-align:center;padding:40px 20px">
         <div style="font-size:40px;margin-bottom:12px">🖼</div>
-        <p class="muted small">No NFTs found in this wallet.</p>
-        <a href="https://tradeport.xyz/sui" target="_blank" rel="noopener" class="btn btn-primary btn-sm mt-3" style="display:inline-flex">Browse on TradePort</a>
+        <p class="card-description" style="margin-bottom:10px">No NFTs found in this wallet.</p>
+        <a href="https://tradeport.xyz/sui" target="_blank" rel="noopener" class="btn btn-primary btn--compact" style="display:inline-flex">Browse on TradePort</a>
       </div>
 
       <div id="nft-grid" class="nft-grid"></div>
 
       <!-- TradePort collection search -->
-      <div class="card mt-4" id="tradeport-card" style="margin-top:24px">
+      <div class="card" id="tradeport-card" style="margin-top:24px">
         <div class="card-title">TradePort collection search</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           Query collection stats via the <a href="https://www.tradeport.xyz/docs/nft-data-api/overview" target="_blank">TradePort GraphQL API</a>.
           No API key needed for read operations on public data.
         </p>
@@ -94,9 +94,9 @@ export function renderNFT(container: HTMLElement) {
   const grid    = container.querySelector<HTMLElement>("#nft-grid")!;
 
   async function loadNFTs(address: string) {
-    loading.classList.remove("hidden");
-    prompt.classList.add("hidden");
-    empty.classList.add("hidden");
+    loading.classList.remove("is-hidden");
+    prompt.classList.add("is-hidden");
+    empty.classList.add("is-hidden");
     grid.innerHTML = "";
 
     try {
@@ -122,10 +122,10 @@ export function renderNFT(container: HTMLElement) {
           };
         });
 
-      loading.classList.add("hidden");
+      loading.classList.add("is-hidden");
 
       if (nfts.length === 0) {
-        empty.classList.remove("hidden");
+        empty.classList.remove("is-hidden");
         return;
       }
 
@@ -147,26 +147,26 @@ export function renderNFT(container: HTMLElement) {
         grid.appendChild(card);
       }
     } catch (err) {
-      loading.classList.add("hidden");
-      grid.innerHTML = `<p class="small" style="color:var(--red);padding:20px 0">Failed to load NFTs: ${err instanceof Error ? err.message : String(err)}</p>`;
+      loading.classList.add("is-hidden");
+      grid.innerHTML = `<p style="font-size:12px;color:var(--red);padding:20px 0">Failed to load NFTs: ${err instanceof Error ? err.message : String(err)}</p>`;
     }
   }
 
   const state = wallet.getState();
   if (!state.connected || !state.address) {
-    prompt.classList.remove("hidden");
+    prompt.classList.remove("is-hidden");
   } else {
     loadNFTs(state.address);
   }
 
   const unsub = wallet.subscribe((s) => {
     if (s.connected && s.address) {
-      prompt.classList.add("hidden");
+      prompt.classList.add("is-hidden");
       loadNFTs(s.address);
     } else {
-      prompt.classList.remove("hidden");
+      prompt.classList.remove("is-hidden");
       grid.innerHTML = "";
-      loading.classList.add("hidden");
+      loading.classList.add("is-hidden");
     }
   });
 
@@ -218,11 +218,11 @@ export function renderNFT(container: HTMLElement) {
       if (!col) throw new Error(`Collection "${slug}" not found`);
 
       inner.innerHTML = `
-        <div class="row-between"><span class="result-label">Name</span><span class="result-value">${col["title"] ?? "—"}</span></div>
-        <div class="row-between mt-2"><span class="result-label">Supply</span><span class="result-value mono">${col["supply"] ?? "—"}</span></div>
-        <div class="row-between mt-2"><span class="result-label">Floor</span><span class="result-value mono">${col["floor"] ? Number(col["floor"]) / 1e9 + " SUI" : "—"}</span></div>
-        <div class="row-between mt-2"><span class="result-label">24h Volume</span><span class="result-value mono">${col["volume24h"] ? Number(col["volume24h"]) / 1e9 + " SUI" : "—"}</span></div>
-        <div class="row-between mt-2"><span class="result-label">Owners</span><span class="result-value mono">${col["owners"] ?? "—"}</span></div>
+        <div class="spread-row"><span class="result-label">Name</span><span class="result-value">${col["title"] ?? "—"}</span></div>
+        <div class="spread-row" style="margin-top:6px"><span class="result-label">Supply</span><span class="result-value code-text">${col["supply"] ?? "—"}</span></div>
+        <div class="spread-row" style="margin-top:6px"><span class="result-label">Floor</span><span class="result-value code-text">${col["floor"] ? Number(col["floor"]) / 1e9 + " SUI" : "—"}</span></div>
+        <div class="spread-row" style="margin-top:6px"><span class="result-label">24h Volume</span><span class="result-value code-text">${col["volume24h"] ? Number(col["volume24h"]) / 1e9 + " SUI" : "—"}</span></div>
+        <div class="spread-row" style="margin-top:6px"><span class="result-label">Owners</span><span class="result-value code-text">${col["owners"] ?? "—"}</span></div>
       `;
       result.classList.add("visible");
     } catch (e) {

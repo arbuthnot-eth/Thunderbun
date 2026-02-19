@@ -1,13 +1,13 @@
 {
   "name": "Thunderbun",
   "short_name": "Thunderbun",
-  "description": "A Sui-native PWA built with Thunderbun",
+  "description": "The Sui-native framework for launching dApps.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#4DA2FF",
-  "background_color": "#0D1117",
+  "theme_color": "#3B8BFF",
+  "background_color": "#09090F",
   "lang": "en",
   "icons": [
     {

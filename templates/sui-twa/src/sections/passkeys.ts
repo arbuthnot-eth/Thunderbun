@@ -33,45 +33,45 @@ export function renderPasskeys(container: HTMLElement) {
       <!-- How It Works -->
       <div class="card">
         <div class="card-title">How Passkeys Work on Sui</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           Passkeys use your device's biometrics (Face ID, fingerprint, PIN) to sign Sui transactions.
           Each passkey derives a unique Sui address — no seed phrase, no extension, no password.
         </p>
-        <ul class="small muted" style="margin-bottom:12px;padding-left:18px">
+        <ul class="card-description" style="padding-left:18px">
           <li>Credentials are bound to an <strong>RP ID</strong> (relying party identifier)</li>
           <li>By setting <code>rpId</code> to the root domain, passkeys work across subdomains</li>
           <li>A passkey created on <code>sub.thunderbun.ai</code> works on <code>app.thunderbun.ai</code></li>
         </ul>
         <div style="background:var(--bg);border-radius:var(--r-md);padding:10px 14px;margin-bottom:8px">
           <span class="result-label">Current RP ID</span>
-          <span class="mono small" style="margin-left:8px">${rpId}</span>
+          <span class="code-text" style="font-size:12px;margin-left:8px">${rpId}</span>
         </div>
       </div>
 
       <!-- Register / Authenticate -->
       <div class="card">
         <div class="card-title">Try It</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           Register a new passkey or authenticate with an existing one.
           The derived Sui address will be displayed below.
         </p>
-        <div class="row gap-2" style="margin-bottom:12px">
+        <div class="inline-group--tight" style="margin-bottom:12px">
           <button id="pk-register" class="btn btn-primary" style="flex:1">Register Passkey</button>
           <button id="pk-auth" class="btn btn-secondary" style="flex:1">Authenticate</button>
         </div>
         <div id="pk-result" style="display:none">
           <div style="background:var(--bg);border-radius:var(--r-md);padding:12px 14px">
             <div class="result-label">Passkey Sui Address</div>
-            <div id="pk-address" class="mono small break-all" style="color:var(--text);margin-top:4px"></div>
+            <div id="pk-address" class="address-display" style="color:var(--text);margin-top:4px"></div>
           </div>
         </div>
-        <div id="pk-error" class="small" style="color:var(--red);display:none;margin-top:8px"></div>
+        <div id="pk-error" style="font-size:12px;color:var(--red);display:none;margin-top:8px"></div>
       </div>
 
       <!-- Cross-Subdomain Architecture -->
       <div class="card">
         <div class="card-title">Cross-Subdomain Iframe Architecture</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           For production apps, serve a tiny passkey auth iframe from the root domain.
           Subdomains embed this iframe and communicate via <code>postMessage</code>.
         </p>
@@ -120,7 +120,7 @@ const address = keypair.toSuiAddress();
 
 // Sign data (e.g. for transaction signing)
 const signed = await keypair.signWithIntent(txBytes, "TransactionData");</pre>
-        <div class="info-links-row mt-3">
+        <div class="info-links-row spaced-top">
           <a href="https://sdk.mystenlabs.com/typescript/cryptography/keypairs/passkey" target="_blank" rel="noopener" class="badge badge-blue">Passkey docs ↗</a>
           <a href="https://webauthn.guide" target="_blank" rel="noopener" class="badge badge-blue">WebAuthn guide ↗</a>
         </div>

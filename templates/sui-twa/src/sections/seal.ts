@@ -26,12 +26,12 @@ export function renderSeal(container: HTMLElement) {
     <div class="section">
       <div class="section-top">
         <div>
-          <h1 class="section-title">Seal 🔒</h1>
+          <h1 class="section-title">Seal</h1>
           <p class="section-desc">Threshold encryption with on-chain access control powered by Sui Move.</p>
         </div>
-        <div class="row gap-2">
+        <div class="inline-group--tight">
           <span class="badge ${sealClient ? "badge-green" : "badge-yellow"}">${sealClient ? "SDK ready" : "No key servers (" + network + ")"}</span>
-          <a href="https://seal-docs.wal.app" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+          <a href="https://seal-docs.wal.app" target="_blank" rel="noopener" class="btn btn-secondary btn--compact">Docs ↗</a>
         </div>
       </div>
 
@@ -85,11 +85,11 @@ export function renderSeal(container: HTMLElement) {
 
       <!-- Seal SDK encrypt demo (testnet only) -->
       <div class="card">
-        <div class="row-between" style="margin-bottom:14px">
+        <div class="spread-row" style="margin-bottom:14px">
           <div class="card-title" style="margin:0">Seal SDK Encrypt</div>
           <span class="badge ${sealClient ? "badge-green" : "badge-yellow"}">${sealClient ? "Testnet key servers" : "Requires testnet"}</span>
         </div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           Encrypt data using the real Seal threshold encryption SDK.
           Requires a deployed Move package with <code>seal_approve</code> for decryption.
         </p>
@@ -99,11 +99,11 @@ export function renderSeal(container: HTMLElement) {
         </div>
         <div class="input-group">
           <label class="input-label">Package ID (Move access-control package)</label>
-          <input id="seal-sdk-pkg" type="text" class="input-field mono" placeholder="0x…" ${!sealClient ? "disabled" : ""} />
+          <input id="seal-sdk-pkg" type="text" class="input-field code-text" placeholder="0x…" ${!sealClient ? "disabled" : ""} />
         </div>
         <div class="input-group">
           <label class="input-label">Identity (object ID or encoded id)</label>
-          <input id="seal-sdk-id" type="text" class="input-field mono" placeholder="0x…" ${!sealClient ? "disabled" : ""} />
+          <input id="seal-sdk-id" type="text" class="input-field code-text" placeholder="0x…" ${!sealClient ? "disabled" : ""} />
         </div>
         <div class="input-group">
           <label class="input-label">Threshold</label>
@@ -119,10 +119,10 @@ export function renderSeal(container: HTMLElement) {
 
         <div class="result-box" id="seal-sdk-result">
           <div class="result-label">Encrypted output (hex)</div>
-          <div class="result-value mono break-all small" id="seal-sdk-ciphertext"></div>
-          <div class="result-label mt-3">Backup key (hex)</div>
-          <div class="result-value mono break-all small" id="seal-sdk-key"></div>
-          <button class="btn btn-secondary btn-sm mt-3" id="seal-sdk-copy">Copy ciphertext</button>
+          <div class="result-value code-text" style="font-size:12px;word-break:break-all" id="seal-sdk-ciphertext"></div>
+          <div class="result-label spaced-top">Backup key (hex)</div>
+          <div class="result-value code-text" style="font-size:12px;word-break:break-all" id="seal-sdk-key"></div>
+          <button class="btn btn-secondary btn--compact spaced-top" id="seal-sdk-copy">Copy ciphertext</button>
         </div>
         <div class="error-msg" id="seal-sdk-err"></div>
       </div>
@@ -130,7 +130,7 @@ export function renderSeal(container: HTMLElement) {
       <!-- Decrypt explanation -->
       <div class="card">
         <div class="card-title">Decrypting with Seal</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           Decryption requires building a PTB that calls your Move <code>seal_approve</code>
           function. The key servers verify on-chain that the caller has permission,
           then return threshold decryption shares.
@@ -170,7 +170,7 @@ const plaintext = await sealClient.decrypt({
       <!-- Local AES-GCM demo -->
       <div class="card">
         <div class="card-title">Local encrypt demo</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           Encrypt a message locally using AES-GCM (browser native).
           Full threshold encryption requires deployed key servers — see the Seal SDK card above.
         </p>
@@ -187,8 +187,8 @@ const plaintext = await sealClient.decrypt({
 
         <div class="result-box" id="seal-enc-result">
           <div class="result-label">Ciphertext (hex)</div>
-          <div class="result-value mono break-all small" id="seal-ciphertext"></div>
-          <button class="btn btn-secondary btn-sm mt-3" id="seal-copy">Copy ciphertext</button>
+          <div class="result-value code-text" style="font-size:12px;word-break:break-all" id="seal-ciphertext"></div>
+          <button class="btn btn-secondary btn--compact spaced-top" id="seal-copy">Copy ciphertext</button>
         </div>
         <div class="error-msg" id="seal-enc-err"></div>
       </div>
@@ -198,7 +198,7 @@ const plaintext = await sealClient.decrypt({
         <div class="card-title">Local decrypt demo</div>
         <div class="input-group">
           <label class="input-label">Ciphertext (hex)</label>
-          <input id="seal-ctxt" type="text" class="input-field mono" placeholder="Paste ciphertext hex…" />
+          <input id="seal-ctxt" type="text" class="input-field code-text" placeholder="Paste ciphertext hex…" />
         </div>
         <div class="input-group">
           <label class="input-label">Passphrase</label>

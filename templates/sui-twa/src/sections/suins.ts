@@ -52,7 +52,7 @@ function expiryLabel(ms: number | null | undefined): string {
 }
 
 function mono(s: string) {
-  return `<span class="mono">${s}</span>`;
+  return `<span class="code-text">${s}</span>`;
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ export function renderSuiNS(container: HTMLElement) {
             Forward &amp; reverse name resolution via the SuiNS SDK and gRPC.
           </p>
         </div>
-        <a href="https://docs.suins.io/developer/indexing" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Indexer docs ↗</a>
+        <a href="https://docs.suins.io/developer/indexing" target="_blank" rel="noopener" class="btn btn-secondary btn--compact">Indexer docs ↗</a>
       </div>
 
       <!-- ── Forward lookup: name → address ───────────────────────────── -->
@@ -81,7 +81,7 @@ export function renderSuiNS(container: HTMLElement) {
         </div>
         <div class="result-box" id="suins-fwd-result">
           <div class="result-label">Target address</div>
-          <div class="result-value green mono" id="suins-fwd-addr"></div>
+          <div class="result-value green code-text" id="suins-fwd-addr"></div>
         </div>
         <div class="error-msg" id="suins-fwd-err"></div>
       </div>
@@ -107,7 +107,7 @@ export function renderSuiNS(container: HTMLElement) {
         <p class="card-note">Uses gRPC <code>defaultNameServiceName()</code> — returns primary name</p>
         <label class="input-label">Sui address</label>
         <div class="input-row">
-          <input id="suins-addr" type="text" class="input-field mono" placeholder="0x…" />
+          <input id="suins-addr" type="text" class="input-field code-text" placeholder="0x…" />
           <button id="suins-reverse" class="btn btn-primary" data-idle="Look up">Look up</button>
         </div>
         <div class="result-box" id="suins-rev-result">

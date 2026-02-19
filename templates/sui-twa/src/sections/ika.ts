@@ -30,14 +30,14 @@ export function renderIka(container: HTMLElement) {
     <div class="section">
       <div class="section-top">
         <div>
-          <h1 class="section-title">Ika MPC 🔐</h1>
+          <h1 class="section-title">Ika MPC</h1>
           <p class="section-desc">Threshold multi-party computation for distributed wallets (dWallets) on Sui.</p>
         </div>
-        <div class="row gap-2">
+        <div class="inline-group--tight">
           <span class="badge ${supported ? "badge-blue" : "badge-yellow"}" id="ika-status-badge">
             ${supported ? "Loading…" : "Not available (" + network + ")"}
           </span>
-          <a href="https://docs.ika.xyz" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+          <a href="https://docs.ika.xyz" target="_blank" rel="noopener" class="btn btn-secondary btn--compact">Docs ↗</a>
         </div>
       </div>
 
@@ -80,14 +80,14 @@ export function renderIka(container: HTMLElement) {
 
       <!-- Network status -->
       <div class="card">
-        <div class="row-between" style="margin-bottom:14px">
+        <div class="spread-row" style="margin-bottom:14px">
           <div class="card-title" style="margin:0">Network Status</div>
-          <button id="ika-refresh" class="btn btn-secondary btn-sm" ${!supported ? "disabled" : ""}>↻ Refresh</button>
+          <button id="ika-refresh" class="btn btn-secondary btn--compact" ${!supported ? "disabled" : ""}>↻ Refresh</button>
         </div>
         <div id="ika-network-info">
           ${supported
-            ? '<div class="muted small">Connecting to Ika ' + network + '…</div>'
-            : '<div class="muted small">Ika is available on testnet and mainnet. Switch network in Settings.</div>'
+            ? '<div class="status-hint" style="font-size:12px">Connecting to Ika ' + network + '…</div>'
+            : '<div class="status-hint" style="font-size:12px">Ika is available on testnet and mainnet. Switch network in Settings.</div>'
           }
         </div>
       </div>
@@ -95,13 +95,13 @@ export function renderIka(container: HTMLElement) {
       <!-- dWallet info -->
       <div class="card">
         <div class="card-title">dWallet Overview</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           dWallets are created through a DKG (distributed key generation) protocol between
           you and the Ika network. Each dWallet has a cap (ownership token) and an encrypted
           user secret key share stored on-chain.
         </p>
         <div id="ika-dwallet-info">
-          <div class="muted small">Connect wallet and refresh to check for existing dWallets.</div>
+          <div class="status-hint" style="font-size:12px">Connect wallet and refresh to check for existing dWallets.</div>
         </div>
       </div>
 
@@ -200,24 +200,24 @@ console.log('Ika system:', system);
       badge.className = "badge badge-green";
       infoEl.innerHTML = `
         <div style="display:grid;gap:8px">
-          <div class="row-between" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
-            <span class="small muted">Network</span>
-            <span class="small mono">${status.network}</span>
+          <div class="spread-row" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
+            <span class="card-description" style="margin-bottom:0">Network</span>
+            <span class="code-text" style="font-size:12px">${status.network}</span>
           </div>
-          <div class="row-between" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
-            <span class="small muted">System Package</span>
-            <span class="small mono">${status.packageId?.slice(0, 10)}…${status.packageId?.slice(-6)}</span>
+          <div class="spread-row" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
+            <span class="card-description" style="margin-bottom:0">System Package</span>
+            <span class="code-text" style="font-size:12px">${status.packageId?.slice(0, 10)}…${status.packageId?.slice(-6)}</span>
           </div>
-          <div class="row-between" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
-            <span class="small muted">Coordinator</span>
-            <span class="small mono">${status.coordinatorId?.slice(0, 10)}…${status.coordinatorId?.slice(-6)}</span>
+          <div class="spread-row" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
+            <span class="card-description" style="margin-bottom:0">Coordinator</span>
+            <span class="code-text" style="font-size:12px">${status.coordinatorId?.slice(0, 10)}…${status.coordinatorId?.slice(-6)}</span>
           </div>
         </div>
       `;
     } else {
       badge.textContent = status.error ?? "Not connected";
       badge.className = "badge badge-yellow";
-      infoEl.innerHTML = `<div class="muted small">${status.error ?? "Failed to connect"}</div>`;
+      infoEl.innerHTML = `<div class="status-hint" style="font-size:12px">${status.error ?? "Failed to connect"}</div>`;
     }
   }
 

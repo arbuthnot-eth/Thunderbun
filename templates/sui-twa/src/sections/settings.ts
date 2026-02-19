@@ -22,7 +22,7 @@ export function renderSettings(container: HTMLElement) {
     <div class="section">
       <div class="section-top" style="margin-bottom:24px">
         <div>
-          <h1 class="section-title">Settings ⚙️</h1>
+          <h1 class="section-title">Settings</h1>
           <p class="section-desc">Network, wallet, and ecosystem references.</p>
         </div>
       </div>
@@ -52,22 +52,22 @@ export function renderSettings(container: HTMLElement) {
         ${s.connected && s.address ? `
           <div style="background:var(--bg);border-radius:var(--r-md);padding:12px 14px;margin-bottom:12px">
             <div class="result-label">Connected address</div>
-            <div class="mono small break-all" style="color:var(--text);margin-top:4px">${s.address}</div>
+            <div class="address-display" style="color:var(--text);margin-top:4px">${s.address}</div>
           </div>
-          <div class="row gap-2">
+          <div class="inline-group--tight">
             <button id="copy-addr" class="btn btn-secondary" style="flex:1">Copy address</button>
             <button id="disconnect" class="btn btn-danger" style="flex:1">Disconnect</button>
           </div>
         ` : `
-          <p class="small muted" style="margin-bottom:12px">No wallet connected.</p>
+          <p class="card-description">No wallet connected.</p>
           <button id="connect-wallet" class="btn btn-primary">Connect Wallet</button>
         `}
       </div>
 
       <!-- MVR -->
       <div class="card">
-        <div class="card-title">MVR — Move Package Registry 📦</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <div class="card-title">MVR — Move Package Registry</div>
+        <p class="card-description">
           MVR allows using <code>@pkg/module</code> named references in transactions
           instead of raw package addresses. Activated in this template via
           <code>mvr: {}</code> in the <code>SuiGrpcClient</code> constructor
@@ -86,7 +86,7 @@ tx.moveCall({
   target: '@deepbook/core::book::place_order',
   arguments: [...],
 });</pre>
-        <div class="info-links-row mt-3">
+        <div class="info-links-row spaced-top">
           <a href="https://www.moveregistry.com" target="_blank" rel="noopener" class="badge badge-blue">MVR site ↗</a>
           <a href="https://docs.suins.io/move-registry/tooling/mvr-cli" target="_blank" rel="noopener" class="badge badge-blue">MVR CLI ↗</a>
         </div>
@@ -94,17 +94,17 @@ tx.moveCall({
 
       <!-- Ika -->
       <div class="card">
-        <div class="card-title">Ika — MPC Network 🔐</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <div class="card-title">Ika — MPC Network</div>
+        <p class="card-description">
           Ika is a threshold multi-party computation network for Sui.
           It uses 2PC (two-party computation) to sign transactions without exposing private keys.
           Ideal for key management, cross-chain bridges, and institutional custody.
         </p>
-        <p class="small" style="margin-bottom:8px">
+        <p class="card-description">
           <strong>→</strong> See the <a href="#" id="ika-nav-link" style="color:var(--accent)">Ika MPC section</a>
           for live network status, SDK demos, and dWallet information.
         </p>
-        <div class="info-links-row mt-3">
+        <div class="info-links-row spaced-top">
           <a href="https://docs.ika.xyz" target="_blank" rel="noopener" class="badge badge-blue">Ika docs ↗</a>
           <a href="https://github.com/dwallet-labs/ika" target="_blank" rel="noopener" class="badge badge-blue">GitHub ↗</a>
         </div>
@@ -112,8 +112,8 @@ tx.moveCall({
 
       <!-- Nautilus -->
       <div class="card">
-        <div class="card-title">Nautilus — Verifiable Off-chain Compute ⚓</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <div class="card-title">Nautilus — Verifiable Off-chain Compute</div>
+        <p class="card-description">
           Nautilus runs code inside AWS Nitro Enclaves (TEEs) and posts cryptographic attestations
           on-chain to Sui, enabling trustless AI agents, oracles, fraud prevention,
           and DePIN solutions.
@@ -127,16 +127,16 @@ tx.moveCall({
       <!-- Passkeys -->
       <div class="card">
         <div class="card-title">Passkeys — WebAuthn for Sui</div>
-        <p class="small muted" style="margin-bottom:12px">
+        <p class="card-description">
           Passkeys let users sign Sui transactions with biometrics (Face ID, fingerprint, PIN) —
           no seed phrase or extension needed. Set <code>rpId</code> to the root domain for
           cross-subdomain portability.
         </p>
-        <p class="small" style="margin-bottom:8px">
+        <p class="card-description">
           <strong>&rarr;</strong> See the <a href="#" id="passkeys-nav-link" style="color:var(--accent)">Passkeys section</a>
           for a live demo and cross-subdomain iframe architecture.
         </p>
-        <div class="info-links-row mt-3">
+        <div class="info-links-row spaced-top">
           <a href="https://sdk.mystenlabs.com/typescript/cryptography/keypairs/passkey" target="_blank" rel="noopener" class="badge badge-blue">SDK docs ↗</a>
           <a href="https://webauthn.guide" target="_blank" rel="noopener" class="badge badge-blue">WebAuthn guide ↗</a>
         </div>
@@ -145,10 +145,10 @@ tx.moveCall({
       <!-- Sponsored Transactions -->
       <div class="card">
         <div class="card-title">Sponsored Transactions</div>
-        <p class="small muted" style="margin-bottom:12px">
-          Two patterns for gasless UX — both using native Sui SDK (no Enoki):
+        <p class="card-description">
+          Two patterns for gasless UX — both using native Sui SDK:
         </p>
-        <ul class="small muted" style="margin-bottom:12px;padding-left:18px">
+        <ul class="card-description" style="padding-left:18px">
           <li><strong>Client-side:</strong> <code>wallet.buildSponsoredTx()</code> sets
               <code>gasOwner</code> to a known sponsor, user signs, then both signatures
               are submitted via <code>executeSponsoredTx()</code></li>

@@ -116,13 +116,13 @@ class App {
       const bal  = document.getElementById("wallet-balance")!;
 
       if (s.connected && s.address) {
-        disc.classList.add("hidden");
-        conn.classList.remove("hidden");
+        disc.classList.add("is-hidden");
+        conn.classList.remove("is-hidden");
         addr.textContent = wallet.formatAddress();
         bal.textContent  = wallet.formatBalance();
       } else {
-        disc.classList.remove("hidden");
-        conn.classList.add("hidden");
+        disc.classList.remove("is-hidden");
+        conn.classList.add("is-hidden");
       }
     });
   }

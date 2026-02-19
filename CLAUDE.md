@@ -75,7 +75,7 @@ sui client publish --gas-budget 100000000
 ## Coding Conventions
 
 - **Vanilla TypeScript** in sui-twa sections — no React components, `innerHTML` + event handlers
-- **No Tailwind** — vanilla CSS with design tokens
+- **Semantic CSS** — no utility classes, custom properties for tokens, semantic class names
 - **Move 2024.beta edition** — method syntax, named error constants
 - **No narration comments** — only explain non-obvious intent
 - **Explicit return types** on exported functions

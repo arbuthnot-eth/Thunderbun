@@ -27,12 +27,12 @@ export function renderWalrus(container: HTMLElement) {
     <div class="section">
       <div class="section-top">
         <div>
-          <h1 class="section-title">Walrus 🐋</h1>
+          <h1 class="section-title">Walrus</h1>
           <p class="section-desc">Decentralized blob storage. Store anything — text, images, files.</p>
         </div>
-        <div class="row gap-2">
+        <div class="inline-group--tight">
           <span class="badge ${sdkAvailable ? "badge-green" : "badge-yellow"}">${sdkAvailable ? "SDK" : "HTTP REST"}</span>
-          <a href="https://docs.wal.app" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
+          <a href="https://docs.wal.app" target="_blank" rel="noopener" class="btn btn-secondary btn--compact">Docs ↗</a>
         </div>
       </div>
 
@@ -48,40 +48,40 @@ export function renderWalrus(container: HTMLElement) {
           <input type="file" id="file-input" style="display:none" />
         </div>
 
-        <div id="file-info" class="hidden mt-3">
-          <div class="row-between" style="background:var(--bg);padding:10px 14px;border-radius:var(--r-md)">
+        <div id="file-info" class="is-hidden" style="margin-top:10px">
+          <div class="spread-row" style="background:var(--bg);padding:10px 14px;border-radius:var(--r-md)">
             <div>
-              <div style="font-size:13px;color:#fff" id="file-name"></div>
-              <div class="small muted" id="file-size"></div>
+              <div style="font-size:13px;color:var(--text-heading)" id="file-name"></div>
+              <div class="card-description" style="margin-bottom:0" id="file-size"></div>
             </div>
-            <div class="row gap-2">
+            <div class="inline-group--tight">
               <select id="epochs-select" class="input-field" style="width:auto;padding:4px 8px">
                 <option value="1">1 epoch</option>
                 <option value="5" selected>5 epochs</option>
                 <option value="10">10 epochs</option>
               </select>
-              <button id="store-btn" class="btn btn-primary btn-sm">Store</button>
+              <button id="store-btn" class="btn btn-primary btn--compact">Store</button>
             </div>
           </div>
         </div>
 
         <div class="result-box" id="store-result">
           <div class="result-label">Blob ID (save this!)</div>
-          <div class="result-value green mono break-all" id="blob-id"></div>
-          <button class="btn btn-secondary btn-sm mt-3" id="copy-blob">Copy blob ID</button>
+          <div class="result-value green code-text" style="word-break:break-all" id="blob-id"></div>
+          <button class="btn btn-secondary btn--compact spaced-top" id="copy-blob">Copy blob ID</button>
         </div>
         <div class="error-msg" id="store-err"></div>
       </div>
 
       <!-- Retrieve -->
       <div class="card">
-        <div class="row-between" style="margin-bottom:14px">
+        <div class="spread-row" style="margin-bottom:14px">
           <div class="card-title" style="margin:0">Retrieve a blob</div>
           <span class="badge ${sdkAvailable ? "badge-green" : "badge-yellow"}">${sdkAvailable ? "SDK readBlob" : "HTTP GET"}</span>
         </div>
         <label class="input-label">Blob ID</label>
         <div class="input-row">
-          <input id="blob-input" type="text" class="input-field mono" placeholder="Enter blob ID…" />
+          <input id="blob-input" type="text" class="input-field code-text" placeholder="Enter blob ID…" />
           <button id="retrieve-btn" class="btn btn-primary">Fetch</button>
         </div>
         <div class="result-box" id="retrieve-result">
@@ -160,7 +160,7 @@ const { blobId } = await walrus.writeBlob({
       f.size < 1024 ? `${f.size} B`
       : f.size < 1024 * 1024 ? `${(f.size / 1024).toFixed(1)} KB`
       : `${(f.size / 1024 / 1024).toFixed(2)} MB`;
-    container.querySelector<HTMLElement>("#file-info")!.classList.remove("hidden");
+    container.querySelector<HTMLElement>("#file-info")!.classList.remove("is-hidden");
     container.querySelector<HTMLElement>("#store-result")!.classList.remove("visible");
   }
 

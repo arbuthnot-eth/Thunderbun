@@ -22,44 +22,50 @@ export function renderZkProof(container: HTMLElement): void {
         : "https://suiscan.xyz/devnet";
 
   container.innerHTML = `
-    <h1 class="page-title">Proof Verifier</h1>
-    <p class="page-subtitle">
-      Verify Groth16 and Ligetron proofs on Sui. The proof_verifier contract is deployed
-      on testnet — register your circuit's verification key, then submit proofs.
-    </p>
-
-    <div class="card">
-      <h3 class="card-title">On-chain verifier</h3>
-      <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:var(--space-3);">
-        Package and registry are live on testnet:
-      </p>
-      <div class="result-box" style="margin-bottom:var(--space-2);">
-        <div class="result-label">Package</div>
-        <div class="result-value mono" style="font-size:0.75rem;word-break:break-all;">${PACKAGE_ID}</div>
+    <div class="section">
+      <div class="section-top">
+        <div>
+          <h1 class="section-title">Proof Verifier</h1>
+          <p class="section-desc">
+            Verify Groth16 and Ligetron proofs on Sui. The proof_verifier contract is deployed
+            on testnet — register your circuit's verification key, then submit proofs.
+          </p>
+        </div>
       </div>
-      <div class="result-box">
-        <div class="result-label">Registry (shared)</div>
-        <div class="result-value mono" style="font-size:0.75rem;word-break:break-all;">${REGISTRY_ID}</div>
-      </div>
-      <div style="margin-top:var(--space-3);">
-        <a href="${explorer}/object/${REGISTRY_ID}" target="_blank" rel="noopener" class="btn btn-secondary">View on SuiScan ↗</a>
-      </div>
-    </div>
 
-    <div class="card">
-      <h3 class="card-title">Ligetron zkVM pipeline</h3>
-      <p style="font-size:0.9rem;color:var(--text-muted);">
-        In-browser Ligetron proving + Seal + Walrus + DeepBook pipeline is being updated
-        for the latest SDKs. Use the on-chain verifier above for Groth16 proofs today.
-      </p>
-      <a href="https://github.com/ligeroinc/ligero-prover" target="_blank" rel="noopener" class="badge badge-blue">Ligetron SDK ↗</a>
-    </div>
+      <div class="card">
+        <div class="card-title">On-chain verifier</div>
+        <p class="card-description">
+          Package and registry are live on testnet:
+        </p>
+        <div class="result-box visible" style="margin-bottom:10px">
+          <div class="result-label">Package</div>
+          <div class="result-value code-text" style="font-size:11px;word-break:break-all">${PACKAGE_ID}</div>
+        </div>
+        <div class="result-box visible">
+          <div class="result-label">Registry (shared)</div>
+          <div class="result-value code-text" style="font-size:11px;word-break:break-all">${REGISTRY_ID}</div>
+        </div>
+        <div class="spaced-top">
+          <a href="${explorer}/object/${REGISTRY_ID}" target="_blank" rel="noopener" class="btn btn-secondary">View on SuiScan ↗</a>
+        </div>
+      </div>
 
-    <div class="info-links">
-      <div class="info-links-label">Resources</div>
-      <div class="info-links-row">
-        <a href="https://docs.sui.io/guides/developer/cryptography/groth16" target="_blank" rel="noopener" class="badge badge-blue">Sui Groth16 ↗</a>
-        <a href="https://ligero-inc.com" target="_blank" rel="noopener" class="badge badge-blue">Ligero / Ligetron ↗</a>
+      <div class="card">
+        <div class="card-title">Ligetron zkVM pipeline</div>
+        <p class="card-description">
+          In-browser Ligetron proving + Seal + Walrus + DeepBook pipeline is being updated
+          for the latest SDKs. Use the on-chain verifier above for Groth16 proofs today.
+        </p>
+        <a href="https://github.com/ligeroinc/ligero-prover" target="_blank" rel="noopener" class="badge badge-blue">Ligetron SDK ↗</a>
+      </div>
+
+      <div class="info-links">
+        <div class="info-links-label">Resources</div>
+        <div class="info-links-row">
+          <a href="https://docs.sui.io/guides/developer/cryptography/groth16" target="_blank" rel="noopener" class="badge badge-blue">Sui Groth16 ↗</a>
+          <a href="https://ligero-inc.com" target="_blank" rel="noopener" class="badge badge-blue">Ligero / Ligetron ↗</a>
+        </div>
       </div>
     </div>
   `;
@@ -67,7 +73,7 @@ export function renderZkProof(container: HTMLElement): void {
   const src = getSectionSource("zkproof");
   if (src) {
     const cfg = { id: "zkproof-src", label: "zkproof.ts", source: src };
-    container.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
     attachCodeViewer(container, cfg);
   }
 }

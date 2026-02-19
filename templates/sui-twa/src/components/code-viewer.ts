@@ -25,7 +25,7 @@ export function codeViewerHTML(cfg: CodeViewerConfig): string {
   const hasTabs = cfg.secondaryLabel && cfg.secondarySource;
   return `
     <div class="code-viewer" id="cv-${cfg.id}">
-      <button class="code-viewer-toggle btn btn-secondary btn-sm" data-cv="${cfg.id}">View Source</button>
+      <button class="code-viewer-toggle btn btn-secondary btn--compact" data-cv="${cfg.id}">View Source</button>
       <div class="code-viewer-body" data-cv-body="${cfg.id}" style="display:none">
         <div class="code-viewer-toolbar">
           ${hasTabs ? `
@@ -36,7 +36,7 @@ export function codeViewerHTML(cfg: CodeViewerConfig): string {
           ` : `
             <span class="code-viewer-filename">${cfg.label}</span>
           `}
-          <button class="code-viewer-copy btn btn-secondary btn-sm" data-cv-copy="${cfg.id}">Copy</button>
+          <button class="code-viewer-copy btn btn-secondary btn--compact" data-cv-copy="${cfg.id}">Copy</button>
         </div>
         <pre class="code-viewer-pre" data-cv-pre="${cfg.id}">${escapeHTML(cfg.source)}</pre>
       </div>

@@ -7,8 +7,8 @@ export function renderHome(container: HTMLElement) {
     <div class="section">
       <div class="section-top">
         <div>
-          <h1 class="section-title">Home ⚡</h1>
-          <p class="section-desc">Live SDK playground for the Sui ecosystem.</p>
+          <h1 class="section-title--hero">Launch your dApp</h1>
+          <p class="section-desc">Your Sui dApp command center.</p>
         </div>
       </div>
       <div id="home-body"></div>
@@ -32,14 +32,14 @@ export function renderHome(container: HTMLElement) {
       body.innerHTML = `
         <div class="card">
           <div class="wallet-connected-card">
-            <div class="row gap-3">
+            <div class="inline-group">
               <div class="wallet-avatar">S</div>
               <div class="wallet-info">
                 <div class="wallet-info-addr">${wallet.formatAddress()}</div>
                 <div class="wallet-info-network">${s.network}</div>
               </div>
             </div>
-            <button class="btn btn-secondary btn-sm" id="home-disconnect">Disconnect</button>
+            <button class="btn btn-secondary btn--compact" id="home-disconnect">Disconnect</button>
           </div>
           <div class="balance-row">
             <span class="balance-label">SUI Balance</span>
@@ -47,25 +47,25 @@ export function renderHome(container: HTMLElement) {
           </div>
         </div>
 
-        <div class="stat-grid mt-4">
+        <div class="stat-grid spaced-top">
           <div class="stat-box">
             <div class="stat-label">Network</div>
             <div class="stat-value" style="text-transform:capitalize">${s.network}</div>
           </div>
           <div class="stat-box" id="home-refresh" style="cursor:pointer">
             <div class="stat-label">Balance ↻</div>
-            <div class="stat-value mono">${wallet.formatBalance()}</div>
+            <div class="stat-value code-text">${wallet.formatBalance()}</div>
           </div>
         </div>
 
-        <div class="info-links mt-6">
+        <div class="info-links spaced-top">
           <div class="info-links-label">Full address</div>
-          <div class="mono small break-all" style="color:var(--text)">${s.address}</div>
-          <button class="btn btn-secondary btn-sm mt-3" id="home-copy">Copy address</button>
+          <div class="address-display" style="color:var(--text)">${s.address}</div>
+          <button class="btn btn-secondary btn--compact spaced-top" id="home-copy">Copy address</button>
         </div>
 
-        <div class="card mt-4">
-          <div class="card-title">Explore SDK Demos</div>
+        <div class="card spaced-top">
+          <div class="card-title">Integrations</div>
           <div class="stat-grid quick-links">
             <div class="stat-box quick-link" data-goto="suins">
               <div class="quick-link-icon">🔖</div>
@@ -112,13 +112,13 @@ export function renderHome(container: HTMLElement) {
         <div class="card">
           <div class="connect-hero">
             <img src="/icons/thunderbun-logo.png" alt="Thunderbun" class="connect-hero-icon-img" />
-            <h2>Sui SDK Playground</h2>
+            <h2>Launch your dApp</h2>
             <p>
-              Thunderbun is a live SDK playground for the Sui ecosystem.
-              Connect a wallet to interact with every demo, view source code, and build your own template.
+              Thunderbun is a web4, Sui-native framework. Connect a wallet to access
+              every SDK integration, view source code, and ship to production.
             </p>
             <button class="btn btn-primary" id="home-connect">Connect Wallet</button>
-            <p class="small muted mt-3">
+            <p class="card-description spaced-top" style="text-align:center">
               Powered by <a href="https://docs.waap.xyz" target="_blank">WaaP</a>
               · <a href="https://sdk.mystenlabs.com/dapp-kit" target="_blank">dApp Kit</a>
               · <a href="https://docs.sui.io/standards/wallet-standard" target="_blank">Wallet Standard</a>
