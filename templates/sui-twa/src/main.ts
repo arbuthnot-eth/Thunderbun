@@ -1,16 +1,6 @@
 import "./style.css";
 import "./init-waap";
 import { wallet } from "./wallet";
-import { renderHome }     from "./sections/home";
-import { renderSuiNS }    from "./sections/suins";
-import { renderWalrus }   from "./sections/walrus";
-import { renderDeepBook } from "./sections/deepbook";
-import { renderSeal }     from "./sections/seal";
-import { renderNFT }      from "./sections/nft";
-import { renderSettings } from "./sections/settings";
-import { renderZkProof }  from "./sections/zkproof";
-import { renderIka }      from "./sections/ika";
-import { renderPasskeys } from "./sections/passkeys";
 
 export type SectionId =
   | "home" | "suins" | "walrus" | "deepbook"
@@ -44,17 +34,17 @@ const EXTERNAL: { label: string; href: string; icon: string }[] = [
   { label: "Shinami Gas",  href: "https://shinami.com",                icon: "⛽" },
 ];
 
-const RENDERERS: Record<SectionId, (el: HTMLElement) => void> = {
-  home:     renderHome,
-  suins:    renderSuiNS,
-  walrus:   renderWalrus,
-  deepbook: renderDeepBook,
-  seal:     renderSeal,
-  passkeys: renderPasskeys,
-  ika:      renderIka,
-  nft:      renderNFT,
-  zkproof:  renderZkProof,
-  settings: renderSettings,
+const RENDERERS: Record<SectionId, () => Promise<{ default: (el: HTMLElement) => void }>> = {
+  home:     () => import("./sections/home").then(m => ({ default: m.renderHome })),
+  suins:    () => import("./sections/suins").then(m => ({ default: m.renderSuiNS })),
+  walrus:   () => import("./sections/walrus").then(m => ({ default: m.renderWalrus })),
+  deepbook: () => import("./sections/deepbook").then(m => ({ default: m.renderDeepBook })),
+  seal:     () => import("./sections/seal").then(m => ({ default: m.renderSeal })),
+  passkeys: () => import("./sections/passkeys").then(m => ({ default: m.renderPasskeys })),
+  ika:      () => import("./sections/ika").then(m => ({ default: m.renderIka })),
+  nft:      () => import("./sections/nft").then(m => ({ default: m.renderNFT })),
+  zkproof:  () => import("./sections/zkproof").then(m => ({ default: m.renderZkProof })),
+  settings: () => import("./sections/settings").then(m => ({ default: m.renderSettings })),
 };
 
 class App {
@@ -70,14 +60,25 @@ class App {
     (window as unknown as Record<string, unknown>).__app = this;
   }
 
-  showSection(id: SectionId) {
+  async showSection(id: SectionId) {
     this.current = id;
-    this.main.innerHTML = "";
-    RENDERERS[id](this.main);
-
+    
     document.querySelectorAll(".nav-item[data-id]").forEach((el) => {
-      (el as HTMLElement).classList.toggle("active", (el as HTMLElement).dataset["id"] === this.current);
+      (el as HTMLElement).classList.toggle("active", (el as HTMLElement).dataset["id"] === id);
     });
+
+    this.main.innerHTML = '<div class="loading-center"><div class="spinner"></div><p>Loading module...</p></div>';
+    
+    try {
+      const module = await RENDERERS[id]();
+      if (this.current !== id) return; // user navigated away
+      this.main.innerHTML = "";
+      module.default(this.main);
+    } catch (err) {
+      if (this.current !== id) return;
+      console.error(err);
+      this.main.innerHTML = \`<div class="section"><div class="error-msg visible">Failed to load section: \${err}</div></div>\`;
+    }
   }
 
   private buildNav() {
