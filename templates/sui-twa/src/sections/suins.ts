@@ -1,133 +1,146 @@
+/**
+ * SuiNS section — uses @mysten/suins SuinsClient
+ * Docs: https://docs.suins.io/developer/sdk
+ * Package: npm install @mysten/suins
+ */
+
+import { SuinsClient } from "@mysten/suins";
 import { wallet } from "../wallet";
+
+let suinsClient: SuinsClient | null = null;
+
+function getClient(): SuinsClient {
+  if (!suinsClient) {
+    suinsClient = new SuinsClient({
+      client: wallet.getClient(),
+      network: wallet.getState().network === "mainnet" ? "mainnet" : "testnet",
+    });
+  }
+  return suinsClient;
+}
 
 export function renderSuiNS(container: HTMLElement) {
   container.innerHTML = `
-    <div class="p-6 max-w-2xl mx-auto">
-      <div class="mb-6 mt-4 flex items-start justify-between">
+    <div class="section">
+      <div class="section-top">
         <div>
-          <h1 class="section-header">SuiNS 🔖</h1>
+          <h1 class="section-title">SuiNS 🔖</h1>
           <p class="section-desc">Resolve human-readable .sui names to addresses.</p>
         </div>
-        <a href="https://suins.io" target="_blank" rel="noopener" class="btn-secondary text-xs">Docs ↗</a>
+        <a href="https://docs.suins.io" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
       </div>
 
-      <div class="card mb-4">
-        <label class="block text-xs font-medium text-sui-muted mb-2">Resolve a .sui name</label>
-        <div class="flex gap-2">
-          <input id="suins-input" type="text" placeholder="example.sui" class="input-field" />
-          <button id="suins-resolve-btn" class="btn-primary whitespace-nowrap">Resolve</button>
-        </div>
-        <div id="suins-result" class="mt-3 hidden">
-          <div class="flex items-center gap-2 p-3 bg-sui-dark rounded-lg">
-            <span class="text-sui-success text-sm">✓</span>
-            <div>
-              <p class="text-xs text-sui-muted">Resolved address</p>
-              <p class="text-sm text-white font-mono" id="suins-result-address"></p>
-            </div>
-          </div>
-        </div>
-        <div id="suins-error" class="mt-3 hidden">
-          <p class="text-sui-error text-sm" id="suins-error-msg"></p>
-        </div>
-      </div>
-
+      <!-- Forward resolve: name → address -->
       <div class="card">
-        <label class="block text-xs font-medium text-sui-muted mb-2">Look up name for an address</label>
-        <div class="flex gap-2">
-          <input id="suins-reverse-input" type="text" placeholder="0x..." class="input-field" />
-          <button id="suins-reverse-btn" class="btn-primary whitespace-nowrap">Look up</button>
+        <div class="card-title">Resolve name → address</div>
+        <label class="input-label">SuiNS name</label>
+        <div class="input-row">
+          <input id="suins-name" type="text" class="input-field" placeholder="example.sui" />
+          <button id="suins-resolve" class="btn btn-primary">Resolve</button>
         </div>
-        <div id="suins-reverse-result" class="mt-3 hidden">
-          <div class="flex items-center gap-2 p-3 bg-sui-dark rounded-lg">
-            <span class="text-sui-success text-sm">✓</span>
-            <p class="text-sm text-white" id="suins-reverse-name"></p>
-          </div>
+        <div class="result-box" id="suins-fwd-result">
+          <div class="result-label">Resolved address</div>
+          <div class="result-value green mono" id="suins-fwd-addr"></div>
         </div>
+        <div class="error-msg" id="suins-fwd-err"></div>
       </div>
 
-      <div class="mt-6 card border-dashed">
-        <p class="text-xs text-sui-muted mb-3 font-medium">Quick links</p>
-        <div class="flex flex-wrap gap-2">
+      <!-- Reverse resolve: address → name -->
+      <div class="card">
+        <div class="card-title">Reverse lookup address → name</div>
+        <label class="input-label">Sui address</label>
+        <div class="input-row">
+          <input id="suins-addr" type="text" class="input-field mono" placeholder="0x…" />
+          <button id="suins-reverse" class="btn btn-primary">Look up</button>
+        </div>
+        <div class="result-box" id="suins-rev-result">
+          <div class="result-label">SuiNS names</div>
+          <div class="result-value green" id="suins-rev-names"></div>
+        </div>
+        <div class="error-msg" id="suins-rev-err"></div>
+      </div>
+
+      <div class="info-links">
+        <div class="info-links-label">Resources</div>
+        <div class="info-links-row">
           <a href="https://suins.io" target="_blank" rel="noopener" class="badge badge-blue">Register a name ↗</a>
-          <a href="https://docs.sui.io/standards/suins" target="_blank" rel="noopener" class="badge badge-blue">SuiNS standard ↗</a>
+          <a href="https://docs.suins.io/developer/sdk" target="_blank" rel="noopener" class="badge badge-blue">SDK reference ↗</a>
+          <a href="https://www.npmjs.com/package/@mysten/suins" target="_blank" rel="noopener" class="badge badge-blue">npm ↗</a>
         </div>
       </div>
     </div>
   `;
 
-  const resolveBtn = container.querySelector<HTMLButtonElement>("#suins-resolve-btn")!;
-  const reverseBtn = container.querySelector<HTMLButtonElement>("#suins-reverse-btn")!;
+  // Pre-fill reverse input with connected address
+  const addrInput = container.querySelector<HTMLInputElement>("#suins-addr")!;
+  const s = wallet.getState();
+  if (s.address) addrInput.value = s.address;
 
-  resolveBtn.addEventListener("click", async () => {
-    const input = container.querySelector<HTMLInputElement>("#suins-input")!;
-    const name = input.value.trim();
+  // Forward resolve
+  container.querySelector("#suins-resolve")?.addEventListener("click", async () => {
+    const name = container.querySelector<HTMLInputElement>("#suins-name")!.value.trim();
     if (!name) return;
 
-    const result = container.querySelector<HTMLElement>("#suins-result")!;
-    const errorEl = container.querySelector<HTMLElement>("#suins-error")!;
-    const addrEl = container.querySelector<HTMLElement>("#suins-result-address")!;
-    const errMsg = container.querySelector<HTMLElement>("#suins-error-msg")!;
+    const btn = container.querySelector<HTMLButtonElement>("#suins-resolve")!;
+    const resultEl = container.querySelector<HTMLElement>("#suins-fwd-result")!;
+    const addrEl   = container.querySelector<HTMLElement>("#suins-fwd-addr")!;
+    const errEl    = container.querySelector<HTMLElement>("#suins-fwd-err")!;
 
-    result.classList.add("hidden");
-    errorEl.classList.add("hidden");
-    resolveBtn.disabled = true;
-    resolveBtn.textContent = "Resolving…";
+    resultEl.classList.remove("visible");
+    errEl.classList.remove("visible");
+    btn.disabled = true;
+    btn.textContent = "Resolving…";
 
     try {
-      const client = wallet.getClient();
-      const res = await client.call("suix_resolveNameServiceAddress", [name]);
-      if (res) {
-        addrEl.textContent = res as string;
-        result.classList.remove("hidden");
+      // SuinsClient.getAddress() resolves a name to its linked Sui address
+      const address = await getClient().getAddress(name);
+      if (address) {
+        addrEl.textContent = address;
+        resultEl.classList.add("visible");
       } else {
-        errMsg.textContent = `No address found for "${name}"`;
-        errorEl.classList.remove("hidden");
+        errEl.textContent = `No address linked to "${name}"`;
+        errEl.classList.add("visible");
       }
-    } catch {
-      errMsg.textContent = "Resolution failed. Check the name and try again.";
-      errorEl.classList.remove("hidden");
+    } catch (err) {
+      errEl.textContent = "Resolution failed: " + (err instanceof Error ? err.message : String(err));
+      errEl.classList.add("visible");
     } finally {
-      resolveBtn.disabled = false;
-      resolveBtn.textContent = "Resolve";
+      btn.disabled = false;
+      btn.textContent = "Resolve";
     }
   });
 
-  reverseBtn.addEventListener("click", async () => {
-    const input = container.querySelector<HTMLInputElement>("#suins-reverse-input")!;
-    const address = input.value.trim() || wallet.getState().address || "";
+  // Reverse lookup
+  container.querySelector("#suins-reverse")?.addEventListener("click", async () => {
+    const address = addrInput.value.trim();
     if (!address) return;
 
-    const resultEl = container.querySelector<HTMLElement>("#suins-reverse-result")!;
-    const nameEl = container.querySelector<HTMLElement>("#suins-reverse-name")!;
+    const btn      = container.querySelector<HTMLButtonElement>("#suins-reverse")!;
+    const resultEl = container.querySelector<HTMLElement>("#suins-rev-result")!;
+    const namesEl  = container.querySelector<HTMLElement>("#suins-rev-names")!;
+    const errEl    = container.querySelector<HTMLElement>("#suins-rev-err")!;
 
-    resultEl.classList.add("hidden");
-    reverseBtn.disabled = true;
-    reverseBtn.textContent = "Looking up…";
+    resultEl.classList.remove("visible");
+    errEl.classList.remove("visible");
+    btn.disabled = true;
+    btn.textContent = "Looking up…";
 
     try {
-      const client = wallet.getClient();
-      const res = await client.call("suix_resolveNameServiceNames", [address]);
-      const names = (res as { data: string[] })?.data;
+      // SuinsClient.getNames() returns an array of names for an address
+      const names = await getClient().getNames(address);
       if (names && names.length > 0) {
-        nameEl.textContent = names[0]!;
-        resultEl.classList.remove("hidden");
+        namesEl.textContent = names.join(", ");
+        resultEl.classList.add("visible");
       } else {
-        nameEl.textContent = "No .sui name found for this address";
-        resultEl.classList.remove("hidden");
+        errEl.textContent = "No SuiNS names found for this address.";
+        errEl.classList.add("visible");
       }
-    } catch {
-      nameEl.textContent = "Lookup failed.";
-      resultEl.classList.remove("hidden");
+    } catch (err) {
+      errEl.textContent = "Lookup failed: " + (err instanceof Error ? err.message : String(err));
+      errEl.classList.add("visible");
     } finally {
-      reverseBtn.disabled = false;
-      reverseBtn.textContent = "Look up";
+      btn.disabled = false;
+      btn.textContent = "Look up";
     }
   });
-
-  // Pre-fill with connected address for reverse lookup
-  const state = wallet.getState();
-  if (state.address) {
-    const reverseInput = container.querySelector<HTMLInputElement>("#suins-reverse-input")!;
-    reverseInput.value = state.address;
-  }
 }

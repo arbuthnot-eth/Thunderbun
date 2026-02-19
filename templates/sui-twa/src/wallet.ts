@@ -1,5 +1,18 @@
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+/**
+ * wallet.ts — WaaP + Sui Wallet Standard integration (no React, no dapp-kit)
+ *
+ * WaaP implements the Sui Wallet Standard, so we can use it directly:
+ *   1. Call initWaaPSui() → get wallet instance
+ *   2. registerWallet() → registers it in the global wallet registry
+ *   3. Connect directly via wallet.features['standard:connect']
+ *
+ * Docs: https://docs.waap.xyz/guides-sui/start
+ */
 
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { namedPackagesPlugin, Transaction } from "@mysten/sui/transactions";
+
+// ── Types ────────────────────────────────────────────────────────────────
 export type Network = "mainnet" | "testnet" | "devnet";
 
 export interface WalletState {
@@ -9,25 +22,53 @@ export interface WalletState {
   balance: bigint | null;
 }
 
-type WalletListener = (state: WalletState) => void;
+type Listener = (state: WalletState) => void;
 
-// WaaP embedded wallet — https://docs.waap.xyz
-// Falls back to window.suiWallet (Sui Wallet browser extension) if WaaP is unavailable.
-declare global {
-  interface Window {
-    waap?: {
-      connect: () => Promise<{ address: string }>;
-      disconnect: () => Promise<void>;
-      signAndExecuteTransaction: (tx: unknown) => Promise<unknown>;
-      getAddress: () => Promise<string | null>;
+// WaaP SDK + Wallet Standard types (declared here to avoid TS errors when
+// package is not yet installed in template consumers' environments)
+declare module "@human.tech/waap-sdk" {
+  export function initWaaPSui(opts: {
+    config: {
+      authenticationMethods?: string[];
+      allowedSocials?: string[];
+      styles?: { darkMode?: boolean };
     };
-    suiWallet?: {
-      requestPermissions: () => Promise<void>;
-      getAccounts: () => Promise<string[]>;
+    useStaging?: boolean;
+  }): WaaPSuiWallet;
+
+  export interface WaaPSuiWallet {
+    name: string;
+    features: {
+      "standard:connect": {
+        connect: (opts?: { silent?: boolean }) => Promise<{ accounts: Array<{ address: string }> }>;
+      };
+      "standard:disconnect"?: { disconnect: () => Promise<void> };
+      "standard:events": {
+        on: (event: string, cb: (data: unknown) => void) => () => void;
+      };
+      "sui:signAndExecuteTransaction": {
+        signAndExecuteTransaction: (opts: {
+          transaction: unknown;
+          account: { address: string };
+          chain: string;
+        }) => Promise<{ digest: string }>;
+      };
     };
+    accounts: Array<{ address: string }>;
   }
 }
 
+declare module "@mysten/wallet-standard" {
+  export function registerWallet(wallet: unknown): void;
+}
+
+// ── MVR: register named packages plugin so transactions can use @pkg/module names
+Transaction.registerGlobalSerializationPlugin(
+  "namedPackagesPlugin",
+  namedPackagesPlugin({ url: "https://mainnet.mvr.mystenlabs.com" })
+);
+
+// ── WalletManager ────────────────────────────────────────────────────────
 class WalletManager {
   private state: WalletState = {
     connected: false,
@@ -36,70 +77,65 @@ class WalletManager {
     balance: null,
   };
 
-  private listeners: WalletListener[] = [];
+  private listeners: Listener[] = [];
   private client: SuiClient;
+  private waapWallet: import("@human.tech/waap-sdk").WaaPSuiWallet | null = null;
 
   constructor() {
     this.client = new SuiClient({ url: getFullnodeUrl("mainnet") });
+    this.initWaaP();
     this.restoreSession();
   }
 
-  getState(): WalletState {
-    return { ...this.state };
-  }
+  // ── Public API ────────────────────────────────────────────────────────
 
-  subscribe(listener: WalletListener): () => void {
+  getState(): WalletState { return { ...this.state }; }
+
+  subscribe(listener: Listener): () => void {
     this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
-    };
-  }
-
-  private emit() {
-    this.listeners.forEach((l) => l(this.getState()));
+    // Emit current state immediately
+    listener(this.getState());
+    return () => { this.listeners = this.listeners.filter((l) => l !== listener); };
   }
 
   async connect(): Promise<void> {
-    try {
-      let address: string | null = null;
+    let address: string | null = null;
 
-      if (window.waap) {
-        // WaaP embedded wallet (preferred — works in TWA without extension)
-        const result = await window.waap.connect();
-        address = result.address;
-      } else if (window.suiWallet) {
-        // Sui Wallet browser extension fallback
-        await window.suiWallet.requestPermissions();
-        const accounts = await window.suiWallet.getAccounts();
-        address = accounts[0] ?? null;
-      } else {
-        // Dev mode: generate a mock address for testing UI
-        address = "0x" + "a".repeat(64);
-        console.warn("[wallet] No wallet provider found. Using mock address for dev.");
+    if (this.waapWallet) {
+      try {
+        const result = await this.waapWallet.features["standard:connect"].connect();
+        address = result.accounts[0]?.address ?? null;
+      } catch (err) {
+        console.warn("[wallet] WaaP connect failed, trying extension fallback:", err);
       }
-
-      if (!address) throw new Error("No address returned from wallet");
-
-      this.state = { ...this.state, connected: true, address };
-      sessionStorage.setItem("sui_wallet_address", address);
-
-      await this.refreshBalance();
-      this.emit();
-    } catch (err) {
-      console.error("[wallet] connect error:", err);
-      throw err;
     }
+
+    // Browser extension fallback (any Wallet Standard wallet)
+    if (!address) {
+      address = await this.tryExtensionWallet();
+    }
+
+    // Dev mock (no wallet available)
+    if (!address) {
+      console.warn("[wallet] No wallet provider found. Using dev mock address.");
+      address = "0x" + "a1b2c3d4e5f6".repeat(5).slice(0, 64);
+    }
+
+    if (!address) throw new Error("No address returned");
+
+    this.state = { ...this.state, connected: true, address };
+    sessionStorage.setItem("sui_wallet_addr", address);
+    await this.refreshBalance();
+    this.emit();
   }
 
   async disconnect(): Promise<void> {
-    if (window.waap) {
+    if (this.waapWallet?.features["standard:disconnect"]) {
       try {
-        await window.waap.disconnect();
-      } catch (_) {
-        // ignore
-      }
+        await this.waapWallet.features["standard:disconnect"]!.disconnect();
+      } catch (_) { /* ignore */ }
     }
-    sessionStorage.removeItem("sui_wallet_address");
+    sessionStorage.removeItem("sui_wallet_addr");
     this.state = { connected: false, address: null, network: this.state.network, balance: null };
     this.emit();
   }
@@ -113,9 +149,7 @@ class WalletManager {
       });
       this.state.balance = BigInt(totalBalance);
       this.emit();
-    } catch (err) {
-      console.warn("[wallet] balance fetch failed:", err);
-    }
+    } catch { /* ignore */ }
   }
 
   setNetwork(network: Network): void {
@@ -125,24 +159,65 @@ class WalletManager {
     this.emit();
   }
 
-  getClient(): SuiClient {
-    return this.client;
-  }
+  getClient(): SuiClient { return this.client; }
 
   formatBalance(): string {
     if (this.state.balance === null) return "—";
-    const sui = Number(this.state.balance) / 1_000_000_000;
-    return `${sui.toFixed(4)} SUI`;
+    return (Number(this.state.balance) / 1_000_000_000).toFixed(4) + " SUI";
   }
 
   formatAddress(full = false): string {
     if (!this.state.address) return "";
     if (full) return this.state.address;
-    return `${this.state.address.slice(0, 6)}…${this.state.address.slice(-4)}`;
+    const a = this.state.address;
+    return `${a.slice(0, 6)}…${a.slice(-4)}`;
+  }
+
+  // ── Private ───────────────────────────────────────────────────────────
+
+  private emit() { this.listeners.forEach((l) => l(this.getState())); }
+
+  private async initWaaP(): Promise<void> {
+    try {
+      const { initWaaPSui } = await import("@human.tech/waap-sdk");
+      const { registerWallet } = await import("@mysten/wallet-standard");
+
+      const w = initWaaPSui({
+        config: {
+          authenticationMethods: ["email", "phone", "social"],
+          allowedSocials: ["google", "twitter", "discord"],
+          styles: { darkMode: true },
+        },
+        useStaging: false,
+      });
+
+      registerWallet(w as unknown as Parameters<typeof registerWallet>[0]);
+      this.waapWallet = w;
+    } catch (err) {
+      console.warn("[wallet] WaaP SDK not available:", err);
+    }
+  }
+
+  private async tryExtensionWallet(): Promise<string | null> {
+    // Walk the registered wallets via Wallet Standard
+    try {
+      const { getWallets } = await import("@mysten/wallet-standard");
+      const wallets = getWallets().get();
+      if (wallets.length === 0) return null;
+
+      const w = wallets[0]!;
+      const connectFeature = w.features["standard:connect"] as
+        | { connect: () => Promise<{ accounts: Array<{ address: string }> }> }
+        | undefined;
+
+      if (!connectFeature) return null;
+      const result = await connectFeature.connect();
+      return result.accounts[0]?.address ?? null;
+    } catch { return null; }
   }
 
   private async restoreSession(): Promise<void> {
-    const saved = sessionStorage.getItem("sui_wallet_address");
+    const saved = sessionStorage.getItem("sui_wallet_addr");
     if (saved) {
       this.state = { ...this.state, connected: true, address: saved };
       await this.refreshBalance();

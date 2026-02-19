@@ -1,149 +1,188 @@
+/**
+ * DeepBook section — DeepBookV3 CLOB on Sui
+ * Docs: https://docs.sui.io/standards/deepbook
+ *
+ * DeepBookV3 is queried via the Sui RPC (suix_* endpoints).
+ * The DEEP token is the fee token: 0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP
+ * Pool creation and trading requires building PTBs (programmable transaction blocks).
+ */
+
 import { wallet } from "../wallet";
+
+// Mainnet SUI/USDC pool (DeepBook v3)
+const SUI_USDC_POOL =
+  "0x4405b50d791fd3346754e8171aaab6bc2ed26c2c46efdd033c14b30ae507ac33";
 
 export function renderDeepBook(container: HTMLElement) {
   container.innerHTML = `
-    <div class="p-6 max-w-2xl mx-auto">
-      <div class="mb-6 mt-4 flex items-start justify-between">
+    <div class="section">
+      <div class="section-top">
         <div>
-          <h1 class="section-header">DeepBook 📖</h1>
-          <p class="section-desc">On-chain central limit order book for Sui. Query pools and market data.</p>
+          <h1 class="section-title">DeepBook 📖</h1>
+          <p class="section-desc">On-chain CLOB on Sui. Query pools and build limit/market orders.</p>
         </div>
-        <a href="https://deepbook.tech" target="_blank" rel="noopener" class="btn-secondary text-xs">Docs ↗</a>
+        <a href="https://docs.sui.io/standards/deepbook" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
       </div>
 
-      <div class="card mb-4">
-        <div class="flex items-center justify-between mb-4">
-          <p class="text-sm font-medium text-white">SUI/USDC Pool</p>
+      <!-- Pool stats -->
+      <div class="card">
+        <div class="row-between" style="margin-bottom:14px">
+          <div class="card-title" style="margin:0">SUI/USDC Pool</div>
           <span class="badge badge-blue">DeepBook v3</span>
         </div>
-        <div id="pool-stats" class="grid grid-cols-2 gap-3">
-          <div class="p-3 bg-sui-dark rounded-lg">
-            <p class="text-xs text-sui-muted mb-1">Best Bid</p>
-            <p class="text-white font-mono text-sm" id="best-bid">—</p>
-          </div>
-          <div class="p-3 bg-sui-dark rounded-lg">
-            <p class="text-xs text-sui-muted mb-1">Best Ask</p>
-            <p class="text-white font-mono text-sm" id="best-ask">—</p>
-          </div>
-          <div class="p-3 bg-sui-dark rounded-lg">
-            <p class="text-xs text-sui-muted mb-1">Mid Price</p>
-            <p class="text-white font-mono text-sm" id="mid-price">—</p>
-          </div>
-          <div class="p-3 bg-sui-dark rounded-lg">
-            <p class="text-xs text-sui-muted mb-1">Spread</p>
-            <p class="text-white font-mono text-sm" id="spread">—</p>
-          </div>
+        <div class="stat-grid" id="pool-stats">
+          <div class="stat-box"><div class="stat-label">Best Bid</div><div class="stat-value" id="db-bid">—</div></div>
+          <div class="stat-box"><div class="stat-label">Best Ask</div><div class="stat-value" id="db-ask">—</div></div>
+          <div class="stat-box"><div class="stat-label">Mid Price</div><div class="stat-value" id="db-mid">—</div></div>
+          <div class="stat-box"><div class="stat-label">Spread</div><div class="stat-value" id="db-spread">—</div></div>
         </div>
-        <button id="refresh-pool" class="btn-secondary w-full mt-4 text-xs">↻ Refresh Pool Data</button>
+        <button id="db-refresh" class="btn btn-secondary btn-full mt-4">↻ Refresh</button>
       </div>
 
-      <div class="card mb-4">
-        <p class="text-sm font-medium text-white mb-3">Place Order (Testnet Demo)</p>
-        <div class="space-y-3">
-          <div class="flex gap-2">
-            <button id="side-buy" class="flex-1 py-2 rounded-lg text-sm font-medium bg-sui-success bg-opacity-20 text-sui-success border border-sui-success border-opacity-30">Buy</button>
-            <button id="side-sell" class="flex-1 py-2 rounded-lg text-sm font-medium text-sui-muted border border-sui-border">Sell</button>
-          </div>
-          <input id="order-price" type="number" placeholder="Price (USDC)" class="input-field" step="0.0001" />
-          <input id="order-qty" type="number" placeholder="Quantity (SUI)" class="input-field" step="0.1" />
+      <!-- Order form (demo) -->
+      <div class="card">
+        <div class="card-title">Place Order <span class="badge badge-yellow">Demo</span></div>
+
+        <div class="side-toggle">
+          <button id="db-buy" class="side-btn buy active">Buy</button>
+          <button id="db-sell" class="side-btn sell">Sell</button>
         </div>
-        <div id="order-preview" class="hidden mt-3 p-3 bg-sui-dark rounded-lg text-xs text-sui-muted">
-          <p>Total: <span id="order-total" class="text-white font-mono"></span> USDC</p>
+
+        <div class="input-group">
+          <label class="input-label">Price (USDC)</label>
+          <input id="db-price" type="number" class="input-field" placeholder="0.0000" step="0.0001" min="0" />
         </div>
-        <button id="place-order-btn" class="btn-primary w-full mt-4" disabled>Connect wallet to trade</button>
+        <div class="input-group">
+          <label class="input-label">Quantity (SUI)</label>
+          <input id="db-qty" type="number" class="input-field" placeholder="0.00" step="0.1" min="0" />
+        </div>
+
+        <div class="result-box" id="db-preview">
+          <div class="result-label">Order total</div>
+          <div class="result-value" id="db-total"></div>
+        </div>
+
+        <button id="db-order" class="btn btn-primary btn-full mt-3" disabled>
+          Connect wallet to trade
+        </button>
+        <p class="small muted mt-3">
+          Real order execution requires building a PTB with DeepBook's Move package.
+          See <a href="https://docs.sui.io/standards/deepbook" target="_blank">DeepBook docs</a> for the full SDK.
+        </p>
       </div>
 
-      <div class="mt-4 card border-dashed">
-        <p class="text-xs text-sui-muted mb-3 font-medium">DeepBook resources</p>
-        <div class="flex flex-wrap gap-2">
-          <a href="https://deepbook.tech" target="_blank" rel="noopener" class="badge badge-blue">DeepBook v3 ↗</a>
+      <div class="info-links">
+        <div class="info-links-label">Resources</div>
+        <div class="info-links-row">
+          <a href="https://deepbook.tech" target="_blank" rel="noopener" class="badge badge-blue">deepbook.tech ↗</a>
           <a href="https://docs.sui.io/standards/deepbook" target="_blank" rel="noopener" class="badge badge-blue">Sui Docs ↗</a>
+          <a href="https://suivision.xyz/coin/0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP" target="_blank" rel="noopener" class="badge badge-blue">DEEP token ↗</a>
         </div>
       </div>
     </div>
   `;
 
-  // Pool data fetch (using DeepBook v3 public RPC endpoint)
-  const DEEPBOOK_POOL = "0x4405b50d791fd3346754e8171aaab6bc2ed26c2c46efdd033c14b30ae507ac33";
-
-  async function fetchPoolData() {
-    const client = wallet.getClient();
-    const btn = container.querySelector<HTMLButtonElement>("#refresh-pool")!;
+  // ── Fetch pool stats ────────────────────────────────────────────────────
+  async function fetchPool() {
+    const btn = container.querySelector<HTMLButtonElement>("#db-refresh")!;
     btn.disabled = true;
     btn.textContent = "Loading…";
 
     try {
-      const result = await client.call("suix_getPoolSummary", [DEEPBOOK_POOL]);
-      const summary = result as { bestBid?: string; bestAsk?: string } | null;
-      if (summary) {
-        const bid = parseFloat(summary.bestBid ?? "0");
-        const ask = parseFloat(summary.bestAsk ?? "0");
-        const mid = (bid + ask) / 2;
-        const spread = ask - bid;
-        container.querySelector("#best-bid")!.textContent = bid > 0 ? `$${bid.toFixed(4)}` : "—";
-        container.querySelector("#best-ask")!.textContent = ask > 0 ? `$${ask.toFixed(4)}` : "—";
-        container.querySelector("#mid-price")!.textContent = mid > 0 ? `$${mid.toFixed(4)}` : "—";
-        container.querySelector("#spread")!.textContent = spread > 0 ? `$${spread.toFixed(6)}` : "—";
+      // Query pool summary via Sui JSON-RPC
+      const client = wallet.getClient();
+      const result = await client.call("suix_getPoolSummary", [SUI_USDC_POOL]) as
+        { bestBid?: string | null; bestAsk?: string | null } | null;
+
+      if (result) {
+        const bid = result.bestBid ? Number(result.bestBid) / 1e9 : null;
+        const ask = result.bestAsk ? Number(result.bestAsk) / 1e9 : null;
+        const mid = bid && ask ? (bid + ask) / 2 : null;
+        const spread = bid && ask ? ask - bid : null;
+
+        container.querySelector("#db-bid")!.textContent    = bid    ? `$${bid.toFixed(4)}`    : "—";
+        container.querySelector("#db-ask")!.textContent    = ask    ? `$${ask.toFixed(4)}`    : "—";
+        container.querySelector("#db-mid")!.textContent    = mid    ? `$${mid.toFixed(4)}`    : "—";
+        container.querySelector("#db-spread")!.textContent = spread ? `$${spread.toFixed(6)}` : "—";
+      } else {
+        // Fallback: fetch pool object for display
+        const obj = await client.getObject({ id: SUI_USDC_POOL, options: { showContent: true } });
+        if (obj.data) {
+          container.querySelector("#db-bid")!.textContent = "N/A";
+          container.querySelector("#db-ask")!.textContent = "N/A";
+          container.querySelector("#db-mid")!.textContent = "Query not supported";
+          container.querySelector("#db-spread")!.textContent = "—";
+        }
       }
-    } catch {
-      container.querySelector("#best-bid")!.textContent = "N/A";
-      container.querySelector("#best-ask")!.textContent = "N/A";
+    } catch (err) {
+      console.warn("[deepbook] pool fetch error:", err);
+      container.querySelector("#db-bid")!.textContent = "Error";
+      container.querySelector("#db-ask")!.textContent = "Error";
     } finally {
       btn.disabled = false;
-      btn.textContent = "↻ Refresh Pool Data";
+      btn.textContent = "↻ Refresh";
     }
   }
 
-  container.querySelector("#refresh-pool")?.addEventListener("click", fetchPoolData);
-  fetchPoolData();
+  container.querySelector("#db-refresh")?.addEventListener("click", fetchPool);
+  fetchPool();
 
-  // Order side toggle
+  // ── Side toggle ─────────────────────────────────────────────────────────
   let side: "buy" | "sell" = "buy";
-  container.querySelector("#side-buy")?.addEventListener("click", () => {
+
+  container.querySelector("#db-buy")?.addEventListener("click", () => {
     side = "buy";
-    container.querySelector("#side-buy")!.className = "flex-1 py-2 rounded-lg text-sm font-medium bg-sui-success bg-opacity-20 text-sui-success border border-sui-success border-opacity-30";
-    container.querySelector("#side-sell")!.className = "flex-1 py-2 rounded-lg text-sm font-medium text-sui-muted border border-sui-border";
+    container.querySelector("#db-buy")!.classList.add("active");
+    container.querySelector("#db-sell")!.classList.remove("active");
+    updateOrderBtn();
   });
-  container.querySelector("#side-sell")?.addEventListener("click", () => {
+  container.querySelector("#db-sell")?.addEventListener("click", () => {
     side = "sell";
-    container.querySelector("#side-sell")!.className = "flex-1 py-2 rounded-lg text-sm font-medium bg-sui-error bg-opacity-20 text-sui-error border border-sui-error border-opacity-30";
-    container.querySelector("#side-buy")!.className = "flex-1 py-2 rounded-lg text-sm font-medium text-sui-muted border border-sui-border";
+    container.querySelector("#db-sell")!.classList.add("active");
+    container.querySelector("#db-buy")!.classList.remove("active");
+    updateOrderBtn();
   });
 
-  // Order preview
+  // ── Order preview ────────────────────────────────────────────────────────
   const updatePreview = () => {
-    const price = parseFloat((container.querySelector<HTMLInputElement>("#order-price")!).value);
-    const qty = parseFloat((container.querySelector<HTMLInputElement>("#order-qty")!).value);
-    const preview = container.querySelector<HTMLElement>("#order-preview")!;
+    const price = parseFloat(container.querySelector<HTMLInputElement>("#db-price")!.value);
+    const qty   = parseFloat(container.querySelector<HTMLInputElement>("#db-qty")!.value);
+    const preview = container.querySelector<HTMLElement>("#db-preview")!;
     if (price > 0 && qty > 0) {
-      preview.classList.remove("hidden");
-      container.querySelector("#order-total")!.textContent = (price * qty).toFixed(4);
+      preview.classList.add("visible");
+      container.querySelector("#db-total")!.textContent = `${(price * qty).toFixed(4)} USDC`;
     } else {
-      preview.classList.add("hidden");
+      preview.classList.remove("visible");
     }
   };
-  container.querySelector("#order-price")?.addEventListener("input", updatePreview);
-  container.querySelector("#order-qty")?.addEventListener("input", updatePreview);
+  container.querySelector("#db-price")?.addEventListener("input", updatePreview);
+  container.querySelector("#db-qty")?.addEventListener("input",   updatePreview);
 
-  // Order button state
-  const unsubscribe = wallet.subscribe((state) => {
-    const btn = container.querySelector<HTMLButtonElement>("#place-order-btn")!;
-    if (state.connected) {
-      btn.disabled = false;
-      btn.textContent = `Place ${side.toUpperCase()} Order`;
-    } else {
-      btn.disabled = true;
-      btn.textContent = "Connect wallet to trade";
-    }
-  });
+  // ── Order button ─────────────────────────────────────────────────────────
+  function updateOrderBtn() {
+    const btn = container.querySelector<HTMLButtonElement>("#db-order")!;
+    const s = wallet.getState();
+    btn.disabled = !s.connected;
+    btn.textContent = s.connected ? `Place ${side.toUpperCase()} Order` : "Connect wallet to trade";
+  }
 
-  container.querySelector("#place-order-btn")?.addEventListener("click", () => {
-    alert("Order placement requires a live DeepBook v3 integration.\nSee https://deepbook.tech for SDK usage.");
-  });
+  const unsub = wallet.subscribe(updateOrderBtn);
+  cleanup(container, unsub);
 
-  // Cleanup
-  const observer = new MutationObserver(() => {
-    if (!document.contains(container)) { unsubscribe(); observer.disconnect(); }
+  container.querySelector("#db-order")?.addEventListener("click", () => {
+    alert(
+      "To place a real order:\n\n" +
+      "1. Build a PTB calling DeepBook's place_limit_order or place_market_order\n" +
+      "2. Pay fees in DEEP token\n" +
+      "3. Sign with wallet.getState() address\n\n" +
+      "See https://docs.sui.io/standards/deepbook for the full Move package interface."
+    );
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+function cleanup(container: HTMLElement, unsub: () => void) {
+  const obs = new MutationObserver(() => {
+    if (!document.contains(container)) { unsub(); obs.disconnect(); }
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
 }

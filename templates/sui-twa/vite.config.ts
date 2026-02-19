@@ -34,7 +34,7 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/fullnode\.mainnet\.sui\.io\/.*/i,
+            urlPattern: /^https:\/\/fullnode\.(mainnet|testnet|devnet)\.sui\.io\/.*/i,
             handler: "NetworkFirst",
             options: {
               cacheName: "sui-rpc-cache",

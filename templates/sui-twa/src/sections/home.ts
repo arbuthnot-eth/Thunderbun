@@ -2,87 +2,89 @@ import { wallet } from "../wallet";
 
 export function renderHome(container: HTMLElement) {
   container.innerHTML = `
-    <div class="p-6 max-w-2xl mx-auto">
-      <div class="mb-8 mt-4">
-        <h1 class="section-header">Welcome to Sui ⚡</h1>
-        <p class="section-desc">Connect your wallet to start interacting with the Sui blockchain.</p>
+    <div class="section">
+      <div class="section-top">
+        <div>
+          <h1 class="section-title">Home ⚡</h1>
+          <p class="section-desc">Connect your wallet to interact with Sui.</p>
+        </div>
       </div>
-
-      <div id="connect-section">
-        <!-- Rendered dynamically -->
-      </div>
-
-      <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4" id="stats-grid">
-        <!-- Filled after connect -->
-      </div>
+      <div id="home-body"></div>
     </div>
   `;
 
-  const connectSection = container.querySelector<HTMLElement>("#connect-section")!;
-  const statsGrid = container.querySelector<HTMLElement>("#stats-grid")!;
+  const body = container.querySelector<HTMLElement>("#home-body")!;
 
   const render = () => {
-    const state = wallet.getState();
+    const s = wallet.getState();
 
-    if (state.connected && state.address) {
-      connectSection.innerHTML = `
+    if (s.connected && s.address) {
+      body.innerHTML = `
         <div class="card">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-gradient-to-br from-sui-blue to-sui-accent flex items-center justify-center text-white font-bold">S</div>
-              <div>
-                <p class="text-white font-medium text-sm">${wallet.formatAddress()}</p>
-                <p class="text-xs text-sui-muted">${state.network}</p>
+          <div class="wallet-connected-card">
+            <div class="row gap-3">
+              <div class="wallet-avatar">S</div>
+              <div class="wallet-info">
+                <div class="wallet-info-addr">${wallet.formatAddress()}</div>
+                <div class="wallet-info-network">${s.network}</div>
               </div>
             </div>
-            <button id="disconnect-btn" class="btn-secondary text-xs px-3 py-1.5">Disconnect</button>
+            <button class="btn btn-secondary btn-sm" id="home-disconnect">Disconnect</button>
           </div>
-          <div class="flex items-center justify-between p-3 bg-sui-dark rounded-lg">
-            <span class="text-sui-muted text-sm">Balance</span>
-            <span class="text-white font-semibold font-mono">${wallet.formatBalance()}</span>
+          <div class="balance-row">
+            <span class="balance-label">SUI Balance</span>
+            <span class="balance-value" id="home-balance">${wallet.formatBalance()}</span>
           </div>
+        </div>
+
+        <div class="stat-grid mt-4">
+          <div class="stat-box">
+            <div class="stat-label">Network</div>
+            <div class="stat-value" style="text-transform:capitalize">${s.network}</div>
+          </div>
+          <div class="stat-box" id="home-refresh" style="cursor:pointer">
+            <div class="stat-label">Balance ↻</div>
+            <div class="stat-value mono">${wallet.formatBalance()}</div>
+          </div>
+        </div>
+
+        <div class="info-links mt-6">
+          <div class="info-links-label">Full address</div>
+          <div class="mono small break-all" style="color:var(--text)">${s.address}</div>
+          <button class="btn btn-secondary btn-sm mt-3" id="home-copy">Copy address</button>
         </div>
       `;
 
-      statsGrid.innerHTML = `
-        <div class="card hover:border-sui-accent transition-colors">
-          <p class="text-xs text-sui-muted mb-1">Network</p>
-          <p class="text-white font-semibold capitalize">${state.network}</p>
-        </div>
-        <div class="card hover:border-sui-accent transition-colors cursor-pointer" id="refresh-btn">
-          <p class="text-xs text-sui-muted mb-1">SUI Balance</p>
-          <p class="text-white font-semibold font-mono">${wallet.formatBalance()}</p>
-          <p class="text-xs text-sui-muted mt-1">↻ click to refresh</p>
-        </div>
-      `;
-
-      connectSection.querySelector("#disconnect-btn")?.addEventListener("click", async () => {
-        await wallet.disconnect();
-      });
-
-      statsGrid.querySelector("#refresh-btn")?.addEventListener("click", async () => {
-        await wallet.refreshBalance();
+      body.querySelector("#home-disconnect")?.addEventListener("click", () => wallet.disconnect());
+      body.querySelector("#home-refresh")?.addEventListener("click", () => wallet.refreshBalance());
+      body.querySelector("#home-copy")?.addEventListener("click", () => {
+        navigator.clipboard.writeText(s.address ?? "");
+        const btn = body.querySelector<HTMLButtonElement>("#home-copy")!;
+        const orig = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = orig; }, 1500);
       });
     } else {
-      connectSection.innerHTML = `
-        <div class="card text-center py-10">
-          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-sui-blue to-sui-accent mx-auto mb-4 flex items-center justify-center text-3xl">⚡</div>
-          <h2 class="text-white font-semibold text-lg mb-2">Connect Wallet</h2>
-          <p class="text-sui-muted text-sm mb-6 max-w-xs mx-auto">
-            Connect with WaaP embedded wallet, Sui Wallet extension, or any Sui-compatible wallet.
-          </p>
-          <button id="connect-btn" class="btn-primary mx-auto">
-            Connect Wallet
-          </button>
-          <p class="text-xs text-sui-muted mt-4">
-            Powered by <a href="https://docs.waap.xyz" target="_blank" class="text-sui-accent hover:underline">WaaP</a>
-          </p>
+      body.innerHTML = `
+        <div class="card">
+          <div class="connect-hero">
+            <div class="connect-hero-icon">⚡</div>
+            <h2>Connect your wallet</h2>
+            <p>
+              WaaP embedded wallet works right in this page — no extension needed.
+              Or use any Sui Wallet Standard extension you already have installed.
+            </p>
+            <button class="btn btn-primary" id="home-connect">Connect Wallet</button>
+            <p class="small muted mt-3">
+              Powered by <a href="https://docs.waap.xyz" target="_blank">WaaP</a>
+              · <a href="https://docs.sui.io/standards/wallet-standard" target="_blank">Wallet Standard</a>
+            </p>
+          </div>
         </div>
       `;
-      statsGrid.innerHTML = "";
 
-      connectSection.querySelector("#connect-btn")?.addEventListener("click", async () => {
-        const btn = connectSection.querySelector<HTMLButtonElement>("#connect-btn")!;
+      const btn = body.querySelector<HTMLButtonElement>("#home-connect")!;
+      btn.addEventListener("click", async () => {
         btn.disabled = true;
         btn.textContent = "Connecting…";
         try {
@@ -97,14 +99,13 @@ export function renderHome(container: HTMLElement) {
   };
 
   const unsub = wallet.subscribe(render);
-  render();
+  cleanup(container, unsub);
+}
 
-  // Cleanup on navigation
-  const observer = new MutationObserver(() => {
-    if (!document.contains(container)) {
-      unsub();
-      observer.disconnect();
-    }
+/** Cleans up subscriptions when the section is removed from the DOM */
+function cleanup(container: HTMLElement, unsub: () => void) {
+  const obs = new MutationObserver(() => {
+    if (!document.contains(container)) { unsub(); obs.disconnect(); }
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  obs.observe(document.body, { childList: true, subtree: true });
 }

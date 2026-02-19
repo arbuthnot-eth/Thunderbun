@@ -1,122 +1,148 @@
+/**
+ * NFT section — browse owned NFTs + TradePort data API
+ * Docs: https://www.tradeport.xyz/docs
+ *
+ * Two tools:
+ *   1. SuiClient.getOwnedObjects() — fetches wallet NFTs with display metadata
+ *   2. TradePort GraphQL API — rich collection/listing/history data
+ *
+ * TradePort Trading SDK (@tradeport/sui-trading-sdk) requires an API key.
+ * Request one at: https://form.asana.com/?k=ClRNDmKRUMlBEYDWbxR_Mw
+ */
+
 import { wallet } from "../wallet";
 
-interface NFTItem {
+const TRADEPORT_GRAPHQL = "https://api.tradeport.xyz/graphql";
+
+interface NFT {
   objectId: string;
-  name?: string;
-  imageUrl?: string;
-  collection?: string;
+  name: string;
+  imageUrl: string;
+  collection: string;
 }
 
 export function renderNFT(container: HTMLElement) {
   container.innerHTML = `
-    <div class="p-6 max-w-2xl mx-auto">
-      <div class="mb-6 mt-4 flex items-start justify-between">
+    <div class="section">
+      <div class="section-top">
         <div>
-          <h1 class="section-header">NFTs 🖼</h1>
-          <p class="section-desc">Browse your Sui NFTs via TradePort.</p>
+          <h1 class="section-title">NFTs 🖼</h1>
+          <p class="section-desc">Browse your Sui NFTs and query TradePort collection data.</p>
         </div>
-        <a href="https://tradeport.xyz" target="_blank" rel="noopener" class="btn-secondary text-xs">TradePort ↗</a>
+        <a href="https://www.tradeport.xyz/docs" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Docs ↗</a>
       </div>
 
-      <div id="nft-connect-prompt" class="card text-center py-10 hidden">
-        <p class="text-sui-muted text-sm">Connect your wallet to view your NFTs.</p>
+      <div id="nft-prompt" class="card hidden">
+        <p class="small muted" style="text-align:center;padding:24px 0">Connect your wallet to view your NFTs.</p>
       </div>
 
-      <div id="nft-loading" class="hidden text-center py-16">
-        <div class="inline-block w-6 h-6 border-2 border-sui-blue border-t-transparent rounded-full animate-spin mb-3"></div>
-        <p class="text-sui-muted text-sm">Loading NFTs…</p>
+      <div id="nft-loading" class="loading-center hidden">
+        <div class="spinner"></div>
+        <p>Loading NFTs…</p>
       </div>
 
-      <div id="nft-empty" class="hidden card text-center py-10">
-        <p class="text-3xl mb-3">🖼</p>
-        <p class="text-sui-muted text-sm">No NFTs found in this wallet.</p>
-        <a href="https://tradeport.xyz/sui" target="_blank" rel="noopener" class="btn-primary mt-4 inline-block text-xs">Browse NFTs on TradePort</a>
+      <div id="nft-empty" class="card hidden" style="text-align:center;padding:40px 20px">
+        <div style="font-size:40px;margin-bottom:12px">🖼</div>
+        <p class="muted small">No NFTs found in this wallet.</p>
+        <a href="https://tradeport.xyz/sui" target="_blank" rel="noopener" class="btn btn-primary btn-sm mt-3" style="display:inline-flex">Browse on TradePort</a>
       </div>
 
-      <div id="nft-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+      <div id="nft-grid" class="nft-grid"></div>
 
-      <div class="mt-6 card border-dashed">
-        <p class="text-xs text-sui-muted mb-3 font-medium">NFT marketplaces</p>
-        <div class="flex flex-wrap gap-2">
+      <!-- TradePort collection search -->
+      <div class="card mt-4" id="tradeport-card" style="margin-top:24px">
+        <div class="card-title">TradePort collection search</div>
+        <p class="small muted" style="margin-bottom:12px">
+          Query collection stats via the <a href="https://www.tradeport.xyz/docs/nft-data-api/overview" target="_blank">TradePort GraphQL API</a>.
+          No API key needed for read operations on public data.
+        </p>
+        <div class="input-row">
+          <input id="tp-slug" type="text" class="input-field" placeholder="Collection slug (e.g. suifrens)" />
+          <button id="tp-search" class="btn btn-primary">Search</button>
+        </div>
+        <div class="result-box" id="tp-result">
+          <div id="tp-result-inner"></div>
+        </div>
+        <div class="error-msg" id="tp-err"></div>
+      </div>
+
+      <div class="info-links" style="margin-top:14px">
+        <div class="info-links-label">Resources</div>
+        <div class="info-links-row">
           <a href="https://tradeport.xyz/sui" target="_blank" rel="noopener" class="badge badge-blue">TradePort ↗</a>
+          <a href="https://www.tradeport.xyz/docs/nft-data-api/overview" target="_blank" rel="noopener" class="badge badge-blue">GraphQL API ↗</a>
+          <a href="https://www.tradeport.xyz/docs/nft-trading-sdk/sui-sdk/getting-started" target="_blank" rel="noopener" class="badge badge-blue">Trading SDK ↗</a>
           <a href="https://bluemove.net" target="_blank" rel="noopener" class="badge badge-blue">BlueMove ↗</a>
-          <a href="https://hyperspace.xyz" target="_blank" rel="noopener" class="badge badge-blue">HyperSpace ↗</a>
         </div>
       </div>
     </div>
   `;
 
-  async function loadNFTs(address: string) {
-    const loadingEl = container.querySelector<HTMLElement>("#nft-loading")!;
-    const emptyEl = container.querySelector<HTMLElement>("#nft-empty")!;
-    const gridEl = container.querySelector<HTMLElement>("#nft-grid")!;
+  const prompt  = container.querySelector<HTMLElement>("#nft-prompt")!;
+  const loading = container.querySelector<HTMLElement>("#nft-loading")!;
+  const empty   = container.querySelector<HTMLElement>("#nft-empty")!;
+  const grid    = container.querySelector<HTMLElement>("#nft-grid")!;
 
-    loadingEl.classList.remove("hidden");
-    emptyEl.classList.add("hidden");
-    gridEl.innerHTML = "";
+  async function loadNFTs(address: string) {
+    loading.classList.remove("hidden");
+    prompt.classList.add("hidden");
+    empty.classList.add("hidden");
+    grid.innerHTML = "";
 
     try {
       const client = wallet.getClient();
-
-      // Fetch owned objects that are likely NFTs (have display metadata)
       const { data } = await client.getOwnedObjects({
         owner: address,
         options: { showDisplay: true, showType: true },
         limit: 24,
       });
 
-      const nfts: NFTItem[] = data
-        .filter((obj) => {
-          const display = obj.data?.display?.data;
-          return display && (display.image_url || display.name);
+      const nfts: NFT[] = data
+        .filter((o) => {
+          const d = o.data?.display?.data;
+          return d && (d["image_url"] || d["name"]);
         })
-        .map((obj) => {
-          const display = obj.data?.display?.data ?? {};
+        .map((o) => {
+          const d = o.data?.display?.data ?? {};
           return {
-            objectId: obj.data?.objectId ?? "",
-            name: display.name ?? display.title ?? "Unnamed NFT",
-            imageUrl: display.image_url ?? display.img_url ?? "",
-            collection: display.collection ?? display.project_name ?? "",
+            objectId:  o.data?.objectId ?? "",
+            name:      d["name"] ?? d["title"] ?? "Unnamed",
+            imageUrl:  d["image_url"] ?? d["img_url"] ?? "",
+            collection: d["collection"] ?? d["project_name"] ?? "",
           };
         });
 
-      loadingEl.classList.add("hidden");
+      loading.classList.add("hidden");
 
       if (nfts.length === 0) {
-        emptyEl.classList.remove("hidden");
+        empty.classList.remove("hidden");
         return;
       }
 
-      nfts.forEach((nft) => {
+      for (const nft of nfts) {
         const card = document.createElement("div");
-        card.className = "card p-0 overflow-hidden cursor-pointer hover:border-sui-accent transition-colors group";
+        card.className = "nft-card";
         card.innerHTML = `
-          <div class="aspect-square bg-sui-dark flex items-center justify-center overflow-hidden">
-            ${nft.imageUrl
-              ? `<img src="${nft.imageUrl}" alt="${nft.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" loading="lazy" />`
-              : `<div class="text-4xl">🖼</div>`
-            }
-          </div>
-          <div class="p-2">
-            <p class="text-xs text-white font-medium truncate">${nft.name ?? "Unnamed"}</p>
-            ${nft.collection ? `<p class="text-xs text-sui-muted truncate">${nft.collection}</p>` : ""}
+          ${nft.imageUrl
+            ? `<img class="nft-img" src="${nft.imageUrl}" alt="${nft.name}" loading="lazy" />`
+            : `<div class="nft-img-placeholder">🖼</div>`}
+          <div class="nft-meta">
+            <div class="nft-name">${nft.name}</div>
+            ${nft.collection ? `<div class="nft-coll">${nft.collection}</div>` : ""}
           </div>
         `;
-        card.addEventListener("click", () => {
-          window.open(`https://tradeport.xyz/sui/token/${nft.objectId}`, "_blank");
-        });
-        gridEl.appendChild(card);
-      });
+        card.addEventListener("click", () =>
+          window.open(`https://tradeport.xyz/sui/token/${nft.objectId}`, "_blank")
+        );
+        grid.appendChild(card);
+      }
     } catch (err) {
-      loadingEl.classList.add("hidden");
-      console.error("[nft] fetch error:", err);
-      gridEl.innerHTML = `<div class="col-span-full text-center py-8 text-sui-error text-sm">Failed to load NFTs.</div>`;
+      loading.classList.add("hidden");
+      grid.innerHTML = `<p class="small" style="color:var(--red);padding:20px 0">Failed to load NFTs: ${err instanceof Error ? err.message : String(err)}</p>`;
     }
   }
 
   const state = wallet.getState();
-  const prompt = container.querySelector<HTMLElement>("#nft-connect-prompt")!;
-
   if (!state.connected || !state.address) {
     prompt.classList.remove("hidden");
   } else {
@@ -129,12 +155,77 @@ export function renderNFT(container: HTMLElement) {
       loadNFTs(s.address);
     } else {
       prompt.classList.remove("hidden");
-      container.querySelector<HTMLElement>("#nft-grid")!.innerHTML = "";
+      grid.innerHTML = "";
+      loading.classList.add("hidden");
     }
   });
 
-  const observer = new MutationObserver(() => {
-    if (!document.contains(container)) { unsub(); observer.disconnect(); }
+  // ── TradePort GraphQL search ───────────────────────────────────────────
+  container.querySelector("#tp-search")?.addEventListener("click", async () => {
+    const slug   = container.querySelector<HTMLInputElement>("#tp-slug")!.value.trim();
+    const btn    = container.querySelector<HTMLButtonElement>("#tp-search")!;
+    const result = container.querySelector<HTMLElement>("#tp-result")!;
+    const inner  = container.querySelector<HTMLElement>("#tp-result-inner")!;
+    const err    = container.querySelector<HTMLElement>("#tp-err")!;
+
+    result.classList.remove("visible");
+    err.classList.remove("visible");
+
+    if (!slug) return;
+
+    btn.disabled = true;
+    btn.textContent = "Searching…";
+
+    try {
+      const query = `
+        query GetCollection($slug: String!) {
+          sui {
+            collection(slug: $slug) {
+              title
+              supply
+              floor
+              volume24h
+              owners
+            }
+          }
+        }
+      `;
+
+      const res = await fetch(TRADEPORT_GRAPHQL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables: { slug } }),
+      });
+
+      const json = await res.json() as {
+        data?: { sui?: { collection?: Record<string, unknown> | null } };
+        errors?: Array<{ message: string }>;
+      };
+
+      if (json.errors?.length) throw new Error(json.errors[0]!.message);
+
+      const col = json.data?.sui?.collection;
+      if (!col) throw new Error(`Collection "${slug}" not found`);
+
+      inner.innerHTML = `
+        <div class="row-between"><span class="result-label">Name</span><span class="result-value">${col["title"] ?? "—"}</span></div>
+        <div class="row-between mt-2"><span class="result-label">Supply</span><span class="result-value mono">${col["supply"] ?? "—"}</span></div>
+        <div class="row-between mt-2"><span class="result-label">Floor</span><span class="result-value mono">${col["floor"] ? Number(col["floor"]) / 1e9 + " SUI" : "—"}</span></div>
+        <div class="row-between mt-2"><span class="result-label">24h Volume</span><span class="result-value mono">${col["volume24h"] ? Number(col["volume24h"]) / 1e9 + " SUI" : "—"}</span></div>
+        <div class="row-between mt-2"><span class="result-label">Owners</span><span class="result-value mono">${col["owners"] ?? "—"}</span></div>
+      `;
+      result.classList.add("visible");
+    } catch (e) {
+      err.textContent = e instanceof Error ? e.message : String(e);
+      err.classList.add("visible");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Search";
+    }
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+
+  const obs = new MutationObserver(() => {
+    if (!document.contains(container)) { unsub(); obs.disconnect(); }
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
 }
