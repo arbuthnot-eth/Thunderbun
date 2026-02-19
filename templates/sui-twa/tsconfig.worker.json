@@ -9,5 +9,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/worker.ts", "src/agents/**/*.ts"]
+  "include": ["src/worker.ts", "src/agents/**/*.ts"],
+  "exclude": []
 }
