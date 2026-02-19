@@ -1,66 +1,94 @@
 # ThunderBun ⚡
 
-**Build ultra-fast, tiny, Sui-native desktop, PWA & TWA apps with TypeScript.**
+**Sui-native TWA framework — Cloudflare Workers, Agents, and Play Store in one scaffold.**
 
-ThunderBun is a fork of [Electrobun](https://github.com/blackboardsh/electrobun) supercharged for the Sui ecosystem — shipping native WaaP embedded wallets, SuiNS, Walrus, DeepBook, and Play Store TWA deployment out of the box.
+Vanilla TypeScript · WaaP wallet · gRPC + MVR · Hono router · Durable Object agents · PWA/TWA
 
-> ~120 KB bundle · No React · Vanilla TypeScript · Mobile-first
+> No React · No Enoki · No JSON-RPC
 
 ---
 
 ## Quick Start
 
 ```bash
-# Scaffold a Sui TWA (mobile-first, Play Store ready)
-npx thunderbun init --template sui-twa
+npx thunderbun init
 
-cd my-sui-twa-app
+cd thunder
 bun install
 bun run dev       # Opens at localhost:5173
 ```
 
+---
+
+## What's Included
+
+| Category | Feature | SDK / Tool |
+|----------|---------|------------|
+| **Wallet** | WaaP embedded wallet | `@human.tech/waap-sdk` |
+| **Wallet** | Passkeys (WebAuthn, cross-subdomain) | `@mysten/sui/keypairs/passkey` |
+| **Wallet** | Sponsored transactions (client + gas station) | `@mysten/sui` native |
+| **Transport** | gRPC + MVR name resolution | `@mysten/sui/grpc` |
+| **Connect** | dApp Kit connect modal | `@mysten/dapp-kit-core` |
+| **Names** | SuiNS forward + reverse lookup | `@mysten/suins` |
+| **Storage** | Walrus blob read/write | `@mysten/walrus` |
+| **Trading** | DeepBook v3 order book queries | `@mysten/deepbook-v3` |
+| **Encryption** | Seal threshold encryption | `@mysten/seal` |
+| **MPC** | Ika 2PC / dWallets | `@ika.xyz/sdk` |
+| **NFTs** | TradePort browsing | REST API |
+| **Proofs** | ZK proof verifier | Groth16 / Ligetron |
+| **Payments** | x402 scaffold (ready for `@x402/sui`) | `@x402/core` + `@x402/hono` |
+| **Workers** | Hono router + static assets | `hono` + Cloudflare Workers |
+| **Agents** | ProofAgent Durable Object | `agents` SDK |
+| **PWA** | Service worker, offline-ready | `vite-plugin-pwa` |
+
+---
+
+## Cloudflare Workers + Agents
+
+The Worker (`src/worker.ts`) is a Hono app that handles everything:
+
+```
+/agents/*        → Durable Object routing (WebSocket + RPC)
+/api/sponsor     → Gas station (opt-in, Ed25519 signing)
+/api/paid/*      → x402 paywalled routes (scaffold)
+/*               → Static PWA assets (Vite build)
+```
+
+### Deploy
+
 ```bash
-# Scaffold a desktop app
-npx thunderbun init --template hello-world
+wrangler login             # one-time
+bun run deploy             # builds + deploys Worker + static assets
+```
+
+### Gas Station (opt-in)
+
+```bash
+wrangler secret put SPONSOR_PRIVATE_KEY   # Bech32 suiprivkey1q...
+wrangler secret put MAX_GAS_BUDGET        # optional, default 50_000_000 (0.05 SUI)
+```
+
+### ProofAgent
+
+Each user gets a persistent Durable Object with SQLite storage, real-time WebSocket state sync, and `@callable` RPC methods:
+
+```ts
+// Browser
+const agent = new AgentClient({ agent: "ProofAgent", name: suiAddress });
+const { proofId } = await agent.call("recordProof", [{ programDigest, txDigest }]);
+const history = await agent.call("getHistory", [{ limit: 20 }]);
 ```
 
 ---
 
-## Templates
-
-| Template | Description |
-|----------|-------------|
-| `sui-twa` | Vanilla TS · Vite · TailwindCSS · WaaP wallet · PWA/TWA → Play Store |
-| `hello-world` | Minimal ThunderBun desktop app |
-| `react-tailwind-vite` | React + Tailwind desktop app |
-| `photo-booth` | Camera + native APIs demo |
-| `multitab-browser` | Multi-window browser demo |
-
----
-
-## Sui Ecosystem Included (sui-twa)
-
-- **WaaP** — Embedded wallet from [docs.waap.xyz](https://docs.waap.xyz)
-- **SuiNS** — Human-readable names
-- **Walrus** — Decentralized storage
-- **DeepBook** — On-chain order book
-- **Ika** — Multi-party computation
-- **Seal** — Threshold encryption
-- **MVR** — Move package registry
-- **TradePort** — NFT marketplace SDK
-- **Sponsored gas** — Gasless transactions via Shinami/zkLogin
-
----
-
-## TWA → Play Store (5 minutes)
+## TWA → Play Store
 
 ```bash
-cd my-sui-twa-app
 bun run build
-# Deploy dist/ to Vercel/Netlify → https://your-app.vercel.app
+bun run deploy             # deploy to Cloudflare Workers
 
-bun run twa:init   # bubblewrap wizard
-bun run twa:build  # outputs app-release.aab
+bun run twa:init           # bubblewrap wizard
+bun run twa:build          # outputs app-release.aab
 # Upload .aab to Google Play Console
 ```
 
@@ -68,37 +96,27 @@ bun run twa:build  # outputs app-release.aab
 
 ---
 
-## Platform Support
+## Project Layout
 
-| Platform | Status |
-|----------|--------|
-| macOS 14+ | ✅ Desktop |
-| Windows 11+ | ✅ Desktop |
-| Ubuntu 22.04+ | ✅ Desktop |
-| Android (TWA) | ✅ Play Store via bubblewrap |
-| iOS (PWA) | ✅ Add to Home Screen |
-| Web | ✅ Any browser |
-
----
-
-## Development (package)
-
-```bash
-cd package
-bun install
-bun build:dev
-bun build:cli
-```
+| Path | Purpose |
+|------|---------|
+| `src/worker.ts` | Hono router — agents, gas station, x402, static assets |
+| `src/agents/ProofAgent.ts` | Durable Object with SQLite + WebSocket state sync |
+| `src/dapp-kit.ts` | dApp Kit instance with gRPC transport and MVR |
+| `src/wallet.ts` | WaaP + connect modal + sponsored tx helpers |
+| `src/sui-client.ts` | Lazy singletons for Seal, DeepBook, Walrus |
+| `src/sections/` | Page sections (vanilla TS render functions) |
+| `wrangler.toml` | Worker config, Durable Object bindings, env vars |
+| `vite.config.ts` | PWA manifest, Workbox caching |
 
 ---
 
 ## Links
 
-- [WaaP Docs](https://docs.waap.xyz)
-- [Sui Developer Portal](https://sui.io/developers)
-- [Bubblewrap CLI](https://github.com/GoogleChromeLabs/bubblewrap)
-- [Original Electrobun](https://github.com/blackboardsh/electrobun)
+- [WaaP](https://docs.waap.xyz) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [Sui Docs](https://docs.sui.io)
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/) · [Agents SDK](https://github.com/cloudflare/agents)
+- [Hono](https://hono.dev) · [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)
 
 ---
 
-MIT License · ThunderBun Team
+MIT · [ThunderBun](https://github.com/arbuthnot-eth/thunderbun)

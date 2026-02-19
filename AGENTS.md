@@ -31,7 +31,7 @@ Thunderbun/
 ├── CLAUDE.md                          ← build/run instructions (Electrobun legacy)
 ├── README.md                          ← user-facing project overview
 ├── package/                           ← ThunderBun CLI + framework source (Bun/TS)
-│   ├── src/cli/index.ts               ← CLI: `npx thunderbun init --template sui-twa`
+│   ├── src/cli/index.ts               ← CLI: `npx thunderbun init`
 │   └── build.ts                       ← embeds templates into the CLI binary
 ├── templates/
 │   └── sui-twa/                       ← THE MAIN TEMPLATE (vanilla TS PWA/TWA)
@@ -189,8 +189,8 @@ bun run dev       # Vite dev server → http://localhost:5173
 ### Scaffold a new app from the template
 
 ```bash
-npx thunderbun init --template sui-twa my-app
-cd my-app
+npx thunderbun init
+cd thunder
 bun install
 bun run dev
 ```
