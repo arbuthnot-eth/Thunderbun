@@ -1,5 +1,7 @@
-# Cloudflare Pages headers
-# These are copied verbatim into dist/ and served with every response.
+# Cloudflare Workers static-asset headers
+# Placed in public/_headers, copied into dist/ by Vite and served by Workers
+# for every static asset response.
+# Docs: https://developers.cloudflare.com/workers/static-assets/headers/
 
 # Digital Asset Links — required content-type for TWA validation
 /.well-known/assetlinks.json

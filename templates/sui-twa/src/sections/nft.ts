@@ -99,16 +99,16 @@ export function renderNFT(container: HTMLElement) {
 
       const nfts: NFT[] = data
         .filter((o) => {
-          const d = o.data?.display?.data;
+          const d = o.data?.display?.data as Record<string, unknown> | undefined;
           return d && (d["image_url"] || d["name"]);
         })
         .map((o) => {
-          const d = o.data?.display?.data ?? {};
+          const d = (o.data?.display?.data ?? {}) as Record<string, unknown>;
           return {
             objectId:  o.data?.objectId ?? "",
-            name:      d["name"] ?? d["title"] ?? "Unnamed",
-            imageUrl:  d["image_url"] ?? d["img_url"] ?? "",
-            collection: d["collection"] ?? d["project_name"] ?? "",
+            name:      String(d["name"] ?? d["title"] ?? "Unnamed"),
+            imageUrl:  String(d["image_url"] ?? d["img_url"] ?? ""),
+            collection: String(d["collection"] ?? d["project_name"] ?? ""),
           };
         });
 

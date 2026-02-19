@@ -1,16 +1,20 @@
 /**
- * wallet.ts — WaaP + Sui Wallet Standard integration (no React, no dapp-kit)
+ * wallet.ts — WaaP (primary) + dApp Kit + Wallet Standard extensions
  *
- * WaaP implements the Sui Wallet Standard, so we can use it directly:
- *   1. Call initWaaPSui() → get wallet instance
- *   2. registerWallet() → registers it in the global wallet registry
- *   3. Connect directly via wallet.features['standard:connect']
+ * WaaP embedded wallet works in TWA without extension.
+ * dApp Kit provides the connect modal (WaaP + Sui Wallet, etc.).
  *
  * Docs: https://docs.waap.xyz/guides-sui/start
+ * Docs: https://sdk.mystenlabs.com/dapp-kit
  */
 
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
-import { namedPackagesPlugin, Transaction } from "@mysten/sui/transactions";
+import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
+
+// Load web components (connect modal, etc.)
+import "@mysten/dapp-kit-core/web";
+
+import { waapReady } from "./init-waap";
+import { dAppKit } from "./dapp-kit";
 
 // ── Types ────────────────────────────────────────────────────────────────
 export type Network = "mainnet" | "testnet" | "devnet";
@@ -24,206 +28,123 @@ export interface WalletState {
 
 type Listener = (state: WalletState) => void;
 
-// WaaP SDK + Wallet Standard types (declared here to avoid TS errors when
-// package is not yet installed in template consumers' environments)
-declare module "@human.tech/waap-sdk" {
-  export function initWaaPSui(opts: {
-    config: {
-      authenticationMethods?: string[];
-      allowedSocials?: string[];
-      styles?: { darkMode?: boolean };
-    };
-    useStaging?: boolean;
-  }): WaaPSuiWallet;
+// ── Connect modal instance ───────────────────────────────────────────────
+let connectModal: HTMLElement | null = null;
 
-  export interface WaaPSuiWallet {
-    name: string;
-    features: {
-      "standard:connect": {
-        connect: (opts?: { silent?: boolean }) => Promise<{ accounts: Array<{ address: string }> }>;
-      };
-      "standard:disconnect"?: { disconnect: () => Promise<void> };
-      "standard:events": {
-        on: (event: string, cb: (data: unknown) => void) => () => void;
-      };
-      "sui:signAndExecuteTransaction": {
-        signAndExecuteTransaction: (opts: {
-          transaction: unknown;
-          account: { address: string };
-          chain: string;
-        }) => Promise<{ digest: string }>;
-      };
+function ensureConnectModal(): HTMLElement & { show: () => Promise<void> } {
+  if (!connectModal) {
+    const el = document.createElement("mysten-dapp-kit-connect-modal");
+    (el as unknown as { instance: typeof dAppKit }).instance = dAppKit;
+    (el as unknown as { sortFn?: (a: { name: string }, b: { name: string }) => number }).sortFn = (a, b) => {
+      // Prefer WaaP first
+      if (a.name.toLowerCase().includes("waap")) return -1;
+      if (b.name.toLowerCase().includes("waap")) return 1;
+      return a.name.localeCompare(b.name);
     };
-    accounts: Array<{ address: string }>;
+    document.body.appendChild(el);
+    connectModal = el;
   }
+  return connectModal as HTMLElement & { show: () => Promise<void> };
 }
-
-declare module "@mysten/wallet-standard" {
-  export function registerWallet(wallet: unknown): void;
-}
-
-// ── MVR: register named packages plugin so transactions can use @pkg/module names
-Transaction.registerGlobalSerializationPlugin(
-  "namedPackagesPlugin",
-  namedPackagesPlugin({ url: "https://mainnet.mvr.mystenlabs.com" })
-);
 
 // ── WalletManager ────────────────────────────────────────────────────────
 class WalletManager {
-  private state: WalletState = {
-    connected: false,
-    address: null,
-    network: "mainnet",
-    balance: null,
-  };
-
   private listeners: Listener[] = [];
-  private client: SuiClient;
-  private waapWallet: import("@human.tech/waap-sdk").WaaPSuiWallet | null = null;
+  private balanceCache: bigint | null = null;
 
   constructor() {
-    this.client = new SuiClient({ url: getFullnodeUrl("mainnet") });
-    this.initWaaP();
-    this.restoreSession();
+    this.syncFromDAppKit();
+    dAppKit.stores.$connection.subscribe(() => this.syncFromDAppKit());
+    dAppKit.stores.$currentNetwork.subscribe(() => this.emit());
   }
 
-  // ── Public API ────────────────────────────────────────────────────────
-
-  getState(): WalletState { return { ...this.state }; }
+  getState(): WalletState {
+    const conn = dAppKit.stores.$connection.get();
+    const network = dAppKit.stores.$currentNetwork.get() as Network;
+    const address = conn.account?.address ?? null;
+    const connected = conn.isConnected;
+    return {
+      connected,
+      address,
+      network,
+      balance: connected && address ? this.balanceCache : null,
+    };
+  }
 
   subscribe(listener: Listener): () => void {
     this.listeners.push(listener);
-    // Emit current state immediately
     listener(this.getState());
-    return () => { this.listeners = this.listeners.filter((l) => l !== listener); };
+    const unsub = dAppKit.stores.$connection.subscribe(() => listener(this.getState()));
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+      unsub();
+    };
   }
 
   async connect(): Promise<void> {
-    let address: string | null = null;
-
-    if (this.waapWallet) {
-      try {
-        const result = await this.waapWallet.features["standard:connect"].connect();
-        address = result.accounts[0]?.address ?? null;
-      } catch (err) {
-        console.warn("[wallet] WaaP connect failed, trying extension fallback:", err);
-      }
-    }
-
-    // Browser extension fallback (any Wallet Standard wallet)
-    if (!address) {
-      address = await this.tryExtensionWallet();
-    }
-
-    // Dev mock (no wallet available)
-    if (!address) {
-      console.warn("[wallet] No wallet provider found. Using dev mock address.");
-      address = "0x" + "a1b2c3d4e5f6".repeat(5).slice(0, 64);
-    }
-
-    if (!address) throw new Error("No address returned");
-
-    this.state = { ...this.state, connected: true, address };
-    sessionStorage.setItem("sui_wallet_addr", address);
-    await this.refreshBalance();
-    this.emit();
+    await waapReady;
+    const modal = ensureConnectModal();
+    await modal.show();
   }
 
   async disconnect(): Promise<void> {
-    if (this.waapWallet?.features["standard:disconnect"]) {
-      try {
-        await this.waapWallet.features["standard:disconnect"]!.disconnect();
-      } catch (_) { /* ignore */ }
-    }
-    sessionStorage.removeItem("sui_wallet_addr");
-    this.state = { connected: false, address: null, network: this.state.network, balance: null };
+    await dAppKit.disconnectWallet();
+    this.balanceCache = null;
     this.emit();
   }
 
   async refreshBalance(): Promise<void> {
-    if (!this.state.address) return;
+    const state = this.getState();
+    if (!state.address) return;
     try {
-      const { totalBalance } = await this.client.getBalance({
-        owner: this.state.address,
+      const client = dAppKit.getClient();
+      const { totalBalance } = await client.getBalance({
+        owner: state.address,
         coinType: "0x2::sui::SUI",
       });
-      this.state.balance = BigInt(totalBalance);
+      this.balanceCache = BigInt(totalBalance);
       this.emit();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   setNetwork(network: Network): void {
-    this.state.network = network;
-    this.client = new SuiClient({ url: getFullnodeUrl(network) });
-    if (this.state.address) this.refreshBalance();
-    this.emit();
+    dAppKit.switchNetwork(network);
+    if (this.getState().address) this.refreshBalance();
   }
 
-  getClient(): SuiClient { return this.client; }
+  getClient(): SuiJsonRpcClient {
+    return dAppKit.getClient() as SuiJsonRpcClient;
+  }
 
   formatBalance(): string {
-    if (this.state.balance === null) return "—";
-    return (Number(this.state.balance) / 1_000_000_000).toFixed(4) + " SUI";
+    const s = this.getState();
+    if (s.balance === null) return "—";
+    return (Number(s.balance) / 1_000_000_000).toFixed(4) + " SUI";
   }
 
   formatAddress(full = false): string {
-    if (!this.state.address) return "";
-    if (full) return this.state.address;
-    const a = this.state.address;
-    return `${a.slice(0, 6)}…${a.slice(-4)}`;
+    const addr = this.getState().address;
+    if (!addr) return "";
+    if (full) return addr;
+    return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
   }
 
-  // ── Private ───────────────────────────────────────────────────────────
-
-  private emit() { this.listeners.forEach((l) => l(this.getState())); }
-
-  private async initWaaP(): Promise<void> {
-    try {
-      const { initWaaPSui } = await import("@human.tech/waap-sdk");
-      const { registerWallet } = await import("@mysten/wallet-standard");
-
-      const w = initWaaPSui({
-        config: {
-          authenticationMethods: ["email", "phone", "social"],
-          allowedSocials: ["google", "twitter", "discord"],
-          styles: { darkMode: true },
-        },
-        useStaging: false,
-      });
-
-      registerWallet(w as unknown as Parameters<typeof registerWallet>[0]);
-      this.waapWallet = w;
-    } catch (err) {
-      console.warn("[wallet] WaaP SDK not available:", err);
-    }
+  private emit() {
+    this.listeners.forEach((l) => l(this.getState()));
   }
 
-  private async tryExtensionWallet(): Promise<string | null> {
-    // Walk the registered wallets via Wallet Standard
-    try {
-      const { getWallets } = await import("@mysten/wallet-standard");
-      const wallets = getWallets().get();
-      if (wallets.length === 0) return null;
-
-      const w = wallets[0]!;
-      const connectFeature = w.features["standard:connect"] as
-        | { connect: () => Promise<{ accounts: Array<{ address: string }> }> }
-        | undefined;
-
-      if (!connectFeature) return null;
-      const result = await connectFeature.connect();
-      return result.accounts[0]?.address ?? null;
-    } catch { return null; }
-  }
-
-  private async restoreSession(): Promise<void> {
-    const saved = sessionStorage.getItem("sui_wallet_addr");
-    if (saved) {
-      this.state = { ...this.state, connected: true, address: saved };
+  private async syncFromDAppKit(): Promise<void> {
+    const conn = dAppKit.stores.$connection.get();
+    if (conn.isConnected && conn.account) {
       await this.refreshBalance();
-      this.emit();
+    } else {
+      this.balanceCache = null;
     }
+    this.emit();
   }
+
 }
 
 export const wallet = new WalletManager();

@@ -92,10 +92,10 @@ export function renderSuiNS(container: HTMLElement) {
     btn.textContent = "Resolving…";
 
     try {
-      // SuinsClient.getAddress() resolves a name to its linked Sui address
-      const address = await getClient().getAddress(name);
-      if (address) {
-        addrEl.textContent = address;
+      // getNameRecord returns { targetAddress } for name → address
+      const record = await getClient().getNameRecord(name);
+      if (record?.targetAddress) {
+        addrEl.textContent = record.targetAddress;
         resultEl.classList.add("visible");
       } else {
         errEl.textContent = `No address linked to "${name}"`;
@@ -117,7 +117,6 @@ export function renderSuiNS(container: HTMLElement) {
 
     const btn      = container.querySelector<HTMLButtonElement>("#suins-reverse")!;
     const resultEl = container.querySelector<HTMLElement>("#suins-rev-result")!;
-    const namesEl  = container.querySelector<HTMLElement>("#suins-rev-names")!;
     const errEl    = container.querySelector<HTMLElement>("#suins-rev-err")!;
 
     resultEl.classList.remove("visible");
@@ -125,22 +124,11 @@ export function renderSuiNS(container: HTMLElement) {
     btn.disabled = true;
     btn.textContent = "Looking up…";
 
-    try {
-      // SuinsClient.getNames() returns an array of names for an address
-      const names = await getClient().getNames(address);
-      if (names && names.length > 0) {
-        namesEl.textContent = names.join(", ");
-        resultEl.classList.add("visible");
-      } else {
-        errEl.textContent = "No SuiNS names found for this address.";
-        errEl.classList.add("visible");
-      }
-    } catch (err) {
-      errEl.textContent = "Lookup failed: " + (err instanceof Error ? err.message : String(err));
-      errEl.classList.add("visible");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Look up";
-    }
+    // Reverse lookup: @mysten/suins v1+ doesn't expose address→names. Use suins.io.
+    resultEl.classList.remove("visible");
+    errEl.textContent = "Reverse lookup: visit suins.io or use the SuiNS indexer API.";
+    errEl.classList.add("visible");
+    btn.disabled = false;
+    btn.textContent = "Look up";
   });
 }

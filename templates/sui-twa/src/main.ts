@@ -1,4 +1,5 @@
 import "./style.css";
+import "./init-waap";
 import { wallet } from "./wallet";
 import { renderHome }     from "./sections/home";
 import { renderSuiNS }    from "./sections/suins";
@@ -28,11 +29,12 @@ const NAV: NavItem[] = [
   { id: "deepbook", label: "DeepBook",       icon: "📖", group: "ecosystem" },
   { id: "seal",     label: "Seal Encrypt",   icon: "🔒", group: "ecosystem" },
   { id: "nft",      label: "TradePort NFTs", icon: "🖼", group: "ecosystem" },
-  { id: "zkproof",  label: "Ligetron ZK",    icon: "🔬", group: "ecosystem" },
+  { id: "zkproof",  label: "Proof Verifier",  icon: "🔬", group: "ecosystem" },
 ];
 
 const EXTERNAL: { label: string; href: string; icon: string }[] = [
   { label: "WaaP Wallet",  href: "https://docs.waap.xyz",              icon: "👛" },
+  { label: "dApp Kit",     href: "https://sdk.mystenlabs.com/dapp-kit", icon: "🔌" },
   { label: "MVR Packages", href: "https://www.moveregistry.com",        icon: "📦" },
   { label: "Ika MPC",      href: "https://docs.ika.xyz",               icon: "🔐" },
   { label: "Nautilus TEE", href: "https://docs.sui.io/guides/developer/nautilus", icon: "⚓" },
@@ -52,6 +54,7 @@ const RENDERERS: Record<SectionId, (el: HTMLElement) => void> = {
 
 class App {
   private current: SectionId = "home";
+
   private main: HTMLElement;
 
   constructor() {
@@ -59,7 +62,7 @@ class App {
     this.buildNav();
     this.watchWallet();
     this.showSection("home");
-    (window as Record<string, unknown>).__app = this;
+    (window as unknown as Record<string, unknown>).__app = this;
   }
 
   showSection(id: SectionId) {
@@ -68,7 +71,7 @@ class App {
     RENDERERS[id](this.main);
 
     document.querySelectorAll(".nav-item[data-id]").forEach((el) => {
-      (el as HTMLElement).classList.toggle("active", (el as HTMLElement).dataset["id"] === id);
+      (el as HTMLElement).classList.toggle("active", (el as HTMLElement).dataset["id"] === this.current);
     });
   }
 

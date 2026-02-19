@@ -1,21 +1,60 @@
-# Cloudflare Pages + Workers config for ThunderBun sui-twa
-# Docs: https://developers.cloudflare.com/pages/
+# Cloudflare Workers config for ThunderBun sui-twa
+# Docs: https://developers.cloudflare.com/workers/
+#       https://developers.cloudflare.com/workers/static-assets/
+#       https://github.com/cloudflare/agents
 #
-# First-time setup:
-#   npx wrangler login          # authenticate with your Cloudflare account
-#   bun run deploy:pages        # creates the project and deploys
+# ─── First-time setup ─────────────────────────────────────────────────────────
+#   npm install -g wrangler          # or: bun add -g wrangler
+#   wrangler login                   # authenticate with your Cloudflare account
+#   bun run build                    # build the Vite PWA into dist/
+#   wrangler deploy                  # deploys Worker + static assets
 #
-# The project name below becomes your default subdomain:
-#   https://thunderbun.pages.dev
+# Your app will be live at:
+#   https://thunderbun.<your-account>.workers.dev
 #
-# To use a custom domain, add it in the Cloudflare Dashboard:
-#   Pages → your project → Custom domains → Add a custom domain
+# Add a custom domain in the Cloudflare Dashboard:
+#   Workers & Pages → thunderbun → Triggers → Custom domains
+# ──────────────────────────────────────────────────────────────────────────────
 
-name       = "thunderbun"
-pages_build_output_dir = "dist"
+name            = "thunderbun"
+main            = "src/worker.ts"
+compatibility_date  = "2025-02-19"
+compatibility_flags = ["nodejs_compat"]
 
+# ─── Static assets (Vite build output) ───────────────────────────────────────
+# Workers serves dist/ as static files. Requests to non-existent paths fall
+# through to index.html so the SPA router handles them client-side.
+[assets]
+directory            = "dist"
+not_found_handling   = "single-page-application"
+binding              = "ASSETS"
+
+# ─── Durable Objects (agents) ────────────────────────────────────────────────
+# Each Durable Object class corresponds to one Agent. Add new agents here.
+[[durable_objects.bindings]]
+name       = "ProofAgent"
+class_name = "ProofAgent"
+
+# ─── Durable Object migrations ───────────────────────────────────────────────
+# new_sqlite_classes = agent gets a built-in SQLite database (sql` tagged template).
+# Bump tag and add new_sqlite_classes whenever you add a new Agent class.
+[[migrations]]
+tag                = "v1"
+new_sqlite_classes = ["ProofAgent"]
+
+# ─── Environment variables ───────────────────────────────────────────────────
+# Plain vars go here; secrets use: wrangler secret put VAR_NAME
+[vars]
+NETWORK = "testnet"
+
+# Production overrides
 [env.production]
 name = "thunderbun"
+[env.production.vars]
+NETWORK = "mainnet"
 
+# Preview / staging
 [env.preview]
 name = "thunderbun-preview"
+[env.preview.vars]
+NETWORK = "testnet"

@@ -1,6 +1,6 @@
 {
-  "name": "My Sui App",
-  "short_name": "SuiApp",
+  "name": "Thunderbun",
+  "short_name": "Thunderbun",
   "description": "A Sui-native PWA built with ThunderBun",
   "start_url": "/",
   "scope": "/",

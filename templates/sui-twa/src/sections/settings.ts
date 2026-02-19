@@ -124,7 +124,7 @@ const ikaClient = new IkaClient({
       <!-- About -->
       <div class="card">
         <div class="card-title">About</div>
-        <div class="settings-row"><span class="settings-key">Framework</span><a href="https://github.com/arbuthnot-eth/thunderbun" target="_blank" class="settings-val">ThunderBun ↗</a></div>
+        <div class="settings-row"><span class="settings-key">Framework</span><a href="https://github.com/arbuthnot-eth/thunderbun" target="_blank" class="settings-val">Thunderbun ↗</a></div>
         <div class="settings-row"><span class="settings-key">Wallet</span><a href="https://docs.waap.xyz" target="_blank" class="settings-val">WaaP ↗</a></div>
         <div class="settings-row"><span class="settings-key">Chain</span><a href="https://sui.io" target="_blank" class="settings-val">Sui ↗</a></div>
         <div class="settings-row"><span class="settings-key">Storage</span><a href="https://docs.wal.app" target="_blank" class="settings-val">Walrus ↗</a></div>

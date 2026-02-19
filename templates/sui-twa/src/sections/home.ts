@@ -72,11 +72,12 @@ export function renderHome(container: HTMLElement) {
             <h2>Connect your wallet</h2>
             <p>
               WaaP embedded wallet works right in this page — no extension needed.
-              Or use any Sui Wallet Standard extension you already have installed.
+              Or use dApp Kit to connect any Sui Wallet Standard extension (Sui Wallet, etc.).
             </p>
             <button class="btn btn-primary" id="home-connect">Connect Wallet</button>
             <p class="small muted mt-3">
               Powered by <a href="https://docs.waap.xyz" target="_blank">WaaP</a>
+              · <a href="https://sdk.mystenlabs.com/dapp-kit" target="_blank">dApp Kit</a>
               · <a href="https://docs.sui.io/standards/wallet-standard" target="_blank">Wallet Standard</a>
             </p>
           </div>
