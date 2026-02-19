@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@human.tech/waap-sdk": "latest",
+    "@mysten/deepbook-v3": "latest",
     "@mysten/seal": "latest",
     "@mysten/sui": "^1.0.0",
     "@mysten/suins": "latest",
