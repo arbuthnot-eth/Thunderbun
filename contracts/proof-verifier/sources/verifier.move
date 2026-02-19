@@ -9,35 +9,16 @@
 
 module proof_verifier::verifier {
 
-    use std::vector;
     use sui::event;
     use sui::groth16;
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
 
     // ============ Errors ============
-    const EUnauthorized: u64 = 1;
-    const EKeyAlreadyRegistered: u64 = 2;
     const EKeyNotFound: u64 = 3;
     const EInvalidProof: u64 = 4;
-    const EInvalidVerifyingKey: u64 = 5;
 
     // ============ Proof Types ============
-    /// Supported proof system identifiers.
-    /// - Groth16: Native Sui verification (BN254 or BLS12-381)
-    /// - Ligetron: Via Groth16 recursion (Ligero wraps Ligetron proofs in Groth16)
-    public struct ProofType has drop, copy {
-        pub id: u8,
-    }
     const GROTH16_BN254: u8 = 0;
     const GROTH16_BLS12_381: u8 = 1;
-    const LIGETRON_VIA_GROTH16: u8 = 2; // Ligetron proof verified inside a Groth16 circuit
-
-    /// Curve selector for Groth16.
-    public struct CurveType has drop, copy {
-        pub id: u8,
-    }
 
     // ============ Registry ============
     /// Registry of verification keys. Keyed by circuit_id (e.g. hex or semantic name).
@@ -48,7 +29,7 @@ module proof_verifier::verifier {
         keys: sui::table::Table<vector<u8>, VerificationKey>,
     }
 
-    struct VerificationKey has store, drop {
+    public struct VerificationKey has store, drop {
         circuit_id: vector<u8>,
         curve: u8, // 0 = BN254, 1 = BLS12-381
         pvk_component_0: vector<u8>,
@@ -127,7 +108,7 @@ module proof_verifier::verifier {
         ctx: &mut TxContext,
     ) {
         let pvk = prepare_vk(curve_type, &vk_bytes);
-        let components = groth16::pvk_to_bytes(&pvk);
+        let components = groth16::pvk_to_bytes(pvk);
         let proof_type_hint = if (curve_type == 0) { GROTH16_BN254 } else { GROTH16_BLS12_381 };
         let vk = VerificationKey {
             circuit_id: circuit_id,
@@ -137,7 +118,7 @@ module proof_verifier::verifier {
             pvk_component_2: *vector::borrow(&components, 2),
             pvk_component_3: *vector::borrow(&components, 3),
             proof_type_hint,
-            registered_at_ms: tx_context::timestamp_ms(ctx),
+            registered_at_ms: tx_context::epoch_timestamp_ms(ctx),
         };
 
         let key_bytes = copy circuit_id;
@@ -151,7 +132,7 @@ module proof_verifier::verifier {
             curve: curve_type,
             proof_type_hint,
             registered_by: tx_context::sender(ctx),
-            timestamp_ms: tx_context::timestamp_ms(ctx),
+            timestamp_ms: tx_context::epoch_timestamp_ms(ctx),
         });
     }
 
@@ -204,7 +185,7 @@ module proof_verifier::verifier {
         let valid = groth16::verify_groth16_proof(&curve, &pvk, &public_inputs, &proof_points);
 
         let sender = tx_context::sender(ctx);
-        let ts = tx_context::timestamp_ms(ctx);
+        let ts = tx_context::epoch_timestamp_ms(ctx);
         if (valid) {
             event::emit(ProofVerified {
                 circuit_id,

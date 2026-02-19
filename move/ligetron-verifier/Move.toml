@@ -1,0 +1,23 @@
+[package]
+name = "ligetron_verifier"
+version = "0.1.0"
+edition = "2024.beta"
+description = "On-chain Groth16-wrapped Ligetron (Ligero-family IOP) proof verifier for Sui"
+license = "MIT"
+
+[dependencies]
+Sui = {
+    git = "https://github.com/MystenLabs/sui.git",
+    subdir = "crates/sui-framework/packages/sui-framework",
+    rev = "framework/testnet",
+}
+
+[addresses]
+ligetron_verifier = "0x0"
+
+[dev-dependencies]
+Sui = {
+    git = "https://github.com/MystenLabs/sui.git",
+    subdir = "crates/sui-framework/packages/sui-framework",
+    rev = "framework/testnet",
+}
