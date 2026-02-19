@@ -62,15 +62,27 @@ Edit **`twa-manifest.json`** in the project root (two fields to change):
 
 ---
 
-### Step 3 — Build and deploy the PWA
+### Step 3 — Build and deploy to Cloudflare Pages
 
 ```bash
-bun run build
-bun run deploy:vercel       # or deploy:netlify or deploy:pages
+npx wrangler login          # one-time: opens browser to authenticate
+bun run deploy              # builds + deploys in one command
 ```
 
-The first time, Vercel will ask you to log in and pick a project name.
-Copy the live URL (e.g. `https://my-app.vercel.app`) and put it in `twa-manifest.json` → `host`.
+The first deploy creates your project and prints the live URL:
+
+```
+✨  Deployment complete! Take a peek over at https://thunderbun.pages.dev
+```
+
+Put that domain (without `https://`) in `twa-manifest.json` → `host`:
+
+```json
+"host": "thunderbun.pages.dev"
+```
+
+> **Custom domain?** Go to Cloudflare Dashboard → Pages → your project → Custom domains.
+> Update `host` and `iconUrl`/`maskableIconUrl`/`webManifestUrl` in `twa-manifest.json` to match.
 
 ---
 
@@ -88,10 +100,10 @@ This:
 Then **redeploy** so the assetlinks file goes live:
 
 ```bash
-bun run build && bun run deploy:vercel
+bun run deploy
 ```
 
-Verify it works: `curl https://your-app.vercel.app/.well-known/assetlinks.json`
+Verify it works: `curl https://thunderbun.pages.dev/.well-known/assetlinks.json`
 
 ---
 
@@ -131,10 +143,12 @@ Output: `android/app/build/outputs/bundle/release/app-release.aab`
 | Symptom | Fix |
 |---------|-----|
 | App opens Chrome instead of TWA | assetlinks.json not deployed, wrong fingerprint, or `host` mismatch in `twa-manifest.json` |
+| `curl /.well-known/assetlinks.json` returns 404 | Run `bun run deploy` — the `public/.well-known/` folder must be re-deployed |
+| assetlinks.json served as wrong content-type | The `public/_headers` file fixes this for Cloudflare Pages — check it was deployed |
 | `keytool not found` | Java not installed — see prerequisites |
 | `bubblewrap: command not found` | Run `bun run twa:setup` |
 | Build fails with Gradle error | Make sure Java 17 is active: `java -version` |
-| Icons missing on Play Console | Re-run `bun run icons:generate` and redeploy |
+| Icons missing on Play Console | Re-run `bun run icons:generate` and `bun run deploy` |
 
 ---
 
@@ -143,8 +157,7 @@ Output: `android/app/build/outputs/bundle/release/app-release.aab`
 Bump `appVersionCode` (integer, must increase) and `appVersionName` in `twa-manifest.json`, then:
 
 ```bash
-bun run build
-bun run deploy:vercel     # redeploy the PWA
+bun run deploy            # rebuild + redeploy to Cloudflare Pages
 bun run twa:build         # new .aab
 # upload new .aab to Play Console
 ```

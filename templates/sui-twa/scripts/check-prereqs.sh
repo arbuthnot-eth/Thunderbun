@@ -50,6 +50,14 @@ else
   fail "twa-manifest.json missing — copy twa-manifest.json.template → twa-manifest.json and fill in your domain"
 fi
 
+# ── Wrangler (Cloudflare deploy) ──────────────────────────────────────────────
+if command -v wrangler &>/dev/null; then
+  WR_VER=$(wrangler --version 2>&1 | head -1)
+  ok "wrangler ${WR_VER}"
+else
+  warn "wrangler not found — run: npm install -g wrangler  (needed for deploy)"
+fi
+
 # ── dist/ (PWA build) ─────────────────────────────────────────────────────────
 if [[ -d "$ROOT/dist" ]]; then
   COUNT=$(ls "$ROOT/dist" | wc -l | tr -d ' ')

@@ -19,9 +19,10 @@
     "twa:update": "bubblewrap update",
     "twa:assetlinks": "bash scripts/gen-keystore.sh debug",
 
+    "deploy": "bun run build && npx wrangler pages deploy dist",
+    "deploy:pages": "npx wrangler pages deploy dist",
     "deploy:vercel": "npx vercel dist --prod",
-    "deploy:netlify": "npx netlify deploy --prod --dir=dist",
-    "deploy:pages": "npx wrangler pages deploy dist"
+    "deploy:netlify": "npx netlify deploy --prod --dir=dist"
   },
   "dependencies": {
     "@human.tech/waap-sdk": "latest",

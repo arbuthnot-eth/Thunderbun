@@ -1,0 +1,28 @@
+# Cloudflare Pages headers
+# These are copied verbatim into dist/ and served with every response.
+
+# Digital Asset Links — required content-type for TWA validation
+/.well-known/assetlinks.json
+  Content-Type: application/json
+  Cache-Control: no-cache, max-age=0
+
+# PWA manifest
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache, max-age=0
+
+# Service worker — must not be cached
+/sw.js
+  Cache-Control: no-cache, max-age=0
+  Service-Worker-Allowed: /
+
+# Immutable hashed assets
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Security headers on all routes
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

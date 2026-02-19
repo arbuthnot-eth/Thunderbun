@@ -1,0 +1,21 @@
+# Cloudflare Pages + Workers config for ThunderBun sui-twa
+# Docs: https://developers.cloudflare.com/pages/
+#
+# First-time setup:
+#   npx wrangler login          # authenticate with your Cloudflare account
+#   bun run deploy:pages        # creates the project and deploys
+#
+# The project name below becomes your default subdomain:
+#   https://thunderbun.pages.dev
+#
+# To use a custom domain, add it in the Cloudflare Dashboard:
+#   Pages → your project → Custom domains → Add a custom domain
+
+name       = "thunderbun"
+pages_build_output_dir = "dist"
+
+[env.production]
+name = "thunderbun"
+
+[env.preview]
+name = "thunderbun-preview"
