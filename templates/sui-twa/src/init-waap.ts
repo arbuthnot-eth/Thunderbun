@@ -11,7 +11,7 @@ export interface WaapInitStatus {
 }
 
 const WAAP_IFRAME_URL = "https://waap.xyz/iframe";
-const WAAP_PRECHECK_TIMEOUT_MS = 4500;
+const WAAP_BOOT_TIMEOUT_MS = 7000;
 
 const waapInitStatus: WaapInitStatus = {
   ready: false,
@@ -23,32 +23,71 @@ export function getWaapInitStatus(): WaapInitStatus {
   return waapInitStatus;
 }
 
-async function canReachWaapIframe(): Promise<boolean> {
-  const ctrl = new AbortController();
-  const timer = window.setTimeout(() => ctrl.abort(), WAAP_PRECHECK_TIMEOUT_MS);
+function isIframeBlockedOrSameOrigin(iframe: HTMLIFrameElement): boolean {
   try {
-    await fetch(WAAP_IFRAME_URL, {
-      method: "GET",
-      mode: "no-cors",
-      cache: "no-store",
-      credentials: "omit",
-      signal: ctrl.signal,
-    });
-    return true;
+    const href = iframe.contentWindow?.location?.href ?? "";
+    return (
+      href === "" ||
+      href === "about:blank" ||
+      href.startsWith("about:srcdoc") ||
+      href.startsWith(window.location.origin)
+    );
   } catch {
+    // Cross-origin access throws when iframe loaded correctly.
     return false;
-  } finally {
-    window.clearTimeout(timer);
   }
+}
+
+async function waitForBody(): Promise<void> {
+  if (document.body) return;
+  await new Promise<void>((resolve) => {
+    window.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+  });
+}
+
+async function canBootWaapIframe(): Promise<boolean> {
+  await waitForBody();
+
+  return await new Promise<boolean>((resolve) => {
+    const iframe = document.createElement("iframe");
+    iframe.src = WAAP_IFRAME_URL;
+    iframe.style.display = "none";
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.setAttribute("tabindex", "-1");
+
+    let settled = false;
+
+    const finish = (ok: boolean): void => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      iframe.onload = null;
+      iframe.onerror = null;
+      iframe.remove();
+      resolve(ok);
+    };
+
+    const timer = window.setTimeout(() => finish(false), WAAP_BOOT_TIMEOUT_MS);
+
+    iframe.onload = () => {
+      window.setTimeout(() => {
+        finish(!isIframeBlockedOrSameOrigin(iframe));
+      }, 120);
+    };
+
+    iframe.onerror = () => finish(false);
+
+    document.body.appendChild(iframe);
+  });
 }
 
 export const waapReady = (async () => {
   try {
-    const reachable = await canReachWaapIframe();
-    if (!reachable) {
+    const booted = await canBootWaapIframe();
+    if (!booted) {
       waapInitStatus.ready = false;
       waapInitStatus.blockedLikely = true;
-      waapInitStatus.reason = "WaaP iframe is unreachable (likely blocked by an ad/privacy extension or browser shield).";
+      waapInitStatus.reason = "WaaP iframe could not boot (likely blocked by an ad/privacy extension or browser shield).";
       console.warn("[init-waap]", waapInitStatus.reason);
       return;
     }
