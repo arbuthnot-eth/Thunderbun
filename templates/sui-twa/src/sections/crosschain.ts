@@ -1,103 +1,178 @@
-import { peerExtensionSdk } from "@zkp2p/sdk";
-
 import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
-import { tradFiToSuiNative, getPeerOnrampState, resolveZkp2pSuiRoute } from "../lib/crosschain";
+import {
+  getOnrampState,
+  getZkp2pContractSnapshot,
+  connectWaaPBaseAddress,
+  launchOnramp,
+  executeSettlement,
+} from "../lib/crosschain";
+import { buildProvidersLink, getZkp2pRuntimeConfig } from "../lib/zkp2p-config";
 import { getInfraSource, getSectionSource } from "../source-files";
-import { wallet, type Network } from "../wallet";
+import { wallet } from "../wallet";
 
-interface IkaNetworkStatus {
-  ready: boolean;
-  message: string;
-}
+type Phase = "idle" | "onramping" | "settling" | "settled";
 
-const PAYMENT_METHODS: string[] = [
-  "venmo",
-  "paypal",
-  "wise",
-  "cashapp",
-  "zelle",
-  "revolut",
-  "monzo",
-  "mercadopago",
-];
+const PHASE_LABELS: Record<Phase, string> = {
+  idle: "Ready",
+  onramping: "Onramp Opened",
+  settling: "Settling",
+  settled: "Settled",
+};
+
+const PHASE_BADGE: Record<Phase, string> = {
+  idle: "badge-blue",
+  onramping: "badge-yellow",
+  settling: "badge-yellow",
+  settled: "badge-green",
+};
 
 export function renderCrosschain(container: HTMLElement): void {
+  let phase: Phase = "idle";
+  let resolvedBaseAddress: string | null = null;
+  let launchedOnrampUrl: string | null = null;
+
+  const cfg = getZkp2pRuntimeConfig();
+
   container.innerHTML = `
-    <div class="section">
+    <div class="section section-wide">
       <div class="section-top">
         <div>
-          <h1 class="section-title">Cross-Chain Onramp</h1>
-          <p class="section-desc">One click: TradFi → Base USDC → native Sui UX via WaaP + Ika + PeerAuth.</p>
+          <div class="section-title">Cross-Chain Onramp</div>
+          <div class="section-desc">Base onboarding is configured from <code>zkp2p-contracts</code>. Settlement resolves <code>zkp2p.sui</code> and executes a sponsored Sui PTB.</div>
         </div>
-        <div class="inline-group--tight">
-          <a href="https://docs.peer.xyz" target="_blank" rel="noopener" class="btn btn-secondary btn--compact">Peer docs ↗</a>
+        <div class="inline-group">
+          <span class="badge badge-blue" id="cc-phase">Ready</span>
+          <a href="https://github.com/zkp2p/zkp2p-contracts" target="_blank" rel="noopener" class="btn btn-secondary btn--compact">Contracts ↗</a>
         </div>
-      </div>
-
-      <div class="card" style="border-color:rgba(59,139,255,0.45);background:linear-gradient(145deg,rgba(59,139,255,0.16),rgba(15,16,24,0.92));margin-bottom:14px">
-        <div class="card-title" style="margin-bottom:6px">ThunderBun - Web4 Native</div>
-        <p class="card-description" style="margin:0;color:var(--text)">Electrobun was cool. This is the future.</p>
       </div>
 
       <div class="card">
-        <div class="card-title">Runtime readiness</div>
-        <div style="display:grid;gap:8px" id="crosschain-status-grid">
-          <div class="spread-row" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
-            <span class="card-description" style="margin-bottom:0">Sui wallet</span>
-            <span class="badge badge-yellow" id="cc-sui-badge">Checking…</span>
+        <div class="card-title">How It Works</div>
+        <div class="seal-steps">
+          <div class="seal-step">
+            <div class="seal-step-num">1</div>
+            <div class="seal-step-body">
+              <div class="seal-step-title">Fund on Base</div>
+              <div class="seal-step-desc">Open the zkp2p provider flow with your WaaP-linked Base address as recipient. The route is pinned to the zkp2p contracts deployment for the current environment.</div>
+            </div>
           </div>
-          <div class="spread-row" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
-            <span class="card-description" style="margin-bottom:0">PeerAuth extension</span>
-            <span class="badge badge-yellow" id="cc-peer-badge">Checking…</span>
+          <div class="seal-step">
+            <div class="seal-step-num">2</div>
+            <div class="seal-step-body">
+              <div class="seal-step-title">Resolve Sponsor</div>
+              <div class="seal-step-desc">ThunderBun resolves <code>zkp2p.sui</code> through SuiNS and verifies your configured gas sponsor matches that address.</div>
+            </div>
           </div>
-          <div class="spread-row" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
-            <span class="card-description" style="margin-bottom:0">Ika network config</span>
-            <span class="badge badge-yellow" id="cc-ika-badge">Checking…</span>
-          </div>
-          <div class="spread-row" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
-            <span class="card-description" style="margin-bottom:0">SuiNS route</span>
-            <span class="badge badge-yellow" id="cc-route-badge">Checking…</span>
+          <div class="seal-step">
+            <div class="seal-step-num">3</div>
+            <div class="seal-step-body">
+              <div class="seal-step-title">Settle on Sui</div>
+              <div class="seal-step-desc">ThunderBun submits a sponsored PTB. If PR1646 helpers are present in Ika SDK, they are used first; otherwise your configured settlement Move target executes.</div>
+            </div>
           </div>
         </div>
-        <div id="cc-peer-action" style="margin-top:10px"></div>
       </div>
 
       <div class="card">
-        <div class="card-title">One-click onramp</div>
-        <p class="card-description">
-          Starts PeerAuth onramp to your WaaP Base address, then submits a Sui marker PTB.
-          The marker PTB is a temporary on-chain anchor until native Ika CCTP entrypoints are finalized.
-        </p>
-
-        <div class="inline-group--tight" style="flex-wrap:wrap;gap:10px">
-          <label class="card-description" for="cc-amount" style="margin:0">Amount (USD)</label>
-          <input id="cc-amount" type="number" min="1" value="100"
-            style="width:120px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg);color:var(--fg);font-size:13px" />
-
-          <label class="card-description" for="cc-method" style="margin:0">Method</label>
-          <select id="cc-method"
-            style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg);color:var(--fg);font-size:13px">
-            ${PAYMENT_METHODS.map((m) => `<option value="${m}">${m}</option>`).join("")}
-          </select>
-
-          <button id="cc-start" class="btn btn-primary btn--compact" style="margin-left:auto">Start one-click flow</button>
+        <div class="card-title">Readiness</div>
+        <div class="stat-grid">
+          <div class="stat-box" id="cc-stat-wallet">
+            <div class="stat-label">Sui Wallet</div>
+            <div class="stat-value">Checking…</div>
+          </div>
+          <div class="stat-box" id="cc-stat-contracts">
+            <div class="stat-label">zkp2p Contracts</div>
+            <div class="stat-value">Checking…</div>
+          </div>
+          <div class="stat-box" id="cc-stat-waap">
+            <div class="stat-label">WaaP Base Address</div>
+            <div class="stat-value">Checking…</div>
+          </div>
+          <div class="stat-box" id="cc-stat-base-usdc">
+            <div class="stat-label">Base USDC</div>
+            <div class="stat-value">—</div>
+          </div>
+          <div class="stat-box" id="cc-stat-network">
+            <div class="stat-label">Sui Network</div>
+            <div class="stat-value">Checking…</div>
+          </div>
         </div>
+      </div>
 
-        <div class="result-box spaced-top" id="cc-result" style="display:none">
-          <div class="result-label">Flow result</div>
-          <div class="result-value code-text" id="cc-result-value" style="font-size:12px;word-break:break-word"></div>
+      <div class="card">
+        <div class="card-title">Contract Route</div>
+        <div class="crosschain-endpoint-list">
+          <div class="crosschain-endpoint-row">
+            <span>Providers Base URL</span>
+            <a href="${escapeHtml(buildProvidersLink())}" target="_blank" rel="noopener" class="code-text">${escapeHtml(cfg.providersBaseUrl)}</a>
+          </div>
+          <div class="crosschain-endpoint-row">
+            <span>Contract Network</span>
+            <span class="code-text" id="cc-contract-network">Checking…</span>
+          </div>
+          <div class="crosschain-endpoint-row">
+            <span>Orchestrator</span>
+            <span class="code-text" id="cc-contract-orchestrator">Checking…</span>
+          </div>
+          <div class="crosschain-endpoint-row">
+            <span>Escrow</span>
+            <span class="code-text" id="cc-contract-escrow">Checking…</span>
+          </div>
+          <div class="crosschain-endpoint-row">
+            <span>USDC</span>
+            <span class="code-text" id="cc-contract-usdc">Checking…</span>
+          </div>
+          <div class="crosschain-endpoint-row">
+            <span>Payment Methods</span>
+            <span class="code-text" id="cc-contract-methods">Checking…</span>
+          </div>
         </div>
+      </div>
 
+      <div class="card" id="cc-onramp-card">
+        <div class="card-title">Onramp</div>
+        <div id="cc-waap-recipient" class="card-description is-hidden"></div>
+        <div id="cc-onramp-launch" class="card-description is-hidden"></div>
+        <button id="cc-cta" class="btn btn-primary btn--block">Checking…</button>
+        <button id="cc-settle" class="btn btn-secondary btn--block is-hidden" type="button">Execute Sponsored Settlement</button>
         <div class="error-msg" id="cc-error"></div>
+      </div>
+
+      <div class="card is-hidden" id="cc-settlement-card">
+        <div class="card-title">Settlement</div>
+        <div id="cc-settlement-spinner" class="inline-group">
+          <span class="spinner"></span>
+          <span class="status-hint">Executing sponsored settlement…</span>
+        </div>
+        <div id="cc-settlement-result" class="is-hidden">
+          <div class="stat-grid">
+            <div class="stat-box">
+              <div class="stat-label">TX Digest</div>
+              <div class="stat-value code-text" id="cc-settle-digest"></div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Settlement Path</div>
+              <div class="stat-value" id="cc-settle-path"></div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Sponsor Address</div>
+              <div class="stat-value code-text" id="cc-settle-sponsor"></div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Status</div>
+              <div class="stat-value" id="cc-settle-status"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="info-links">
         <div class="info-links-label">Resources</div>
         <div class="info-links-row">
+          <a href="https://github.com/zkp2p/zkp2p-contracts" target="_blank" rel="noopener" class="badge badge-blue">zkp2p-contracts ↗</a>
           <a href="https://docs.waap.xyz" target="_blank" rel="noopener" class="badge badge-blue">WaaP ↗</a>
           <a href="https://docs.ika.xyz" target="_blank" rel="noopener" class="badge badge-blue">Ika ↗</a>
-          <a href="https://www.npmjs.com/package/@zkp2p/sdk" target="_blank" rel="noopener" class="badge badge-blue">PeerAuth SDK ↗</a>
-          <a href="https://github.com/zkp2p/zkp2p-contracts" target="_blank" rel="noopener" class="badge badge-blue">zkp2p-contracts ↗</a>
+          <a href="${escapeHtml(buildProvidersLink())}" target="_blank" rel="noopener" class="badge badge-blue">Providers ↗</a>
         </div>
       </div>
     </div>
@@ -105,175 +180,289 @@ export function renderCrosschain(container: HTMLElement): void {
 
   const src = getSectionSource("crosschain");
   if (src) {
-    const cfg = {
+    const codeCfg = {
       id: "crosschain-src",
       label: "crosschain.ts",
       source: src,
       secondaryLabel: "lib/crosschain.ts",
       secondarySource: getInfraSource("lib/crosschain.ts") ?? undefined,
     };
-    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(cfg));
-    attachCodeViewer(container, cfg);
+    container.querySelector(".section")!.insertAdjacentHTML("beforeend", codeViewerHTML(codeCfg));
+    attachCodeViewer(container, codeCfg);
   }
 
-  const amountInput = container.querySelector<HTMLInputElement>("#cc-amount")!;
-  const methodInput = container.querySelector<HTMLSelectElement>("#cc-method")!;
-  const startBtn = container.querySelector<HTMLButtonElement>("#cc-start")!;
-  const errorEl = container.querySelector<HTMLElement>("#cc-error")!;
-  const resultBox = container.querySelector<HTMLElement>("#cc-result")!;
-  const resultValue = container.querySelector<HTMLElement>("#cc-result-value")!;
+  const $ = <T extends HTMLElement>(sel: string): T => container.querySelector<T>(sel)!;
 
-  const refreshStatus = async (): Promise<void> => {
-    const suiBadge = container.querySelector<HTMLElement>("#cc-sui-badge")!;
-    const peerBadge = container.querySelector<HTMLElement>("#cc-peer-badge")!;
-    const ikaBadge = container.querySelector<HTMLElement>("#cc-ika-badge")!;
-    const routeBadge = container.querySelector<HTMLElement>("#cc-route-badge")!;
+  const phaseBadge = $("#cc-phase");
+  const ctaBtn = $("#cc-cta") as HTMLButtonElement;
+  const settleBtn = $("#cc-settle") as HTMLButtonElement;
+  const errorEl = $("#cc-error");
+  const waapRecipientEl = $("#cc-waap-recipient");
+  const launchEl = $("#cc-onramp-launch");
+  const settlementCard = $("#cc-settlement-card");
+  const settlementSpinner = $("#cc-settlement-spinner");
+  const settlementResult = $("#cc-settlement-result");
+
+  function setPhase(next: Phase): void {
+    phase = next;
+    phaseBadge.className = `badge ${PHASE_BADGE[next]}`;
+    phaseBadge.textContent = PHASE_LABELS[next];
+  }
+
+  function showError(msg: string): void {
+    errorEl.textContent = msg;
+    errorEl.classList.add("visible");
+  }
+
+  function clearError(): void {
+    errorEl.textContent = "";
+    errorEl.classList.remove("visible");
+  }
+
+  function setContractFields(): void {
+    const state = wallet.getState();
+    const snapshot = getZkp2pContractSnapshot(state.network);
+
+    $("#cc-contract-network").textContent = `${snapshot.network} (${snapshot.chainId})`;
+    $("#cc-contract-orchestrator").textContent = snapshot.orchestrator ?? "Not set";
+    $("#cc-contract-escrow").textContent = snapshot.escrow ?? "Not set";
+    $("#cc-contract-usdc").textContent = snapshot.usdc ?? "Not set";
+    $("#cc-contract-methods").textContent = snapshot.paymentMethods.length > 0
+      ? snapshot.paymentMethods.slice(0, 8).join(", ")
+      : "Not available";
+  }
+
+  async function refreshReadiness(): Promise<void> {
+    const state = wallet.getState();
+
+    const walletStat = $("#cc-stat-wallet .stat-value");
+    if (state.connected && state.address) {
+      walletStat.textContent = shortAddress(state.address);
+      walletStat.style.color = "var(--green)";
+    } else {
+      walletStat.textContent = "Not connected";
+      walletStat.style.color = "var(--yellow)";
+    }
+
+    const networkStat = $("#cc-stat-network .stat-value");
+    networkStat.textContent = state.network;
+    const isValidNetwork = state.network === "mainnet" || state.network === "testnet";
+    networkStat.style.color = isValidNetwork ? "var(--green)" : "var(--yellow)";
+
+    const onrampState = await getOnrampState();
+    const contractsStat = $("#cc-stat-contracts .stat-value");
+    if (onrampState === "ready") {
+      const snapshot = getZkp2pContractSnapshot(state.network);
+      contractsStat.textContent = `${snapshot.network} route active`;
+      contractsStat.style.color = "var(--green)";
+    } else {
+      contractsStat.textContent = "Missing contract config";
+      contractsStat.style.color = "var(--red)";
+    }
+
+    const waapStat = $("#cc-stat-waap .stat-value");
+    if (resolvedBaseAddress || state.waapBaseAddress) {
+      const addr = resolvedBaseAddress ?? state.waapBaseAddress!;
+      waapStat.textContent = shortAddress(addr);
+      waapStat.style.color = "var(--green)";
+      waapRecipientEl.textContent = `WaaP Base recipient: ${addr}`;
+      waapRecipientEl.classList.remove("is-hidden");
+    } else {
+      waapStat.textContent = "Not resolved";
+      waapStat.style.color = "var(--muted)";
+      waapRecipientEl.classList.add("is-hidden");
+    }
+
+    const usdcStat = $("#cc-stat-base-usdc .stat-value");
+    const usdcDisplay = wallet.formatBaseUsdcBalance();
+    usdcStat.textContent = usdcDisplay;
+    if (state.waapBaseUsdcBalance !== null && state.waapBaseUsdcBalance > 0n) {
+      usdcStat.style.color = "var(--green)";
+    } else if (state.waapBaseAddress) {
+      usdcStat.style.color = "var(--yellow)";
+    } else {
+      usdcStat.style.color = "var(--muted)";
+    }
+
+    setContractFields();
+    updateButtons(state.connected, onrampState);
+  }
+
+  function updateButtons(walletConnected: boolean, onrampState: string): void {
+    settleBtn.classList.toggle("is-hidden", phase !== "onramping");
+
+    if (phase === "settling") {
+      ctaBtn.textContent = "Processing…";
+      ctaBtn.disabled = true;
+      settleBtn.disabled = true;
+      return;
+    }
+
+    if (phase === "settled") {
+      ctaBtn.textContent = "Start New Onramp";
+      ctaBtn.disabled = false;
+      settleBtn.disabled = true;
+      return;
+    }
+
+    if (!walletConnected) {
+      ctaBtn.textContent = "Connect Wallet";
+      ctaBtn.disabled = false;
+      settleBtn.disabled = true;
+      return;
+    }
+
+    if (onrampState === "config_missing") {
+      ctaBtn.textContent = "Configure zkp2p Contracts";
+      ctaBtn.disabled = true;
+      settleBtn.disabled = true;
+      return;
+    }
+
+    if (phase === "onramping") {
+      ctaBtn.textContent = "Onramp Opened";
+      ctaBtn.disabled = true;
+      settleBtn.disabled = false;
+      return;
+    }
+
+    ctaBtn.textContent = "Open zkp2p Onramp";
+    ctaBtn.disabled = false;
+    settleBtn.disabled = true;
+  }
+
+  async function handleCta(): Promise<void> {
+    clearError();
+
+    if (phase === "settled") {
+      resetFlow();
+      await refreshReadiness();
+      return;
+    }
 
     const state = wallet.getState();
-    if (state.connected && state.address) {
-      suiBadge.className = "badge badge-green";
-      suiBadge.textContent = `${state.network}: ${shortAddress(state.address)}`;
-    } else {
-      suiBadge.className = "badge badge-yellow";
-      suiBadge.textContent = "Connect wallet";
+    if (!state.connected) {
+      try {
+        await wallet.connect();
+      } catch (err) {
+        showError(err instanceof Error ? err.message : String(err));
+      }
+      return;
     }
-
-    const peerState = await getPeerOnrampState();
-    renderPeerState(container, peerState);
-    if (peerState === "ready") {
-      peerBadge.className = "badge badge-green";
-      peerBadge.textContent = "Ready";
-    } else if (peerState === "needs_connection") {
-      peerBadge.className = "badge badge-yellow";
-      peerBadge.textContent = "Needs connection";
-    } else if (peerState === "needs_install") {
-      peerBadge.className = "badge badge-yellow";
-      peerBadge.textContent = "Needs install";
-    } else {
-      peerBadge.className = "badge badge-yellow";
-      peerBadge.textContent = "Unavailable";
-    }
-
-    const ika = await fetchIkaStatus(state.network);
-    ikaBadge.className = ika.ready ? "badge badge-green" : "badge badge-yellow";
-    ikaBadge.textContent = ika.message;
 
     try {
-      const route = await resolveZkp2pSuiRoute();
-      routeBadge.className = "badge badge-green";
-      routeBadge.textContent = `${route.name} → ${shortAddress(route.address)}`;
+      await startOnrampFlow();
     } catch (err) {
-      routeBadge.className = "badge badge-yellow";
-      routeBadge.textContent = err instanceof Error ? err.message : "Route unavailable";
+      showError(err instanceof Error ? err.message : String(err));
+      resetFlow();
     }
-  };
+  }
 
-  const startFlow = async (): Promise<void> => {
-    const amount = Number(amountInput.value);
-    const method = methodInput.value;
+  async function startOnrampFlow(): Promise<void> {
+    setPhase("onramping");
 
-    errorEl.classList.remove("visible");
-    errorEl.textContent = "";
-    resultBox.style.display = "none";
+    resolvedBaseAddress = await connectWaaPBaseAddress();
+    const launched = launchOnramp({ recipientAddress: resolvedBaseAddress });
+    launchedOnrampUrl = launched.url;
 
-    startBtn.disabled = true;
-    const originalText = startBtn.textContent;
-    startBtn.textContent = "Running…";
+    launchEl.innerHTML = `Launched onramp on <code>${escapeHtml(launched.contractNetwork)}</code>. <a href="${escapeHtml(launched.url)}" target="_blank" rel="noopener">Open again ↗</a>`;
+    launchEl.classList.remove("is-hidden");
+
+    await refreshReadiness();
+  }
+
+  async function triggerSettlement(): Promise<void> {
+    if (!resolvedBaseAddress) {
+      showError("WaaP Base address is not linked.");
+      return;
+    }
+
+    clearError();
+    setPhase("settling");
+
+    settlementCard.classList.remove("is-hidden");
+    settlementSpinner.classList.remove("is-hidden");
+    settlementResult.classList.add("is-hidden");
 
     try {
-      const result = await tradFiToSuiNative({
-        amountUsd: amount,
-        paymentMethod: method,
-      });
+      const result = await executeSettlement({ baseAddress: resolvedBaseAddress });
 
-      resultBox.style.display = "block";
-      resultValue.textContent = [
-        `Base recipient: ${result.baseAddress}`,
-        `Peer state: ${result.peerState}`,
-        `Sui route: ${result.markerRecipientName} → ${result.markerRecipientAddress}`,
-        `Reverse name: ${result.markerRecipientDefaultName ?? "none"}`,
-        `Marker PTB digest: ${result.markerTxDigest ?? "unavailable"}`,
-      ].join("\n");
+      settlementSpinner.classList.add("is-hidden");
+      settlementResult.classList.remove("is-hidden");
+
+      $("#cc-settle-digest").textContent = result.digest ?? "unavailable";
+      $("#cc-settle-path").textContent = result.path;
+      $("#cc-settle-sponsor").textContent = shortAddress(result.sponsorAddress);
+      $("#cc-settle-status").textContent = "Settled";
+      $("#cc-settle-status").style.color = "var(--green)";
+
+      setPhase("settled");
     } catch (err) {
-      errorEl.textContent = err instanceof Error ? err.message : String(err);
-      errorEl.classList.add("visible");
-    } finally {
-      startBtn.disabled = false;
-      startBtn.textContent = originalText;
-      await refreshStatus();
+      settlementSpinner.classList.add("is-hidden");
+      settlementResult.classList.remove("is-hidden");
+      $("#cc-settle-status").textContent = "Failed";
+      $("#cc-settle-status").style.color = "var(--red)";
+      showError(err instanceof Error ? err.message : String(err));
+      setPhase("onramping");
     }
-  };
 
-  startBtn.addEventListener("click", () => {
-    startFlow().catch((err) => {
-      errorEl.textContent = err instanceof Error ? err.message : String(err);
-      errorEl.classList.add("visible");
+    await refreshReadiness();
+  }
+
+  function resetFlow(): void {
+    setPhase("idle");
+    launchedOnrampUrl = null;
+    launchEl.classList.add("is-hidden");
+    launchEl.textContent = "";
+    settlementCard.classList.add("is-hidden");
+    settlementSpinner.classList.remove("is-hidden");
+    settlementResult.classList.add("is-hidden");
+  }
+
+  ctaBtn.addEventListener("click", () => {
+    handleCta().catch((err) => {
+      showError(err instanceof Error ? err.message : String(err));
     });
   });
 
-  const unsub = wallet.subscribe(() => {
-    refreshStatus().catch((err) => console.error("[crosschain] status refresh failed", err));
-  });
-  cleanup(container, unsub);
-
-  refreshStatus().catch((err) => {
-    errorEl.textContent = err instanceof Error ? err.message : String(err);
-    errorEl.classList.add("visible");
-  });
-}
-
-function renderPeerState(container: HTMLElement, state: "needs_install" | "needs_connection" | "ready" | "error"): void {
-  const actionEl = container.querySelector<HTMLElement>("#cc-peer-action")!;
-
-  if (state === "needs_install") {
-    actionEl.innerHTML = '<button id="cc-peer-install" class="btn btn-secondary btn--compact">Install PeerAuth ↗</button>';
-    actionEl.querySelector("#cc-peer-install")?.addEventListener("click", () => {
-      peerExtensionSdk.openInstallPage();
+  settleBtn.addEventListener("click", () => {
+    if (!launchedOnrampUrl) {
+      showError("Start the onramp flow before settlement.");
+      return;
+    }
+    triggerSettlement().catch((err) => {
+      showError(err instanceof Error ? err.message : String(err));
     });
-    return;
-  }
+  });
 
-  if (state === "needs_connection") {
-    actionEl.innerHTML = '<button id="cc-peer-connect" class="btn btn-secondary btn--compact">Connect PeerAuth</button>';
-    actionEl.querySelector("#cc-peer-connect")?.addEventListener("click", async () => {
-      await peerExtensionSdk.requestConnection();
-    });
-    return;
-  }
+  const walletUnsub = wallet.subscribe(() => {
+    if (phase !== "settling") {
+      refreshReadiness().catch((err) => console.error("[crosschain] readiness refresh failed", err));
+    }
+  });
 
-  actionEl.innerHTML = '<div class="status-hint" style="font-size:12px">PeerAuth is ready for onramp requests.</div>';
-}
-
-async function fetchIkaStatus(network: Network): Promise<IkaNetworkStatus> {
-  if (network !== "mainnet" && network !== "testnet") {
-    return { ready: false, message: `Unsupported (${network})` };
-  }
-
-  try {
-    const { getNetworkConfig } = await import("@ika.xyz/sdk");
-    const cfg = getNetworkConfig(network);
-    return {
-      ready: true,
-      message: `${network}: ${shortAddress(cfg.packages.ikaSystemPackage)}`,
-    };
-  } catch (err) {
-    return {
-      ready: false,
-      message: err instanceof Error ? err.message : "Ika unavailable",
-    };
-  }
-}
-
-function shortAddress(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
-function cleanup(container: HTMLElement, unsub: () => void): void {
   const obs = new MutationObserver(() => {
     if (!document.contains(container)) {
-      unsub();
+      walletUnsub();
       obs.disconnect();
     }
   });
   obs.observe(document.body, { childList: true, subtree: true });
+
+  refreshReadiness().catch((err) => {
+    showError(err instanceof Error ? err.message : String(err));
+  });
+}
+
+function shortAddress(address: string): string {
+  if (address.length <= 12) return address;
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;");
 }

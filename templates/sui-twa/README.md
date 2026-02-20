@@ -1,8 +1,8 @@
 # Thunderbun
 
 Live SDK playground for the Sui ecosystem — run in browser, ship to the Play Store. gRPC-first · dApp Kit · Cloudflare Workers + Agents · PWA-ready.
-Includes a one-click onramp flow: TradFi → Base USDC via PeerAuth, then a Sui marker PTB coordinated by WaaP + Ika-aware runtime checks.
-The Sui leg now resolves `zkp2p.sui` through SuiNS and routes marker transfers to the resolved address.
+Includes a one-click onramp flow: TradFi → Base USDC via zkp2p contracts, then a native sponsored Sui settlement PTB coordinated by WaaP + Ika-aware runtime checks.
+The Sui leg resolves `zkp2p.sui` through SuiNS and enforces sponsor-address match before execution.
 
 **Live:** [thunderbun.ai](https://thunderbun.ai)
 
@@ -106,7 +106,7 @@ Edit **`twa-manifest.json`** in the project root (two fields to change):
 ### Step 3 — Build and deploy to Cloudflare Workers
 
 ```bash
-npx wrangler login          # one-time: opens browser to authenticate
+wrangler login              # one-time: opens browser to authenticate
 bun run deploy              # builds + deploys Worker + static assets
 ```
 
@@ -215,7 +215,7 @@ bun run twa:build         # new .aab
 | **DeepBook** | `@mysten/deepbook-v3` | SDK queries: `midPrice`, `getLevel2TicksFromMid`, pool params |
 | **Seal** | `@mysten/seal` | Real `SealClient.encrypt()` on testnet + local AES-GCM demo |
 | **Ika MPC** | `@ika.xyz/sdk` | Network status, dWallet info, dynamic import for code splitting |
-| **Cross-chain Onramp** | WaaP + PeerAuth + Ika | One-click TradFi → Base USDC flow + Sui marker PTB anchor |
+| **Cross-chain Onramp** | WaaP + zkp2p-contracts + Ika | Base USDC onramp route + sponsored Sui settlement PTB |
 | **TradePort** | REST API | NFT browsing |
 | **Proof Verifier** | — | Link to on-chain Groth16 / Ligetron verification |
 | **x402 Scaffold** | `@x402/core` + `@x402/hono` | Paywalled endpoints ready for `@x402/sui` |
@@ -233,6 +233,36 @@ bun run twa:build         # new .aab
 ```env
 # Default: zkp2p.sui
 VITE_ZKP2P_SUINS_NAME=zkp2p.sui
+
+# zkp2p runtime endpoints
+VITE_ZKP2P_PROVIDERS_BASE_URL=https://mobile.zkp2p.xyz/providers/
+VITE_ZKP2P_CURATOR_API_URL=https://api.zkp2p.xyz
+VITE_ZKP2P_ATTESTATION_SERVICE_URL=https://attestation-service.zkp2p.xyz
+VITE_ZKP2P_ATTESTOR_WS_URL=wss://attestor.zkp2p.xyz/ws
+
+# Contract routing (defaults by Sui network: mainnet->base, testnet->baseSepolia)
+VITE_ZKP2P_CONTRACT_NETWORK=baseSepolia
+
+# Onramp behavior
+VITE_ZKP2P_WAIT_FOR_PROOF=true
+VITE_ZKP2P_PROOF_TIMEOUT_MS=480000
+VITE_ZKP2P_CONSOLE_LOGGING=false
+VITE_ZKP2P_REFERRER=ThunderBun
+VITE_ZKP2P_REFERRER_LOGO_URL=
+VITE_ZKP2P_CALLBACK_URL=
+# Optional override for providers onramp toToken
+VITE_ZKP2P_ONRAMP_TO_TOKEN=8453:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+
+# Optional Move entrypoint for Sui-side settlement logic
+# e.g. 0x...::zkp2p_bridge::settle_from_base_onramp
+VITE_ZKP2P_SUI_SETTLEMENT_TARGET=
+
+# Optional Move entrypoint for post-settlement DeepBook hook
+# e.g. 0x...::zkp2p_bridge::deepbook_convert_usdc
+VITE_ZKP2P_DEEPBOOK_HOOK_TARGET=
+
+# Optional: enable runtime adapter lookup for Ika PR1646 helper exports
+VITE_IKA_PR1646_ENABLED=false
 ```
 
 ---
@@ -244,6 +274,7 @@ VITE_ZKP2P_SUINS_NAME=zkp2p.sui
 | `src/dapp-kit.ts` | dApp Kit instance with gRPC transport and MVR enabled |
 | `src/wallet.ts` | WaaP + dApp Kit connect modal + Wallet Standard |
 | `src/sui-client.ts` | Shared SDK client accessors (Seal, DeepBook, Walrus) |
+| `src/lib/zkp2p-config.ts` | zkp2p endpoint and onramp runtime config |
 | `src/source-files.ts` | Raw source loader (Vite `?raw` glob for code viewer) |
 | `src/components/code-viewer.ts` | Collapsible source code viewer component |
 | `src/sections/` | Page sections (each is a vanilla TS render function) |
@@ -281,7 +312,7 @@ wrangler deploy --env preview      # deploys to thunderbun-preview.workers.dev
 
 ## Gas Station Setup (Optional)
 
-The Worker includes an opt-in gas station at `POST /api/sponsor`. To enable it:
+The Worker includes an opt-in gas station at `POST /api/sponsor` and status endpoint `GET /api/sponsor/status`. To enable it:
 
 ```bash
 # Set the sponsor private key (Bech32 suiprivkey1q... format)
@@ -291,7 +322,8 @@ wrangler secret put SPONSOR_PRIVATE_KEY
 wrangler secret put MAX_GAS_BUDGET
 ```
 
-When configured, clients can send base64-encoded transaction bytes to `/api/sponsor` and receive a sponsor signature back. See the Settings section in the app for the full client-side flow.
+When configured, clients can send base64-encoded transaction bytes to `/api/sponsor` and receive a sponsor signature back.
+For the cross-chain flow, the client sends `requiredSponsor`, and the Worker rejects signing if the configured sponsor does not match the resolved `zkp2p.sui` address.
 
 ---
 

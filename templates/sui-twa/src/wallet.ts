@@ -23,6 +23,11 @@ export type Network = "mainnet" | "testnet" | "devnet";
 export interface WalletState {
   connected: boolean;
   address: string | null;
+  waapBaseAddress: string | null;
+  waapBaseBalance: bigint | null;
+  waapBaseUsdcBalance: bigint | null;
+  suiPrimaryName: string | null;
+  waapBasePrimaryName: string | null;
   network: Network;
   balance: bigint | null;
 }
@@ -31,6 +36,69 @@ type Listener = (state: WalletState) => void;
 
 // ── Connect modal instance ───────────────────────────────────────────────
 let connectModal: HTMLElement | null = null;
+const WAAP_HINTS: string[] = ["waap", "silk", "human.tech", "walletconnect", "reown"];
+const WAAP_CONNECT_HINTS: string[] = ["waap", "silk", "human"];
+const BASE_CHAIN_ID = "0x2105";
+const BASE_USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const BALANCE_OF_SELECTOR = "0x70a08231";
+
+interface WaaPEvmProvider {
+  request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
+  logout?: () => Promise<unknown>;
+  getLoginMethod?: () => "waap" | "human" | "injected" | "walletconnect" | null;
+}
+
+declare global {
+  interface Window {
+    waap?: WaaPEvmProvider;
+  }
+}
+
+function setWaapOverlayMode(active: boolean): void {
+  document.body.classList.toggle("waap-overlay-active", active);
+  if (connectModal) {
+    if (active) {
+      connectModal.style.pointerEvents = "none";
+      connectModal.setAttribute("aria-hidden", "true");
+    } else {
+      connectModal.style.pointerEvents = "";
+      connectModal.removeAttribute("aria-hidden");
+    }
+  }
+}
+
+function closeConnectDialogForWaaP(): void {
+  const dialog = connectModal?.shadowRoot?.querySelector("dialog");
+  if (dialog instanceof HTMLDialogElement && dialog.open) {
+    dialog.close();
+  }
+  setWaapOverlayMode(true);
+}
+
+function isLikelyWaapOverlay(node: Node): boolean {
+  if (!(node instanceof HTMLElement)) return false;
+  if (node.tagName === "WAAP-WALLET") return true;
+
+  const haystack = `${node.id} ${node.className} ${node.getAttribute("data-testid") ?? ""} ${node.getAttribute("aria-label") ?? ""}`.toLowerCase();
+  if (WAAP_HINTS.some((hint) => haystack.includes(hint))) return true;
+
+  try {
+    const style = getComputedStyle(node);
+    const z = Number.parseInt(style.zIndex || "0", 10);
+    if (
+      style.position === "fixed" &&
+      z >= 900 &&
+      node.clientWidth >= window.innerWidth * 0.75 &&
+      node.clientHeight >= window.innerHeight * 0.55
+    ) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
 
 function ensureConnectModal(): HTMLElement & { show: () => Promise<void> } {
   if (!connectModal) {
@@ -46,10 +114,32 @@ function ensureConnectModal(): HTMLElement & { show: () => Promise<void> } {
   return connectModal as HTMLElement & { show: () => Promise<void> };
 }
 
+function selectPreferredWaaPWallet() {
+  const wallets = dAppKit.stores.$wallets.get();
+  const preferred = wallets.find((wallet) => {
+    const haystack = `${wallet.name} ${(wallet as { id?: string }).id ?? ""}`.toLowerCase();
+    return WAAP_CONNECT_HINTS.some((hint) => haystack.includes(hint));
+  });
+  return preferred ?? null;
+}
+
+function hasWaaPName(name: string | undefined): boolean {
+  if (!name) return false;
+  const lowered = name.toLowerCase();
+  return WAAP_CONNECT_HINTS.some((hint) => lowered.includes(hint));
+}
+
 // ── WalletManager ────────────────────────────────────────────────────────
 class WalletManager {
   private listeners: Listener[] = [];
   private balanceCache: bigint | null = null;
+  private waapBaseAddress: string | null = null;
+  private waapBaseBalanceCache: bigint | null = null;
+  private waapBaseUsdcBalanceCache: bigint | null = null;
+  private suiPrimaryName: string | null = null;
+  private waapBasePrimaryName: string | null = null;
+  private waapBaseAutoRequested = false;
+  private waapAddressLookup: Promise<string | null> | null = null;
 
   constructor() {
     this.syncFromDAppKit();
@@ -65,6 +155,11 @@ class WalletManager {
     return {
       connected,
       address,
+      waapBaseAddress: connected ? this.waapBaseAddress : null,
+      waapBaseBalance: connected ? this.waapBaseBalanceCache : null,
+      waapBaseUsdcBalance: connected ? this.waapBaseUsdcBalanceCache : null,
+      suiPrimaryName: connected ? this.suiPrimaryName : null,
+      waapBasePrimaryName: connected ? this.waapBasePrimaryName : null,
       network,
       balance: connected && address ? this.balanceCache : null,
     };
@@ -82,60 +177,132 @@ class WalletManager {
 
   async connect(): Promise<void> {
     await waapReady;
+    setWaapOverlayMode(false);
+
+    // Prefer WaaP direct connect so users land in WaaP immediately.
+    const preferredWaaP = selectPreferredWaaPWallet();
+    if (preferredWaaP) {
+      try {
+        await dAppKit.connectWallet({ wallet: preferredWaaP });
+        await this.getWaaPBaseAddress({ request: true });
+        this.waapBaseAutoRequested = true;
+        return;
+      } catch (err) {
+        console.warn("[wallet] direct WaaP connect failed, using modal fallback:", err);
+      }
+    }
+
     const modal = ensureConnectModal();
 
-    // dApp Kit opens <dialog> via .showModal() → top layer, above everything.
-    // When user picks WaaP, WaaP appends its own auth overlay to <body>.
-    // Close the dialog at that point so it doesn't stack above WaaP.
+    // dApp Kit opens a top-layer <dialog>. When WaaP auth opens, force-close
+    // the dApp Kit dialog so WaaP can receive pointer/keyboard focus.
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
         for (const node of m.addedNodes) {
-          if (
-            node instanceof HTMLElement &&
-            node.tagName === "DIV" &&
-            node !== connectModal &&
-            node.id !== "app" &&
-            node.id !== "splash"
-          ) {
-            const dialog = connectModal?.shadowRoot?.querySelector("dialog");
-            if (dialog instanceof HTMLDialogElement && dialog.open) {
-              dialog.close();
-            }
+          if (isLikelyWaapOverlay(node)) {
+            closeConnectDialogForWaaP();
             observer.disconnect();
             return;
           }
         }
       }
     });
+
     observer.observe(document.body, { childList: true });
+    const shadowRoot = connectModal?.shadowRoot;
+    const onShadowClick = (ev: Event) => {
+      const matched = ev.composedPath().some((p) => {
+        if (!(p instanceof HTMLElement)) return false;
+        const text = (p.textContent ?? "").toLowerCase();
+        return WAAP_HINTS.some((hint) => text.includes(hint));
+      });
+      if (matched) {
+        closeConnectDialogForWaaP();
+      }
+    };
+    shadowRoot?.addEventListener("click", onShadowClick, true);
 
     try {
       await modal.show();
     } finally {
       observer.disconnect();
+      shadowRoot?.removeEventListener("click", onShadowClick, true);
+      setWaapOverlayMode(false);
+    }
+
+    const conn = dAppKit.stores.$connection.get();
+    if (conn.isConnected && hasWaaPName(conn.wallet?.name)) {
+      await this.getWaaPBaseAddress({ request: true });
+      this.waapBaseAutoRequested = true;
     }
   }
 
   async disconnect(): Promise<void> {
     await dAppKit.disconnectWallet();
     this.balanceCache = null;
+    this.waapBaseAddress = null;
+    this.waapBaseBalanceCache = null;
+    this.waapBaseUsdcBalanceCache = null;
+    this.suiPrimaryName = null;
+    this.waapBasePrimaryName = null;
+    this.waapBaseAutoRequested = false;
+    this.waapAddressLookup = null;
+    this.emit();
+  }
+
+  async disconnectWaaP(): Promise<void> {
+    await waapReady;
+    const provider = window.waap as WaaPEvmProvider | undefined;
+
+    if (provider?.logout) {
+      try {
+        await provider.logout();
+      } catch (err) {
+        console.warn("[wallet] waap logout failed:", err);
+      }
+    }
+
+    try {
+      await dAppKit.disconnectWallet();
+    } catch {
+      /* ignore */
+    }
+
+    this.balanceCache = null;
+    this.waapBaseAddress = null;
+    this.waapBaseBalanceCache = null;
+    this.waapBaseUsdcBalanceCache = null;
+    this.suiPrimaryName = null;
+    this.waapBasePrimaryName = null;
+    this.waapBaseAutoRequested = false;
+    this.waapAddressLookup = null;
     this.emit();
   }
 
   async refreshBalance(): Promise<void> {
     const state = this.getState();
     if (!state.address) return;
-    try {
+    const address = state.address;
+    const tasks: Promise<void>[] = [];
+
+    tasks.push((async () => {
       const client = dAppKit.getClient();
-      const { balance } = await client.getBalance({
-        owner: state.address,
-        coinType: "0x2::sui::SUI",
-      });
-      this.balanceCache = BigInt(balance.balance);
-      this.emit();
-    } catch {
-      /* ignore */
-    }
+      try {
+        const { balance } = await client.getBalance({
+          owner: address,
+          coinType: "0x2::sui::SUI",
+        });
+        this.balanceCache = BigInt(balance.balance);
+      } catch {
+        /* ignore */
+      }
+    })());
+
+    tasks.push(this.refreshSuiPrimaryName(address));
+    tasks.push(this.refreshBaseProfile());
+
+    await Promise.all(tasks);
+    this.emit();
   }
 
   setNetwork(network: Network): void {
@@ -153,6 +320,16 @@ class WalletManager {
     return (Number(s.balance) / 1_000_000_000).toFixed(4) + " SUI";
   }
 
+  formatBaseBalance(): string {
+    if (this.waapBaseBalanceCache === null) return "—";
+    return `${formatEthFromWei(this.waapBaseBalanceCache)} ETH`;
+  }
+
+  formatBaseUsdcBalance(): string {
+    if (this.waapBaseUsdcBalanceCache === null) return "—";
+    return formatUsdc(this.waapBaseUsdcBalanceCache);
+  }
+
   formatAddress(full = false): string {
     const addr = this.getState().address;
     if (!addr) return "";
@@ -160,17 +337,51 @@ class WalletManager {
     return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
   }
 
+  async getWaaPBaseAddress({ request = false }: { request?: boolean } = {}): Promise<string | null> {
+    if (this.waapAddressLookup) return this.waapAddressLookup;
+
+    const lookup = this.resolveWaaPBaseAddress(request);
+    this.waapAddressLookup = lookup;
+    try {
+      return await lookup;
+    } finally {
+      if (this.waapAddressLookup === lookup) {
+        this.waapAddressLookup = null;
+      }
+    }
+  }
+
+  async linkWaaPBaseAddress(): Promise<string> {
+    await waapReady;
+
+    const current = dAppKit.stores.$connection.get();
+    if (!current.isConnected || !hasWaaPName(current.wallet?.name)) {
+      const preferredWaaP = selectPreferredWaaPWallet();
+      if (!preferredWaaP) {
+        throw new Error("WaaP wallet is not available. Open connect and choose WaaP first.");
+      }
+      await dAppKit.connectWallet({ wallet: preferredWaaP });
+    }
+
+    const base = await this.getWaaPBaseAddress({ request: true });
+    if (!base) {
+      throw new Error("WaaP Base address could not be resolved.");
+    }
+    this.waapBaseAutoRequested = true;
+    return base;
+  }
+
   // ── Sponsored Transactions ────────────────────────────────────────────────
 
   async buildSponsoredTx(
-    build: (tx: Transaction) => void,
+    build: (tx: Transaction) => void | Promise<void>,
     sponsorAddress: string,
   ): Promise<{ bytes: string; userSignature: string }> {
     const mod = await import("@mysten/sui/transactions");
     const tx = new mod.Transaction();
     tx.setSender(this.getState().address!);
     tx.setGasOwner(sponsorAddress);
-    build(tx);
+    await build(tx);
     const { signature, bytes } = await dAppKit.signTransaction({ transaction: tx });
     return { bytes, userSignature: signature };
   }
@@ -194,12 +405,187 @@ class WalletManager {
     const conn = dAppKit.stores.$connection.get();
     if (conn.isConnected && conn.account) {
       await this.refreshBalance();
+      if (hasWaaPName(conn.wallet?.name)) {
+        const shouldAutoRequest = !this.waapBaseAddress && !this.waapBaseAutoRequested;
+        await this.getWaaPBaseAddress({ request: shouldAutoRequest });
+        if (shouldAutoRequest) this.waapBaseAutoRequested = true;
+        await this.refreshBaseProfile();
+      } else {
+        this.waapBaseAddress = null;
+        this.waapBaseBalanceCache = null;
+        this.waapBaseUsdcBalanceCache = null;
+        this.waapBasePrimaryName = null;
+        this.waapBaseAutoRequested = false;
+      }
     } else {
       this.balanceCache = null;
+      this.waapBaseAddress = null;
+      this.waapBaseBalanceCache = null;
+      this.waapBaseUsdcBalanceCache = null;
+      this.suiPrimaryName = null;
+      this.waapBasePrimaryName = null;
+      this.waapBaseAutoRequested = false;
+      this.waapAddressLookup = null;
     }
     this.emit();
+  }
+
+  private async resolveWaaPBaseAddress(request: boolean): Promise<string | null> {
+    await waapReady;
+    const provider = window.waap as WaaPEvmProvider | undefined;
+    if (!provider) {
+      this.waapBaseAddress = null;
+      this.emit();
+      return null;
+    }
+
+    try {
+      if (request) {
+        const loginMethod = provider.getLoginMethod?.();
+        if (loginMethod && loginMethod !== "waap" && loginMethod !== "human") {
+          try {
+            await provider.logout?.();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      try {
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: BASE_CHAIN_ID }],
+        });
+      } catch {
+        await provider.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: BASE_CHAIN_ID,
+            chainName: "Base",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: ["https://mainnet.base.org"],
+            blockExplorerUrls: ["https://basescan.org"],
+          }],
+        });
+      }
+
+      const accounts = await provider.request({
+        method: request ? "eth_requestAccounts" : "eth_accounts",
+      });
+      const nextAddress = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : null;
+      this.waapBaseAddress = nextAddress;
+      if (!nextAddress) {
+        this.waapBaseBalanceCache = null;
+        this.waapBaseUsdcBalanceCache = null;
+        this.waapBasePrimaryName = null;
+      } else {
+        await this.refreshBaseProfile();
+      }
+      this.emit();
+      return nextAddress;
+    } catch (err) {
+      // Most common case: extension/adblock interference with WaaP iframe boot.
+      console.warn("[wallet] failed resolving WaaP Base address:", err);
+      this.waapBaseAddress = null;
+      this.waapBaseBalanceCache = null;
+      this.waapBaseUsdcBalanceCache = null;
+      this.waapBasePrimaryName = null;
+      this.emit();
+      return null;
+    }
+  }
+
+  private async refreshSuiPrimaryName(address: string): Promise<void> {
+    try {
+      const client = dAppKit.getClient();
+      const reverse = await client.defaultNameServiceName({ address });
+      this.suiPrimaryName = reverse.data.name ?? null;
+    } catch {
+      this.suiPrimaryName = null;
+    }
+  }
+
+  private async refreshBaseProfile(): Promise<void> {
+    const baseAddress = this.waapBaseAddress;
+    if (!baseAddress) {
+      this.waapBaseBalanceCache = null;
+      this.waapBaseUsdcBalanceCache = null;
+      this.waapBasePrimaryName = null;
+      return;
+    }
+
+    const provider = window.waap as WaaPEvmProvider | undefined;
+    if (!provider) {
+      this.waapBaseBalanceCache = null;
+      this.waapBaseUsdcBalanceCache = null;
+      this.waapBasePrimaryName = null;
+      return;
+    }
+
+    try {
+      const weiHex = await provider.request({
+        method: "eth_getBalance",
+        params: [baseAddress, "latest"],
+      });
+      if (typeof weiHex === "string") {
+        this.waapBaseBalanceCache = BigInt(weiHex);
+      }
+    } catch {
+      this.waapBaseBalanceCache = null;
+    }
+
+    try {
+      const paddedAddr = baseAddress.slice(2).toLowerCase().padStart(64, "0");
+      const data = `${BALANCE_OF_SELECTOR}${paddedAddr}`;
+      const result = await provider.request({
+        method: "eth_call",
+        params: [{ to: BASE_USDC_ADDRESS, data }, "latest"],
+      });
+      if (typeof result === "string") {
+        this.waapBaseUsdcBalanceCache = BigInt(result);
+      }
+    } catch {
+      this.waapBaseUsdcBalanceCache = null;
+    }
+
+    this.waapBasePrimaryName = await resolveBasePrimaryName(baseAddress);
   }
 
 }
 
 export const wallet = new WalletManager();
+
+function formatUsdc(raw: bigint): string {
+  const whole = raw / 1_000_000n;
+  const fractional = raw % 1_000_000n;
+  if (fractional === 0n) return `${whole} USDC`;
+  const padded = fractional.toString().padStart(6, "0");
+  const trimmed = padded.slice(0, 2).replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed} USDC` : `${whole} USDC`;
+}
+
+function formatEthFromWei(wei: bigint): string {
+  const whole = wei / 1_000_000_000_000_000_000n;
+  const fractional = wei % 1_000_000_000_000_000_000n;
+  if (fractional === 0n) return whole.toString();
+  const padded = fractional.toString().padStart(18, "0");
+  const trimmed = padded.slice(0, 4).replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed}` : whole.toString();
+}
+
+async function resolveBasePrimaryName(address: string): Promise<string | null> {
+  try {
+    const [{ createPublicClient, http }, { base }] = await Promise.all([
+      import("viem"),
+      import("viem/chains"),
+    ]);
+    const client = createPublicClient({
+      chain: base,
+      transport: http("https://mainnet.base.org"),
+    });
+    const name = await client.getEnsName({ address: address as `0x${string}` });
+    return typeof name === "string" && name.length > 0 ? name : null;
+  } catch {
+    return null;
+  }
+}

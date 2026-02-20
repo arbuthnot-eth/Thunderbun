@@ -72,6 +72,22 @@ sui client publish --gas-budget 100000000
 - Seal key servers only configured for testnet — `getSealClient()` returns null on other networks
 - Walrus SDK `writeBlob()` requires `Signer` keypair (not available in browser) — use HTTP publisher for writes, SDK for reads
 
+## Peer Onramp (sui-twa)
+
+The Peer (zkp2p) onramp is **extension-only** — no REST API, redirect URL, or headless flow. All interactions go through the PeerAuth Chrome extension via `@zkp2p/sdk`. See `docs/onramp-llm.md` for the full integration spec and `.claude/agents/peer-onramp.md` for agent context.
+
+**Critical rules:**
+- Use `createPeerExtensionSdk({ window })` — **not** the default `peerExtensionSdk` singleton
+- `recipientAddress` is optional — onramp button must work without a connected wallet
+- Never silently redirect to Chrome Web Store — show a modal explaining the extension first
+- `referrerLogo` must be `http`/`https` URL, never a `data:` URI
+- Subscribe to `onProofComplete()` **before** calling `onramp()` to avoid race conditions
+
+**Current architecture:**
+- `src/lib/crosschain.ts` — `launchOnramp()` (fire-and-forget) + `executeSettlement()` (post-proof)
+- `src/sections/crosschain.ts` — phase state machine: `idle → onramping → proved → settling → settled`
+- Settlement only triggers after proof callback success
+
 ## Coding Conventions
 
 - **Vanilla TypeScript** in sui-twa sections — no React components, `innerHTML` + event handlers

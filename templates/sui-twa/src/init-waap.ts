@@ -6,8 +6,18 @@
 
 export const waapReady = (async () => {
   try {
-    const { initWaaPSui } = await import("@human.tech/waap-sdk");
+    const { initWaaP, initWaaPSui } = await import("@human.tech/waap-sdk");
     const { registerWallet } = await import("@mysten/wallet-standard");
+
+    // Boot EVM provider so window.waap is available for Base address linking.
+    initWaaP({
+      config: {
+        authenticationMethods: ["email", "phone", "social"],
+        allowedSocials: ["google", "twitter", "discord"],
+        styles: { darkMode: true },
+      },
+      useStaging: false,
+    });
 
     const w = initWaaPSui({
       config: {

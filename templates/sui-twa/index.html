@@ -3,15 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#3B8BFF" />
+    <meta name="theme-color" content="#0A1423" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="The Sui-native framework for launching dApps. Built-in SDKs, Cloudflare Agents, PWA-ready." />
     <link rel="icon" type="image/png" href="/icons/thunderbun-logo.png" />
     <link rel="apple-touch-icon" href="/icons/pwa-192x192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Thunderbun — Web4 dApp Portal</title>
     <style>
       #splash{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#09090F;transition:opacity .3s ease}
@@ -27,29 +28,18 @@
       <img src="/icons/thunderbun-logo.png" alt="" width="64" height="64" />
     </div>
     <div id="app">
+      <button id="sidebar-dock-toggle" aria-label="Open navigation">
+        <img src="/icons/thunderbun-logo.png" alt="" width="20" height="20" />
+        <span>Menu</span>
+      </button>
+      <div id="sidebar-backdrop" aria-hidden="true"></div>
+
       <!-- Sidebar -->
       <aside id="sidebar">
         <div class="sidebar-logo">
           <img class="sidebar-logo-icon" src="/icons/thunderbun-logo.png" alt="Thunderbun" width="32" height="32" />
           <span class="sidebar-logo-name" id="app-title">Thunderbun</span>
-        </div>
-
-        <!-- Wallet card -->
-        <div class="wallet-card" id="wallet-card" onclick="window.__app?.showSection('home')">
-          <div id="wallet-disconnected">
-            <span class="wallet-label">
-              <span class="wallet-status-dot disconnected"></span>
-              Not connected
-            </span>
-          </div>
-          <div id="wallet-connected" class="is-hidden">
-            <span class="wallet-label connected">
-              <span class="wallet-status-dot connected"></span>
-              Connected
-            </span>
-            <div class="wallet-address" id="wallet-address"></div>
-            <div class="wallet-balance" id="wallet-balance"></div>
-          </div>
+          <button id="sidebar-close" class="sidebar-close" aria-label="Close navigation">✕</button>
         </div>
 
         <!-- Navigation -->
@@ -75,6 +65,49 @@
 
       <!-- Main -->
       <main id="main-content"></main>
+
+      <!-- Top-right wallet widget -->
+      <aside id="wallet-widget" aria-live="polite">
+        <div class="wallet-widget-toolbar">
+          <span class="wallet-widget-toolbar-text" id="wallet-widget-toolbar-text">Wallet</span>
+          <button class="wallet-widget-toggle" id="wallet-widget-toggle" aria-label="Collapse wallet widget">−</button>
+        </div>
+
+        <div id="wallet-widget-content">
+          <div id="wallet-widget-disconnected">
+            <div class="wallet-widget-title">Wallet</div>
+            <div class="wallet-widget-sub">Not connected</div>
+            <button class="btn btn-primary btn--compact" id="wallet-widget-connect">Connect WaaP</button>
+          </div>
+
+          <div id="wallet-widget-connected" class="is-hidden">
+            <div class="wallet-widget-head">
+              <span class="wallet-label connected">
+                <span class="wallet-status-dot connected"></span>
+                Connected
+              </span>
+              <span class="wallet-widget-balance" id="wallet-widget-balance"></span>
+            </div>
+
+            <div class="wallet-widget-row">
+              <span class="wallet-widget-key">Sui</span>
+              <span class="wallet-widget-addr code-text" id="wallet-widget-sui"></span>
+              <button class="btn btn-secondary btn--compact" id="wallet-widget-copy-sui">Copy</button>
+            </div>
+
+            <div class="wallet-widget-row">
+              <span class="wallet-widget-key">Base</span>
+              <span class="wallet-widget-addr code-text" id="wallet-widget-base"></span>
+              <button class="btn btn-secondary btn--compact" id="wallet-widget-copy-base">Copy</button>
+            </div>
+
+            <div class="wallet-widget-actions">
+              <button class="btn btn-primary btn--compact" id="wallet-widget-link-base">Link Base</button>
+              <button class="btn btn-secondary btn--compact" id="wallet-widget-disconnect">Disconnect</button>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

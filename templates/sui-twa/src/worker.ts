@@ -34,13 +34,36 @@ app.use("*", cors());
 
 // ── Gas Station — opt-in sponsored transactions ─────────────────────────────
 
+app.get("/api/sponsor/status", async (c) => {
+  const secretKey = c.env.SPONSOR_PRIVATE_KEY;
+  if (!secretKey) {
+    return c.json({
+      configured: false,
+      sponsorAddress: null,
+      maxGasBudget: null,
+    });
+  }
+
+  const { decodeSuiPrivateKey } = await import("@mysten/sui/cryptography");
+  const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
+
+  const { secretKey: raw } = decodeSuiPrivateKey(secretKey);
+  const keypair = Ed25519Keypair.fromSecretKey(raw);
+
+  return c.json({
+    configured: true,
+    sponsorAddress: keypair.toSuiAddress(),
+    maxGasBudget: c.env.MAX_GAS_BUDGET ?? "50000000",
+  });
+});
+
 app.post("/api/sponsor", async (c) => {
   const secretKey = c.env.SPONSOR_PRIVATE_KEY;
   if (!secretKey) {
     return c.json({ error: "Gas station not configured" }, 501);
   }
 
-  const body = await c.req.json<{ txBytes: string }>();
+  const body = await c.req.json<{ txBytes: string; requiredSponsor?: string }>();
   if (!body.txBytes) {
     return c.json({ error: "Missing txBytes" }, 400);
   }
@@ -54,13 +77,23 @@ app.post("/api/sponsor", async (c) => {
 
   const { secretKey: raw } = decodeSuiPrivateKey(secretKey);
   const keypair = Ed25519Keypair.fromSecretKey(raw);
+  const sponsorAddress = keypair.toSuiAddress();
+
+  if (
+    body.requiredSponsor &&
+    sponsorAddress.toLowerCase() !== body.requiredSponsor.toLowerCase()
+  ) {
+    return c.json({
+      error: `Configured sponsor ${sponsorAddress} does not match required sponsor ${body.requiredSponsor}`,
+    }, 400);
+  }
 
   const txBytes = Uint8Array.from(atob(body.txBytes), (ch) => ch.charCodeAt(0));
   const { signature } = await keypair.signTransaction(txBytes);
 
   return c.json({
     sponsorSignature: signature,
-    sponsorAddress: keypair.toSuiAddress(),
+    sponsorAddress,
   });
 });
 

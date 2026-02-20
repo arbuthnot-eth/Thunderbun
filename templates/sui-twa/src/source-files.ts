@@ -17,6 +17,7 @@ const infra = import.meta.glob([
   './sui-client.ts',
   './worker.ts',
   './lib/crosschain.ts',
+  './lib/zkp2p-config.ts',
 ], {
   query: '?raw',
   import: 'default',
