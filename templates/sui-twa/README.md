@@ -1,6 +1,8 @@
 # Thunderbun
 
 Live SDK playground for the Sui ecosystem — run in browser, ship to the Play Store. gRPC-first · dApp Kit · Cloudflare Workers + Agents · PWA-ready.
+Includes a one-click onramp flow: TradFi → Base USDC via PeerAuth, then a Sui marker PTB coordinated by WaaP + Ika-aware runtime checks.
+The Sui leg now resolves `zkp2p.sui` through SuiNS and routes marker transfers to the resolved address.
 
 **Live:** [thunderbun.ai](https://thunderbun.ai)
 
@@ -213,6 +215,7 @@ bun run twa:build         # new .aab
 | **DeepBook** | `@mysten/deepbook-v3` | SDK queries: `midPrice`, `getLevel2TicksFromMid`, pool params |
 | **Seal** | `@mysten/seal` | Real `SealClient.encrypt()` on testnet + local AES-GCM demo |
 | **Ika MPC** | `@ika.xyz/sdk` | Network status, dWallet info, dynamic import for code splitting |
+| **Cross-chain Onramp** | WaaP + PeerAuth + Ika | One-click TradFi → Base USDC flow + Sui marker PTB anchor |
 | **TradePort** | REST API | NFT browsing |
 | **Proof Verifier** | — | Link to on-chain Groth16 / Ligetron verification |
 | **x402 Scaffold** | `@x402/core` + `@x402/hono` | Paywalled endpoints ready for `@x402/sui` |
@@ -224,6 +227,13 @@ bun run twa:build         # new .aab
 - `@x402/sui` payment scheme — activate x402 Hono middleware when it ships
 - CommerceAgent (Cloudflare Durable Object with autonomous payments)
 - Agent dashboard with real-time WebSocket state
+
+### Optional Env Overrides
+
+```env
+# Default: zkp2p.sui
+VITE_ZKP2P_SUINS_NAME=zkp2p.sui
+```
 
 ---
 

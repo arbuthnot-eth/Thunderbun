@@ -1,7 +1,7 @@
 import { peerExtensionSdk } from "@zkp2p/sdk";
 
 import { codeViewerHTML, attachCodeViewer } from "../components/code-viewer";
-import { tradFiToSuiNative, getPeerOnrampState } from "../lib/crosschain";
+import { tradFiToSuiNative, getPeerOnrampState, resolveZkp2pSuiRoute } from "../lib/crosschain";
 import { getInfraSource, getSectionSource } from "../source-files";
 import { wallet, type Network } from "../wallet";
 
@@ -54,6 +54,10 @@ export function renderCrosschain(container: HTMLElement): void {
             <span class="card-description" style="margin-bottom:0">Ika network config</span>
             <span class="badge badge-yellow" id="cc-ika-badge">Checking…</span>
           </div>
+          <div class="spread-row" style="background:var(--bg);padding:8px 12px;border-radius:var(--r-sm)">
+            <span class="card-description" style="margin-bottom:0">SuiNS route</span>
+            <span class="badge badge-yellow" id="cc-route-badge">Checking…</span>
+          </div>
         </div>
         <div id="cc-peer-action" style="margin-top:10px"></div>
       </div>
@@ -93,6 +97,7 @@ export function renderCrosschain(container: HTMLElement): void {
           <a href="https://docs.waap.xyz" target="_blank" rel="noopener" class="badge badge-blue">WaaP ↗</a>
           <a href="https://docs.ika.xyz" target="_blank" rel="noopener" class="badge badge-blue">Ika ↗</a>
           <a href="https://www.npmjs.com/package/@zkp2p/sdk" target="_blank" rel="noopener" class="badge badge-blue">PeerAuth SDK ↗</a>
+          <a href="https://github.com/zkp2p/zkp2p-contracts" target="_blank" rel="noopener" class="badge badge-blue">zkp2p-contracts ↗</a>
         </div>
       </div>
     </div>
@@ -122,6 +127,7 @@ export function renderCrosschain(container: HTMLElement): void {
     const suiBadge = container.querySelector<HTMLElement>("#cc-sui-badge")!;
     const peerBadge = container.querySelector<HTMLElement>("#cc-peer-badge")!;
     const ikaBadge = container.querySelector<HTMLElement>("#cc-ika-badge")!;
+    const routeBadge = container.querySelector<HTMLElement>("#cc-route-badge")!;
 
     const state = wallet.getState();
     if (state.connected && state.address) {
@@ -151,6 +157,15 @@ export function renderCrosschain(container: HTMLElement): void {
     const ika = await fetchIkaStatus(state.network);
     ikaBadge.className = ika.ready ? "badge badge-green" : "badge badge-yellow";
     ikaBadge.textContent = ika.message;
+
+    try {
+      const route = await resolveZkp2pSuiRoute();
+      routeBadge.className = "badge badge-green";
+      routeBadge.textContent = `${route.name} → ${shortAddress(route.address)}`;
+    } catch (err) {
+      routeBadge.className = "badge badge-yellow";
+      routeBadge.textContent = err instanceof Error ? err.message : "Route unavailable";
+    }
   };
 
   const startFlow = async (): Promise<void> => {
@@ -175,6 +190,8 @@ export function renderCrosschain(container: HTMLElement): void {
       resultValue.textContent = [
         `Base recipient: ${result.baseAddress}`,
         `Peer state: ${result.peerState}`,
+        `Sui route: ${result.markerRecipientName} → ${result.markerRecipientAddress}`,
+        `Reverse name: ${result.markerRecipientDefaultName ?? "none"}`,
         `Marker PTB digest: ${result.markerTxDigest ?? "unavailable"}`,
       ].join("\n");
     } catch (err) {
