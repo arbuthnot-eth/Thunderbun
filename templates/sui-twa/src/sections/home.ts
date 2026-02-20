@@ -304,7 +304,12 @@ export function renderHome(container: HTMLElement) {
                 <div class="card-title">Burn Recovery</div>
                 <div class="card-description">Scan Base for past USDC burns and mint any with completed attestations.</div>
               </div>
-              <button class="btn btn-primary btn--compact" id="home-scan-burns" ${recoveryScanBusy ? "disabled" : ""}>${recoveryScanBusy ? "Scanning…" : "Scan Burns"}</button>
+              <div class="inline-group--tight">
+                ${recoveredBurns.some((b) => b.attestationStatus === "complete")
+                  ? `<button class="btn btn-primary btn--compact" id="home-mint-all" ${recoveryMintingIndex !== null ? "disabled" : ""}>${recoveryMintingIndex !== null ? "Minting…" : "Mint All"}</button>`
+                  : ""}
+                <button class="btn btn-primary btn--compact" id="home-scan-burns" ${recoveryScanBusy ? "disabled" : ""}>${recoveryScanBusy ? "Scanning…" : "Scan Burns"}</button>
+              </div>
             </div>
             ${recoveryScanMessage ? `<div class="cctp-status code-text">${escapeHtml(recoveryScanMessage)}</div>` : ""}
             ${recoveryScanError ? `<div class="cctp-error">${escapeHtml(recoveryScanError)}</div>` : ""}
@@ -440,6 +445,9 @@ export function renderHome(container: HTMLElement) {
 
       body.querySelector("#home-scan-burns")?.addEventListener("click", () => {
         void runRecoveryScan();
+      });
+      body.querySelector("#home-mint-all")?.addEventListener("click", () => {
+        void runRecoveryMintAll();
       });
       body.querySelectorAll<HTMLButtonElement>("[data-recovery-idx]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -731,6 +739,49 @@ export function renderHome(container: HTMLElement) {
       recoveryMintingIndex = null;
       if (mounted) render();
     }
+  }
+
+  async function runRecoveryMintAll(): Promise<void> {
+    const mintable = recoveredBurns
+      .map((b, i) => ({ burn: b, idx: i }))
+      .filter((e) => e.burn.attestationStatus === "complete");
+    if (mintable.length === 0) return;
+
+    let minted = 0;
+    let failed = 0;
+    for (const { burn, idx } of mintable) {
+      recoveryMintingIndex = idx;
+      recoveryMintMessage = `Minting ${minted + 1} of ${mintable.length}…`;
+      recoveryMintError = null;
+      render();
+
+      try {
+        const result = await mintRecoveredBurn(burn, (p) => {
+          recoveryMintMessage = `Minting ${minted + 1} of ${mintable.length}: ${p.message}`;
+          if (mounted) render();
+        });
+        burn.attestationStatus = "minted";
+        burn.mintDigest = result.digest;
+        minted++;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes("nonce") || message.includes("already")) {
+          burn.attestationStatus = "minted";
+          minted++;
+        } else {
+          failed++;
+          recoveryMintError = `Burn ${burn.nonce.toString()}: ${message}`;
+          break;
+        }
+      }
+    }
+
+    recoveryMintingIndex = null;
+    recoveryMintMessage = failed > 0
+      ? `Minted ${minted} of ${mintable.length} (${failed} failed).`
+      : `All ${minted} burns minted successfully.`;
+    await wallet.refreshBalance();
+    if (mounted) render();
   }
 
   function resetBridge(): void {
