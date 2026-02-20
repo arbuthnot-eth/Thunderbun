@@ -18,6 +18,7 @@ import { wallet, type Network } from "../wallet";
 import {
   getCctpConfig,
   MESSAGE_SENT_TOPIC,
+  DEPOSIT_FOR_BURN_TOPIC,
   ALLOWANCE_SELECTOR,
   APPROVE_SELECTOR,
 } from "./cctp-config";
@@ -902,6 +903,21 @@ function extractDigest(result: unknown): string | null {
   const topLevel = (result as { digest?: unknown }).digest;
   if (typeof topLevel === "string") return topLevel;
 
+  const grpcTx = (result as {
+    $kind?: unknown;
+    Transaction?: { digest?: unknown };
+    FailedTransaction?: { digest?: unknown };
+  });
+  if (grpcTx.$kind === "Transaction" && typeof grpcTx.Transaction?.digest === "string") {
+    return grpcTx.Transaction.digest;
+  }
+  if (grpcTx.$kind === "FailedTransaction" && typeof grpcTx.FailedTransaction?.digest === "string") {
+    return grpcTx.FailedTransaction.digest;
+  }
+
+  const nestedTxDigest = (result as { transaction?: { digest?: unknown } }).transaction?.digest;
+  if (typeof nestedTxDigest === "string") return nestedTxDigest;
+
   const nested = (result as { data?: { digest?: unknown } }).data?.digest;
   if (typeof nested === "string") return nested;
 
@@ -980,6 +996,7 @@ interface IrisV2Message {
   message: string | null;
   cctpVersion: number;
   delayReason: string | null;
+  destinationTxHash: string | null;
 }
 
 async function fetchIrisMessageByTxHash(
@@ -1008,8 +1025,196 @@ async function fetchIrisMessageByTxHash(
       message: typeof message.message === "string" ? message.message : null,
       cctpVersion: typeof message.cctpVersion === "number" ? message.cctpVersion : 1,
       delayReason: typeof message.delayReason === "string" ? message.delayReason : null,
+      destinationTxHash: typeof (message as { destinationTxHash?: unknown }).destinationTxHash === "string"
+        ? (message as { destinationTxHash: string }).destinationTxHash
+        : null,
     };
   } catch {
     return null;
   }
+}
+
+// ── Recovery: Scan & Mint Past Burns ─────────────────────────────────────
+
+export interface RecoverableBurn {
+  burnTxHash: string;
+  nonce: bigint;
+  amount: bigint;
+  mintRecipient: string;
+  destinationDomain: number;
+  depositor: string;
+  blockNumber: number;
+  attestationStatus: "pending" | "complete" | "minted" | "unknown";
+  attestation: string | null;
+  messageBytes: Uint8Array | null;
+  messageHash: string | null;
+}
+
+function getBaseRpcUrl(network: Network): string {
+  return network === "testnet" ? "https://sepolia.base.org" : "https://mainnet.base.org";
+}
+
+async function baseRpcCall(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
+  const res = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const body = await res.json() as { result?: unknown; error?: { message?: string } };
+  if (body.error) throw new Error(body.error.message ?? JSON.stringify(body.error));
+  return body.result;
+}
+
+export async function scanPastBurns(
+  progress?: (msg: string) => void,
+  network?: Network,
+): Promise<RecoverableBurn[]> {
+  const net = network ?? wallet.getState().network;
+  const config = getCctpConfig(net);
+  const baseAddress = wallet.getState().waapBaseAddress;
+  if (!baseAddress) throw new Error("WaaP Base address not linked.");
+
+  const rpcUrl = getBaseRpcUrl(net);
+  progress?.("Querying Base blockchain for past CCTP burns…");
+
+  const blockHex = await baseRpcCall(rpcUrl, "eth_blockNumber", []) as string;
+  const currentBlock = Number(blockHex);
+
+  const blocksToScan = 1_300_000; // ~30 days at 2s/block
+  const fromBlock = Math.max(0, currentBlock - blocksToScan);
+  const chunkSize = 50_000;
+
+  const paddedDepositor = "0x" + baseAddress.slice(2).toLowerCase().padStart(64, "0");
+
+  interface LogEntry {
+    transactionHash: string;
+    topics: string[];
+    data: string;
+    blockNumber: string;
+  }
+
+  const allLogs: LogEntry[] = [];
+
+  for (let start = fromBlock; start <= currentBlock; start += chunkSize) {
+    const end = Math.min(start + chunkSize - 1, currentBlock);
+    const chunkIndex = Math.floor((start - fromBlock) / chunkSize) + 1;
+    const totalChunks = Math.ceil((currentBlock - fromBlock) / chunkSize);
+    progress?.(`Scanning blocks ${start.toLocaleString()}–${end.toLocaleString()} (chunk ${chunkIndex}/${totalChunks})…`);
+
+    try {
+      const logs = await baseRpcCall(rpcUrl, "eth_getLogs", [{
+        address: config.base.tokenMessenger,
+        topics: [DEPOSIT_FOR_BURN_TOPIC, null, null, paddedDepositor],
+        fromBlock: "0x" + start.toString(16),
+        toBlock: "0x" + end.toString(16),
+      }]) as LogEntry[];
+
+      if (Array.isArray(logs) && logs.length > 0) {
+        allLogs.push(...logs);
+      }
+    } catch (err) {
+      console.warn(`[recovery] eth_getLogs failed for blocks ${start}-${end}:`, err);
+    }
+  }
+
+  if (allLogs.length === 0) {
+    progress?.("No past CCTP burns found for this address.");
+    return [];
+  }
+
+  progress?.(`Found ${allLogs.length} burn(s). Checking attestation status…`);
+
+  const burns: RecoverableBurn[] = [];
+
+  for (let i = 0; i < allLogs.length; i++) {
+    const log = allLogs[i];
+    progress?.(`Checking attestation ${i + 1}/${allLogs.length}…`);
+
+    const nonce = BigInt(log.topics[1]);
+    const dataHex = log.data.startsWith("0x") ? log.data.slice(2) : log.data;
+    const amount = BigInt("0x" + dataHex.slice(0, 64));
+    const mintRecipient = "0x" + dataHex.slice(64, 128);
+    const destinationDomain = Number("0x" + dataHex.slice(128, 192));
+
+    const irisResult = await fetchIrisMessageByTxHash(
+      config.irisApiUrl,
+      config.baseDomain,
+      log.transactionHash,
+    );
+
+    let attestationStatus: RecoverableBurn["attestationStatus"] = "unknown";
+    let attestation: string | null = null;
+    let messageBytes: Uint8Array | null = null;
+    let messageHash: string | null = null;
+
+    if (irisResult) {
+      if (irisResult.status === "complete" && irisResult.attestation) {
+        attestationStatus = irisResult.destinationTxHash ? "minted" : "complete";
+        attestation = irisResult.attestation;
+
+        if (irisResult.message) {
+          messageBytes = hexToBytes(irisResult.message);
+        } else {
+          // Fallback: extract MessageSent from tx receipt
+          try {
+            const receipt = await baseRpcCall(rpcUrl, "eth_getTransactionReceipt", [log.transactionHash]) as Record<string, unknown>;
+            const extracted = await extractMessageSent(receipt);
+            messageBytes = extracted.messageBytes;
+            messageHash = extracted.messageHash;
+          } catch {
+            console.warn(`[recovery] failed to extract MessageSent from receipt for ${log.transactionHash}`);
+          }
+        }
+
+        if (messageBytes && !messageHash) {
+          const { keccak256 } = await import("viem");
+          messageHash = keccak256(messageBytes);
+        }
+      } else {
+        attestationStatus = "pending";
+      }
+    }
+
+    burns.push({
+      burnTxHash: log.transactionHash,
+      nonce,
+      amount,
+      mintRecipient,
+      destinationDomain,
+      depositor: baseAddress,
+      blockNumber: Number(log.blockNumber),
+      attestationStatus,
+      attestation,
+      messageBytes,
+      messageHash,
+    });
+  }
+
+  const readyCount = burns.filter(b => b.attestationStatus === "complete").length;
+  const mintedCount = burns.filter(b => b.attestationStatus === "minted").length;
+  const pendingCount = burns.filter(b => b.attestationStatus === "pending").length;
+  progress?.(`Scan complete: ${burns.length} burn(s) — ${readyCount} ready to mint, ${mintedCount} already minted, ${pendingCount} pending.`);
+
+  return burns;
+}
+
+export async function mintRecoveredBurn(
+  burn: RecoverableBurn,
+  progress?: (p: CctpProgress) => void,
+  network?: Network,
+): Promise<CctpMintResult> {
+  if (!burn.attestation || !burn.messageBytes) {
+    throw new Error("This burn does not have attestation data. It may still be pending.");
+  }
+
+  return mintUsdcOnSui(
+    {
+      attestation: burn.attestation,
+      messageBytes: burn.messageBytes,
+      messageHash: burn.messageHash ?? "",
+    },
+    progress,
+    network,
+    burn.mintRecipient,
+  );
 }

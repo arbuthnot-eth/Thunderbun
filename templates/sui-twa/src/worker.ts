@@ -38,6 +38,18 @@ export interface Env {
 
   /** Per-recipient cooldown window for sponsor top-ups (default 1800000 ms) */
   BASE_SPONSOR_COOLDOWN_MS?: string;
+
+  /** CACHE Sui package ID (0x...) */
+  CACHE_SUI_PACKAGE_ID?: string;
+
+  /** CACHE bridge shared object ID (0x...) */
+  CACHE_SUI_BRIDGE_ID?: string;
+
+  /** Base vault contract address (0x...) */
+  CACHE_BASE_VAULT_ADDRESS?: string;
+
+  /** Shared bearer token used by relayer/attester automation */
+  CACHE_RELAY_AUTH_TOKEN?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -213,6 +225,62 @@ app.get("/api/paid/example", (c) => {
   });
 });
 
+// ── CACHE relay scaffold ─────────────────────────────────────────────────────
+
+app.get("/api/cache-relay/status", (c) => {
+  const configured = Boolean(
+    c.env.CACHE_SUI_PACKAGE_ID &&
+    c.env.CACHE_SUI_BRIDGE_ID &&
+    c.env.CACHE_BASE_VAULT_ADDRESS,
+  );
+
+  return c.json({
+    configured,
+    network: c.env.NETWORK,
+    packageId: c.env.CACHE_SUI_PACKAGE_ID ?? null,
+    bridgeObjectId: c.env.CACHE_SUI_BRIDGE_ID ?? null,
+    baseVaultAddress: c.env.CACHE_BASE_VAULT_ADDRESS ?? null,
+    relayAuthConfigured: Boolean(c.env.CACHE_RELAY_AUTH_TOKEN),
+  });
+});
+
+app.post("/api/cache-relay/mint", async (c) => {
+  if (!isCacheRelayAuthorized(c.req.header("authorization"), c.env.CACHE_RELAY_AUTH_TOKEN)) {
+    return c.json({ error: "Unauthorized cache relay request." }, 401);
+  }
+
+  const body = await c.req.json<{
+    sourceChainId?: number;
+    sourceNonce?: number;
+    sourceTxHash?: string;
+    recipient?: string;
+    amount?: string;
+    publicKeys?: string[];
+    signatures?: string[];
+  }>().catch(() => null);
+
+  if (!body) {
+    return c.json({ error: "Invalid JSON body." }, 400);
+  }
+
+  // This route intentionally remains a scaffold until attester verification,
+  // event finality policy, and Sui tx submission are wired.
+  return c.json({
+    ok: false,
+    status: "not_implemented",
+    message: "CACHE mint relay scaffold is live; submission logic not wired yet.",
+    received: {
+      sourceChainId: body.sourceChainId ?? null,
+      sourceNonce: body.sourceNonce ?? null,
+      sourceTxHash: body.sourceTxHash ?? null,
+      recipient: body.recipient ?? null,
+      amount: body.amount ?? null,
+      publicKeyCount: Array.isArray(body.publicKeys) ? body.publicKeys.length : 0,
+      signatureCount: Array.isArray(body.signatures) ? body.signatures.length : 0,
+    },
+  }, 501);
+});
+
 // ── Static assets fallback ──────────────────────────────────────────────────
 
 app.all("*", async (c) => c.env.ASSETS.fetch(c.req.raw));
@@ -225,4 +293,16 @@ function asHexPrivateKey(value: string): `0x${string}` {
     throw new Error("Invalid BASE_SPONSOR_PRIVATE_KEY format.");
   }
   return trimmed as `0x${string}`;
+}
+
+function isCacheRelayAuthorized(
+  authorizationHeader: string | undefined,
+  configuredToken: string | undefined,
+): boolean {
+  if (!configuredToken) return false;
+  const header = authorizationHeader?.trim() ?? "";
+  if (!header.startsWith("Bearer ")) return false;
+  const token = header.slice("Bearer ".length).trim();
+  if (!token) return false;
+  return token === configuredToken.trim();
 }

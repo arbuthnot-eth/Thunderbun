@@ -1,0 +1,9 @@
+[package]
+name = "cache_sui"
+version = "0.1.0"
+edition = "2024.beta"
+authors = ["ThunderBun Team"]
+description = "CACHE stablecoin on Sui with attester-gated Base deposit minting"
+
+[addresses]
+cache_sui = "0x0"

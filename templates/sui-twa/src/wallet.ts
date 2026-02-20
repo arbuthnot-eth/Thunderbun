@@ -166,6 +166,7 @@ async function ensureBaseChain(provider: WaaPEvmProvider): Promise<void> {
 
 // ── WalletManager ────────────────────────────────────────────────────────
 class WalletManager {
+  private static readonly WALLET_REQUEST_TIMEOUT_MS = 15_000;
   private listeners: Listener[] = [];
   private balanceCache: bigint | null = null;
   private suiUsdcBalanceCache: bigint | null = null;
@@ -572,6 +573,8 @@ class WalletManager {
   async signAndExecuteSuiTransaction(transaction: Transaction): Promise<unknown> {
     await this.ensureWalletCanSignOrSignAndExecuteTransactions();
     const sender = this.getState().address;
+    const conn = dAppKit.stores.$connection.get();
+    const isWaaPWallet = hasWaaPName(conn.wallet?.name);
     if (sender) {
       transaction.setSenderIfNotSet(sender);
     }
@@ -583,7 +586,6 @@ class WalletManager {
     // to some WaaP builds.
     try {
       const chain = `sui:${this.getState().network}`;
-      const conn = dAppKit.stores.$connection.get();
       const signed = await this.withWalletRequestTimeout(
         () => signSuiTransactionViaReactDappKit({
           transaction,
@@ -597,6 +599,9 @@ class WalletManager {
     } catch (err) {
       console.warn("[wallet] react-dapp-kit signTransaction failed:", err);
       failures.push(err);
+      if (isWaaPWallet) {
+        throw new Error(this.formatSignFailures(failures));
+      }
     }
 
     // Fallback path: dApp Kit core explicit sign + execute.
@@ -649,7 +654,7 @@ class WalletManager {
     run: () => Promise<T>,
     label: string,
   ): Promise<T> {
-    const timeoutMs = 45_000;
+    const timeoutMs = WalletManager.WALLET_REQUEST_TIMEOUT_MS;
     let timer = 0;
     try {
       return await Promise.race([

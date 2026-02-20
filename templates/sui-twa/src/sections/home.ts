@@ -7,8 +7,11 @@ import {
   loadPendingBridge,
   clearPendingBridge,
   topUpBaseGasFromUsdc,
+  scanPastBurns,
+  mintRecoveredBurn,
   type CctpPhase,
   type CctpProgress,
+  type RecoverableBurn,
 } from "../lib/cctp";
 import { wallet } from "../wallet";
 
@@ -79,6 +82,13 @@ export function renderHome(container: HTMLElement) {
   let bridgeInFlight = false;
   let activityFeed = loadBridgeActivityFeed();
   let activeGroupId: string | null = activityFeed[0]?.id ?? null;
+  let recoveredBurns: RecoverableBurn[] = [];
+  let recoveryScanBusy = false;
+  let recoveryScanMessage = "";
+  let recoveryScanError: string | null = null;
+  let recoveryMintingIndex: number | null = null;
+  let recoveryMintMessage = "";
+  let recoveryMintError: string | null = null;
 
   const getActiveGroup = (): BridgeActivityGroup | null => {
     if (!activeGroupId) return null;
@@ -288,6 +298,42 @@ export function renderHome(container: HTMLElement) {
             <div class="card-description">Fallback: SDK route in Cross-Chain section (Ika/WaaP path).</div>
           </div>
 
+          <div class="card">
+            <div class="spread-row">
+              <div>
+                <div class="card-title">Burn Recovery</div>
+                <div class="card-description">Scan Base for past USDC burns and mint any with completed attestations.</div>
+              </div>
+              <button class="btn btn-primary btn--compact" id="home-scan-burns" ${recoveryScanBusy ? "disabled" : ""}>${recoveryScanBusy ? "Scanning…" : "Scan Burns"}</button>
+            </div>
+            ${recoveryScanMessage ? `<div class="cctp-status code-text">${escapeHtml(recoveryScanMessage)}</div>` : ""}
+            ${recoveryScanError ? `<div class="cctp-error">${escapeHtml(recoveryScanError)}</div>` : ""}
+            ${recoveryMintMessage ? `<div class="recovery-mint-status code-text">${escapeHtml(recoveryMintMessage)}</div>` : ""}
+            ${recoveryMintError ? `<div class="recovery-mint-error">${escapeHtml(recoveryMintError)}</div>` : ""}
+            ${recoveredBurns.length > 0 ? `
+              <div class="recovery-burn-list">
+                ${recoveredBurns.map((burn, i) => `
+                  <div class="recovery-burn-item">
+                    <div class="recovery-burn-info">
+                      <div class="recovery-burn-tx code-text">${escapeHtml(shortHash(burn.burnTxHash))} · ${escapeHtml(formatRecoveryUsdc(burn.amount))}</div>
+                      <div class="recovery-burn-meta">Nonce ${burn.nonce.toString()} · Block ${burn.blockNumber.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      ${burn.attestationStatus === "complete"
+                        ? `<button class="btn btn-primary btn--compact" data-recovery-idx="${i}" ${recoveryMintingIndex !== null ? "disabled" : ""}>${recoveryMintingIndex === i ? "Minting…" : "Mint on Sui"}</button>`
+                        : burn.attestationStatus === "minted"
+                          ? `<span class="badge badge-green">Minted</span>`
+                          : burn.attestationStatus === "pending"
+                            ? `<span class="badge badge-yellow">Pending</span>`
+                            : `<span class="badge badge-red">Unknown</span>`
+                      }
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            ` : ""}
+          </div>
+
           <div class="home-minimal-actions">
             <button class="btn btn-primary btn--compact" id="home-link-base">${s.waapBaseAddress ? "Re-link Base" : "Link Base"}</button>
             <button class="btn btn-secondary btn--compact" id="home-open-suins">Open SuiNS</button>
@@ -388,6 +434,16 @@ export function renderHome(container: HTMLElement) {
         activeGroupId = null;
         saveBridgeActivityFeed(activityFeed);
         render();
+      });
+
+      body.querySelector("#home-scan-burns")?.addEventListener("click", () => {
+        void runRecoveryScan();
+      });
+      body.querySelectorAll<HTMLButtonElement>("[data-recovery-idx]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.dataset.recoveryIdx);
+          if (!Number.isNaN(idx)) void runRecoveryMint(idx);
+        });
       });
 
     } else {
@@ -613,6 +669,67 @@ export function renderHome(container: HTMLElement) {
     }
   }
 
+  async function runRecoveryScan(): Promise<void> {
+    if (recoveryScanBusy) return;
+    recoveryScanBusy = true;
+    recoveryScanError = null;
+    recoveryScanMessage = "Starting scan…";
+    recoveredBurns = [];
+    recoveryMintMessage = "";
+    recoveryMintError = null;
+    recoveryMintingIndex = null;
+    render();
+
+    try {
+      recoveredBurns = await scanPastBurns((msg) => {
+        recoveryScanMessage = msg;
+        if (mounted) render();
+      });
+      recoveryScanError = null;
+    } catch (err) {
+      recoveryScanError = err instanceof Error ? err.message : String(err);
+      recoveryScanMessage = "";
+    } finally {
+      recoveryScanBusy = false;
+      if (mounted) render();
+    }
+  }
+
+  async function runRecoveryMint(index: number): Promise<void> {
+    const burn = recoveredBurns[index];
+    if (!burn || burn.attestationStatus !== "complete") return;
+    if (recoveryMintingIndex !== null) return;
+
+    recoveryMintingIndex = index;
+    recoveryMintError = null;
+    recoveryMintMessage = "Building Sui mint transaction…";
+    render();
+
+    try {
+      const result = await mintRecoveredBurn(burn, (p) => {
+        recoveryMintMessage = p.message;
+        if (mounted) render();
+      });
+      burn.attestationStatus = "minted";
+      recoveryMintMessage = `Mint complete. Digest: ${shortDigest(result.digest)}`;
+      recoveryMintError = null;
+      await wallet.refreshBalance();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("nonce") || message.includes("already")) {
+        burn.attestationStatus = "minted";
+        recoveryMintMessage = "Already minted on Sui.";
+        recoveryMintError = null;
+      } else {
+        recoveryMintError = message;
+        recoveryMintMessage = "";
+      }
+    } finally {
+      recoveryMintingIndex = null;
+      if (mounted) render();
+    }
+  }
+
   function resetBridge(): void {
     bridgePhase = "idle";
     bridgeMessage = "";
@@ -694,6 +811,11 @@ function formatUsdcDecimal(raw: bigint): string {
   if (fractional === 0n) return whole.toString();
   const padded = fractional.toString().padStart(6, "0").replace(/0+$/, "");
   return `${whole}.${padded}`;
+}
+
+function formatRecoveryUsdc(raw: bigint): string {
+  const decimal = formatUsdcDecimal(raw);
+  return `${decimal} USDC`;
 }
 
 function createEmptyStepTxMap(): StepTxMap {

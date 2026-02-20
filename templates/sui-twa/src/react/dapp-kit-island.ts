@@ -54,9 +54,24 @@ const queryClient = new QueryClient({
 let mounted = false;
 let runtime: BridgeRuntime | null = null;
 let runtimeWaiters: Array<(value: BridgeRuntime) => void> = [];
+type WaaPSignMode = "signTxBytes" | "signTxBlockBytes" | "signTxBlockObject" | "signTxJson";
+const WAAP_SIGN_MODE_ORDER: readonly WaaPSignMode[] = ["signTxBytes", "signTxBlockBytes", "signTxBlockObject", "signTxJson"];
+let waapPreferredSignMode: WaaPSignMode = "signTxBytes";
 
 function normalize(input: string | null | undefined): string {
   return (input ?? "").trim().toLowerCase();
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function isTransactionFormatCompatibilityError(err: unknown): boolean {
+  const msg = errorMessage(err).toLowerCase();
+  return msg.includes("unsupported transaction format")
+    || msg.includes("failed to build transaction")
+    || msg.includes("keys: tojson")
+    || msg.includes("r is not a function");
 }
 
 function findWalletByName(wallets: readonly WalletWithRequiredFeatures[], wantedName: string | null | undefined): WalletWithRequiredFeatures | null {
@@ -175,52 +190,108 @@ function RuntimeBridge(): React.ReactElement {
         const features = selectedWallet.features;
         const signTxBlockFeature = features["sui:signTransactionBlock"];
         const signTxFeature = features["sui:signTransaction"];
-        const txBytes = await request.transaction.build({ client });
+        const isWaaP = isLikelyWaaPWallet(selectedWallet);
 
-        if (signTxFeature) {
-          try {
-            const signed = await (signTxFeature.signTransaction as unknown as (input: {
-              account: WalletAccount;
-              chain: `${string}:${string}`;
-              transaction: Uint8Array;
-            }) => Promise<{ bytes: string; signature: string }>)({
-              account: selectedAccount,
-              chain,
-              transaction: txBytes,
-            });
-            return {
-              bytes: signed.bytes,
-              signature: signed.signature,
-            };
-          } catch (bytesErr) {
-            const isWaaP = isLikelyWaaPWallet(selectedWallet);
-            if (isWaaP) {
-              throw bytesErr;
+        if (isWaaP) {
+          const txBytes = await request.transaction.build({ client });
+          const orderedModes: WaaPSignMode[] = [
+            waapPreferredSignMode,
+            ...WAAP_SIGN_MODE_ORDER.filter((mode) => mode !== waapPreferredSignMode),
+          ];
+          const formatFailures: string[] = [];
+          let txJson: string | null = null;
+
+          for (const mode of orderedModes) {
+            try {
+              if (mode === "signTxBytes") {
+                if (!signTxFeature) continue;
+                const signed = await (signTxFeature.signTransaction as unknown as (input: {
+                  account: WalletAccount;
+                  chain: `${string}:${string}`;
+                  transaction: Uint8Array;
+                }) => Promise<{ bytes: string; signature: string }>)({
+                  account: selectedAccount,
+                  chain,
+                  transaction: txBytes,
+                });
+                waapPreferredSignMode = mode;
+                return { bytes: signed.bytes, signature: signed.signature };
+              }
+
+              if (mode === "signTxBlockBytes") {
+                if (!signTxBlockFeature) continue;
+                const signed = await (signTxBlockFeature.signTransactionBlock as unknown as (input: {
+                  account: WalletAccount;
+                  chain: `${string}:${string}`;
+                  transactionBlock: Uint8Array;
+                }) => Promise<{ bytes?: string; transactionBlockBytes?: string; signature: string }>)({
+                  account: selectedAccount,
+                  chain,
+                  transactionBlock: txBytes,
+                });
+                const bytes = signed.bytes ?? signed.transactionBlockBytes;
+                if (!bytes) {
+                  throw new Error("WaaP signTransactionBlock returned no transaction bytes.");
+                }
+                waapPreferredSignMode = mode;
+                return { bytes, signature: signed.signature };
+              }
+
+              if (mode === "signTxBlockObject") {
+                if (!signTxBlockFeature) continue;
+                const signed = await signTxBlockFeature.signTransactionBlock({
+                  account: selectedAccount,
+                  chain,
+                  transactionBlock: request.transaction,
+                });
+                waapPreferredSignMode = mode;
+                return { bytes: signed.transactionBlockBytes, signature: signed.signature };
+              }
+
+              if (mode === "signTxJson") {
+                if (!signTxFeature) continue;
+                if (!txJson) {
+                  txJson = await request.transaction.toJSON({
+                    supportedIntents: [...currentWalletState.supportedIntents],
+                    client,
+                  });
+                }
+                const signed = await signTxFeature.signTransaction({
+                  account: selectedAccount,
+                  chain,
+                  transaction: {
+                    toJSON: async () => txJson!,
+                  },
+                });
+                waapPreferredSignMode = mode;
+                return { bytes: signed.bytes, signature: signed.signature };
+              }
+            } catch (err) {
+              const msg = errorMessage(err);
+              if (!isTransactionFormatCompatibilityError(err)) {
+                throw new Error(`WaaP signing failed (${mode}). ${msg}`);
+              }
+              formatFailures.push(`${mode}: ${msg}`);
             }
+          }
+
+          if (formatFailures.length > 0) {
+            const unique = Array.from(new Set(formatFailures));
+            throw new Error(`WaaP signing format mismatch. ${unique.join(" | ")}`);
           }
         }
 
+        // Prefer legacy block signing first for broad wallet compatibility.
         if (signTxBlockFeature) {
-          try {
-            const signed = await (signTxBlockFeature.signTransactionBlock as unknown as (input: {
-              account: WalletAccount;
-              chain: `${string}:${string}`;
-              transactionBlock: Uint8Array;
-            }) => Promise<{ bytes?: string; transactionBlockBytes?: string; signature: string }>)({
-              account: selectedAccount,
-              chain,
-              transactionBlock: txBytes,
-            });
-            const bytes = signed.bytes ?? signed.transactionBlockBytes;
-            if (bytes) {
-              return {
-                bytes,
-                signature: signed.signature,
-              };
-            }
-          } catch {
-            // Fall through to object-style signing below.
-          }
+          const signed = await signTxBlockFeature.signTransactionBlock({
+            account: selectedAccount,
+            chain,
+            transactionBlock: request.transaction,
+          });
+          return {
+            bytes: signed.transactionBlockBytes,
+            signature: signed.signature,
+          };
         }
 
         if (signTxFeature) {

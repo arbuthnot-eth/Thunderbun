@@ -46,6 +46,10 @@ export interface CctpConfig {
 // topic0 = keccak256("MessageSent(bytes)")
 export const MESSAGE_SENT_TOPIC = "0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036";
 
+// ── DepositForBurn event ──────────────────────────────────────────────────
+// topic0 = keccak256("DepositForBurn(uint64,address,uint256,address,bytes32,uint32,bytes32,bytes32)")
+export const DEPOSIT_FOR_BURN_TOPIC = "0x2fa9ca894982930190727e75500a97d8dc500233a5065e0f3126c48fbe0343c0";
+
 // ── ERC-20 / CCTP function selectors ──────────────────────────────────────
 export const ALLOWANCE_SELECTOR = "0xdd62ed3e"; // allowance(address,address)
 export const APPROVE_SELECTOR = "0x095ea7b3"; // approve(address,uint256)
@@ -73,7 +77,7 @@ const MAINNET_CONFIG: CctpConfig = {
   suiDomain: 8,
   irisApiUrl: "https://iris-api.circle.com",
   pollingIntervalMs: 10_000,
-  pollingTimeoutMs: 1_800_000,
+  pollingTimeoutMs: 300_000,
 };
 
 const TESTNET_CONFIG: CctpConfig = {
@@ -95,7 +99,7 @@ const TESTNET_CONFIG: CctpConfig = {
   suiDomain: 8,
   irisApiUrl: "https://iris-api-sandbox.circle.com",
   pollingIntervalMs: 10_000,
-  pollingTimeoutMs: 1_800_000,
+  pollingTimeoutMs: 300_000,
 };
 
 /**
