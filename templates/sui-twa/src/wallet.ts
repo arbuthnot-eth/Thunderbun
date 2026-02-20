@@ -2,7 +2,7 @@
  * wallet.ts — WaaP (primary) + dApp Kit + Wallet Standard extensions
  *
  * WaaP embedded wallet works in TWA without extension.
- * dApp Kit provides the connect modal (WaaP + Sui Wallet, etc.).
+ * Connect flow prefers native WaaP SDK auth first, then syncs dApp Kit.
  *
  * Docs: https://docs.waap.xyz/guides-sui/start
  * Docs: https://sdk.mystenlabs.com/dapp-kit
@@ -11,14 +11,12 @@
 import type { SuiGrpcClient } from "@mysten/sui/grpc";
 import type { Transaction } from "@mysten/sui/transactions";
 
-// Load web components (connect modal, etc.)
-import "@mysten/dapp-kit-core/web";
-import type { UiWalletAccount } from "@wallet-standard/ui";
+import type { UiWallet, UiWalletAccount } from "@wallet-standard/ui";
 import {
   getWalletAccountForUiWalletAccount_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as getWalletAccountForUiWalletAccount,
 } from "@wallet-standard/ui-registry";
 
-import { waapReady } from "./init-waap";
+import { getWaapInitStatus, waapReady } from "./init-waap";
 import { dAppKit } from "./dapp-kit";
 import { signSuiTransactionViaReactDappKit } from "./react/dapp-kit-island";
 
@@ -26,6 +24,7 @@ import { signSuiTransactionViaReactDappKit } from "./react/dapp-kit-island";
 export type Network = "mainnet" | "testnet" | "devnet";
 
 export interface WalletState {
+  hydrating: boolean;
   connected: boolean;
   address: string | null;
   suiUsdcBalance: bigint | null;
@@ -40,9 +39,6 @@ export interface WalletState {
 
 type Listener = (state: WalletState) => void;
 
-// ── Connect modal instance ───────────────────────────────────────────────
-let connectModal: HTMLElement | null = null;
-const WAAP_HINTS: string[] = ["waap", "silk", "human.tech", "walletconnect", "reown", "peer"];
 const WAAP_CONNECT_HINTS: string[] = ["waap", "silk", "human", "peer"];
 const BASE_CHAIN_ID = "0x2105";
 const BASE_USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -50,6 +46,7 @@ const BALANCE_OF_SELECTOR = "0x70a08231";
 
 interface WaaPEvmProvider {
   request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
+  login?: () => Promise<unknown>;
   logout?: () => Promise<unknown>;
   getLoginMethod?: () => "waap" | "human" | "injected" | "walletconnect" | null;
 }
@@ -60,64 +57,14 @@ declare global {
   }
 }
 
-function setWaapOverlayMode(active: boolean): void {
-  document.body.classList.toggle("waap-overlay-active", active);
-  if (connectModal) {
-    if (active) {
-      connectModal.style.pointerEvents = "none";
-      connectModal.setAttribute("aria-hidden", "true");
-    } else {
-      connectModal.style.pointerEvents = "";
-      connectModal.removeAttribute("aria-hidden");
-    }
-  }
-}
-
-function closeConnectDialogForWaaP(): void {
-  const dialog = connectModal?.shadowRoot?.querySelector("dialog");
-  if (dialog instanceof HTMLDialogElement && dialog.open) {
-    dialog.close();
-  }
-  setWaapOverlayMode(true);
-}
-
-function isLikelyWaapOverlay(node: Node): boolean {
-  if (!(node instanceof HTMLElement)) return false;
-  if (node.tagName === "WAAP-WALLET") return true;
-
-  const haystack = `${node.id} ${node.className} ${node.getAttribute("data-testid") ?? ""} ${node.getAttribute("aria-label") ?? ""}`.toLowerCase();
-  if (WAAP_HINTS.some((hint) => haystack.includes(hint))) return true;
-
+function hardReloadApp(): void {
   try {
-    const style = getComputedStyle(node);
-    const z = Number.parseInt(style.zIndex || "0", 10);
-    if (
-      style.position === "fixed" &&
-      z >= 900 &&
-      node.clientWidth >= window.innerWidth * 0.75 &&
-      node.clientHeight >= window.innerHeight * 0.55
-    ) {
-      return true;
-    }
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("tb_hard_reset", String(Date.now()));
+    window.location.replace(nextUrl.toString());
   } catch {
-    return false;
+    window.location.reload();
   }
-
-  return false;
-}
-
-function ensureConnectModal(): HTMLElement & { show: () => Promise<void> } {
-  if (!connectModal) {
-    const el = document.createElement("mysten-dapp-kit-connect-modal");
-    (el as unknown as { instance: typeof dAppKit }).instance = dAppKit;
-    (el as unknown as { sortFn?: (a: { name: string }, b: { name: string }) => number }).sortFn = (a, b) => {
-      // Sort normally, keeping user's installed wallets first
-      return a.name.localeCompare(b.name);
-    };
-    document.body.appendChild(el);
-    connectModal = el;
-  }
-  return connectModal as HTMLElement & { show: () => Promise<void> };
 }
 
 function selectPreferredWaaPWallet() {
@@ -133,6 +80,20 @@ function hasWaaPName(name: string | undefined): boolean {
   if (!name) return false;
   const lowered = name.toLowerCase();
   return WAAP_CONNECT_HINTS.some((hint) => lowered.includes(hint));
+}
+
+function getTraditionalWallets(): UiWallet[] {
+  return dAppKit.stores.$wallets.get().filter((wallet) => !hasWaaPName(wallet.name));
+}
+
+async function waitForPreferredWaaPWallet(timeoutMs = 5_000): Promise<ReturnType<typeof selectPreferredWaaPWallet>> {
+  const startedAt = Date.now();
+  let preferred = selectPreferredWaaPWallet();
+  while (!preferred && Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    preferred = selectPreferredWaaPWallet();
+  }
+  return preferred;
 }
 
 async function ensureBaseChain(provider: WaaPEvmProvider): Promise<void> {
@@ -168,6 +129,7 @@ async function ensureBaseChain(provider: WaaPEvmProvider): Promise<void> {
 class WalletManager {
   private static readonly WALLET_REQUEST_TIMEOUT_MS = 15_000;
   private listeners: Listener[] = [];
+  private hydrating = true;
   private balanceCache: bigint | null = null;
   private suiUsdcBalanceCache: bigint | null = null;
   private waapBaseAddress: string | null = null;
@@ -177,11 +139,19 @@ class WalletManager {
   private waapBasePrimaryName: string | null = null;
   private waapBaseAutoRequested = false;
   private waapAddressLookup: Promise<string | null> | null = null;
+  private connectHubEl: HTMLElement | null = null;
+  private connectHubWalletUnsub: (() => void) | null = null;
+  private connectHubEscHandler: ((event: KeyboardEvent) => void) | null = null;
+  private connectHubBusy = false;
+  private connectHubBusyTarget: "waap" | number | null = null;
+  private connectHubWalletFilter = "";
 
   constructor() {
-    this.syncFromDAppKit();
-    dAppKit.stores.$connection.subscribe(() => this.syncFromDAppKit());
+    dAppKit.stores.$connection.subscribe(() => {
+      void this.syncFromDAppKit();
+    });
     dAppKit.stores.$currentNetwork.subscribe(() => this.emit());
+    void this.finishInitialHydration();
   }
 
   getState(): WalletState {
@@ -190,6 +160,7 @@ class WalletManager {
     const address = conn.account?.address ?? null;
     const connected = conn.isConnected;
     return {
+      hydrating: this.hydrating,
       connected,
       address,
       suiUsdcBalance: connected ? this.suiUsdcBalanceCache : null,
@@ -213,69 +184,96 @@ class WalletManager {
     };
   }
 
-  async connect(): Promise<void> {
-    await waapReady;
-    setWaapOverlayMode(false);
-
-    // Prefer WaaP direct connect so users land in WaaP immediately.
-    const preferredWaaP = selectPreferredWaaPWallet();
-    if (preferredWaaP) {
-      try {
-        await dAppKit.connectWallet({ wallet: preferredWaaP });
-        await this.getWaaPBaseAddress({ request: true });
-        this.waapBaseAutoRequested = true;
-        return;
-      } catch (err) {
-        console.warn("[wallet] direct WaaP connect failed, using modal fallback:", err);
-      }
-    }
-
-    const modal = ensureConnectModal();
-
-    // dApp Kit opens a top-layer <dialog>. When WaaP auth opens, force-close
-    // the dApp Kit dialog so WaaP can receive pointer/keyboard focus.
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
-          if (isLikelyWaapOverlay(node)) {
-            closeConnectDialogForWaaP();
-            observer.disconnect();
-            return;
-          }
-        }
-      }
-    });
-
-    observer.observe(document.body, { childList: true });
-    const shadowRoot = connectModal?.shadowRoot;
-    const onShadowClick = (ev: Event) => {
-      const matched = ev.composedPath().some((p) => {
-        if (!(p instanceof HTMLElement)) return false;
-        const text = (p.textContent ?? "").toLowerCase();
-        return WAAP_HINTS.some((hint) => text.includes(hint));
-      });
-      if (matched) {
-        closeConnectDialogForWaaP();
+  openConnectModal(): void {
+    this.ensureConnectHub();
+    this.connectHubWalletFilter = "";
+    const walletSearch = this.connectHubEl?.querySelector<HTMLInputElement>("#tb-connect-hub-wallet-search");
+    if (walletSearch) walletSearch.value = "";
+    this.renderConnectHubWalletList();
+    this.setConnectHubStatus(null, false);
+    this.connectHubEl?.classList.add("is-open");
+    document.body.classList.add("tb-connect-modal-open");
+    this.teardownConnectHubEscapeListener();
+    this.connectHubEscHandler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        this.closeConnectHub();
       }
     };
-    shadowRoot?.addEventListener("click", onShadowClick, true);
+    window.addEventListener("keydown", this.connectHubEscHandler);
+  }
 
-    try {
-      await modal.show();
-    } finally {
-      observer.disconnect();
-      shadowRoot?.removeEventListener("click", onShadowClick, true);
-      setWaapOverlayMode(false);
+  async connect(): Promise<void> {
+    await waapReady;
+    const waapStatus = getWaapInitStatus();
+    if (!waapStatus.ready) {
+      throw new Error(waapStatus.reason ?? "WaaP SDK failed to initialize.");
     }
 
+    const provider = window.waap as WaaPEvmProvider | undefined;
+    if (!provider) {
+      throw new Error("WaaP provider not available.");
+    }
+
+    const method = provider.getLoginMethod?.();
+    if (method && method !== "waap" && method !== "human") {
+      try {
+        await provider.logout?.();
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (provider.login) {
+      await provider.login();
+    }
+
+    const accounts = await provider.request({ method: "eth_requestAccounts" });
+    const baseAddress = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : null;
+    if (!baseAddress) {
+      throw new Error("WaaP did not return a Base account.");
+    }
+
+    this.waapBaseAddress = baseAddress;
+    this.waapBaseAutoRequested = true;
+    await this.refreshBaseProfile();
+
+    const preferredWaaP = await waitForPreferredWaaPWallet();
+    if (!preferredWaaP) {
+      this.emit();
+      throw new Error("WaaP Sui wallet was not registered in dApp Kit. Check browser privacy settings and extensions.");
+    }
+
+    await dAppKit.connectWallet({ wallet: preferredWaaP });
+    await this.refreshBalance();
+  }
+
+  async connectTraditional(wallet?: UiWallet): Promise<void> {
+    const selectedWallet = wallet ?? getTraditionalWallets()[0] ?? null;
+    if (!selectedWallet) {
+      throw new Error("No traditional Sui wallets detected in dApp Kit.");
+    }
+
+    const preferredAccount =
+      this.findSigningAccount(selectedWallet.accounts, ["sui:signTransaction", "sui:signAndExecuteTransaction"]) ??
+      selectedWallet.accounts[0] ??
+      null;
+
+    await dAppKit.connectWallet({
+      wallet: selectedWallet,
+      ...(preferredAccount ? { account: preferredAccount } : {}),
+    });
+
     const conn = dAppKit.stores.$connection.get();
-    if (conn.isConnected && hasWaaPName(conn.wallet?.name)) {
+    if (conn.wallet?.name && hasWaaPName(conn.wallet.name)) {
       await this.getWaaPBaseAddress({ request: true });
       this.waapBaseAutoRequested = true;
     }
+
+    await this.refreshBalance();
   }
 
   async disconnect(): Promise<void> {
+    this.closeConnectHub();
     await dAppKit.disconnectWallet();
     this.balanceCache = null;
     this.suiUsdcBalanceCache = null;
@@ -289,8 +287,9 @@ class WalletManager {
     this.emit();
   }
 
-  async disconnectWaaP(): Promise<void> {
+  async disconnectWaaP({ hardReset = false }: { hardReset?: boolean } = {}): Promise<void> {
     await waapReady;
+    this.closeConnectHub();
     const provider = window.waap as WaaPEvmProvider | undefined;
 
     if (provider?.logout) {
@@ -317,6 +316,244 @@ class WalletManager {
     this.waapBaseAutoRequested = false;
     this.waapAddressLookup = null;
     this.emit();
+
+    if (hardReset) {
+      hardReloadApp();
+    }
+  }
+
+  async disconnectAndHardReset(): Promise<void> {
+    await this.disconnectWaaP({ hardReset: true });
+  }
+
+  private ensureConnectHub(): void {
+    if (this.connectHubEl) return;
+
+    const root = document.createElement("div");
+    root.id = "tb-connect-hub";
+    root.className = "tb-connect-hub";
+    root.innerHTML = `
+      <div class="tb-connect-hub-backdrop" data-connect-hub-action="close"></div>
+      <div class="tb-connect-hub-panel" role="dialog" aria-modal="true" aria-labelledby="tb-connect-hub-title">
+        <button class="tb-connect-hub-close" type="button" aria-label="Close wallet connect" data-connect-hub-action="close">×</button>
+        <div class="tb-connect-hub-head">
+          <div class="tb-connect-hub-title" id="tb-connect-hub-title">Connect Wallet</div>
+          <div class="tb-connect-hub-sub">Use .SKI (WaaP) or a traditional Sui wallet from dApp Kit.</div>
+          <div class="tb-connect-hub-pillrow">
+            <span class="tb-connect-hub-pill">Sui + Base</span>
+            <span class="tb-connect-hub-pill">Sponsored PTBs</span>
+            <span class="tb-connect-hub-pill">dApp Kit Ready</span>
+          </div>
+        </div>
+        <div class="tb-connect-hub-grid">
+          <section class="tb-connect-hub-col">
+            <div class="tb-connect-hub-col-title">.SKI (WaaP)</div>
+            <div class="tb-connect-hub-col-sub">Embedded social login, Base linking, and instant ready state.</div>
+            <ul class="tb-connect-hub-col-list">
+              <li>Works in app and mobile web</li>
+              <li>Auto-resolves Base + Sui identity</li>
+              <li>Best path for cross-chain rails</li>
+            </ul>
+            <button class="btn btn-primary btn--block tb-connect-hub-waap-btn" type="button" data-connect-hub-action="connect-waap">.SKI</button>
+          </section>
+          <section class="tb-connect-hub-col">
+            <div class="tb-connect-hub-col-title">Traditional Wallets</div>
+            <div class="tb-connect-hub-col-sub">Phantom, Backpack, Slush, Suiet, and other injected wallets.</div>
+            <input
+              id="tb-connect-hub-wallet-search"
+              class="tb-connect-hub-search"
+              type="text"
+              inputmode="text"
+              placeholder="Filter wallets..."
+              aria-label="Filter traditional wallets"
+            />
+            <div class="tb-connect-hub-wallet-list" id="tb-connect-hub-wallet-list"></div>
+          </section>
+        </div>
+        <div class="tb-connect-hub-status" id="tb-connect-hub-status"></div>
+      </div>
+    `;
+
+    root.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement;
+      const actionEl = target.closest<HTMLElement>("[data-connect-hub-action]");
+      if (!actionEl) return;
+
+      const action = actionEl.dataset.connectHubAction;
+      if (action === "close") {
+        this.closeConnectHub();
+        return;
+      }
+
+      if (action === "connect-waap") {
+        void this.runConnectHubWaaP();
+        return;
+      }
+
+      if (action === "connect-traditional") {
+        const idxRaw = actionEl.getAttribute("data-wallet-index");
+        const idx = idxRaw ? Number(idxRaw) : NaN;
+        if (Number.isNaN(idx)) return;
+        void this.runConnectHubTraditional(idx);
+      }
+    });
+
+    root.addEventListener("input", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (target.id !== "tb-connect-hub-wallet-search") return;
+      this.connectHubWalletFilter = target.value.trim().toLowerCase();
+      this.renderConnectHubWalletList();
+    });
+
+    document.body.appendChild(root);
+    this.connectHubEl = root;
+
+    if (!this.connectHubWalletUnsub) {
+      this.connectHubWalletUnsub = dAppKit.stores.$wallets.subscribe(() => {
+        if (this.connectHubEl?.classList.contains("is-open")) {
+          this.renderConnectHubWalletList();
+        }
+      });
+    }
+  }
+
+  private closeConnectHub(): void {
+    if (!this.connectHubEl) return;
+    this.connectHubEl.classList.remove("is-open");
+    document.body.classList.remove("tb-connect-modal-open");
+    this.connectHubBusy = false;
+    this.connectHubBusyTarget = null;
+    this.teardownConnectHubEscapeListener();
+  }
+
+  private teardownConnectHubEscapeListener(): void {
+    if (!this.connectHubEscHandler) return;
+    window.removeEventListener("keydown", this.connectHubEscHandler);
+    this.connectHubEscHandler = null;
+  }
+
+  private renderConnectHubWalletList(): void {
+    const walletList = this.connectHubEl?.querySelector<HTMLElement>("#tb-connect-hub-wallet-list");
+    if (!walletList) return;
+
+    const wallets = getTraditionalWallets();
+    const filteredWallets = this.connectHubWalletFilter.length > 0
+      ? wallets.filter((wallet) => wallet.name.toLowerCase().includes(this.connectHubWalletFilter))
+      : wallets;
+
+    if (wallets.length === 0) {
+      walletList.innerHTML = `
+        <div class="tb-connect-hub-empty">No traditional Sui wallet detected.</div>
+      `;
+      return;
+    }
+
+    if (filteredWallets.length === 0) {
+      walletList.innerHTML = `
+        <div class="tb-connect-hub-empty">No wallets match that filter.</div>
+      `;
+      return;
+    }
+
+    walletList.innerHTML = filteredWallets
+      .map((wallet) => {
+        const originalIndex = wallets.findIndex((candidate) => candidate === wallet);
+        if (originalIndex < 0) return "";
+        const icon = escapeAttribute(wallet.icon);
+        const name = escapeHtml(wallet.name);
+        const disabled = this.connectHubBusy ? "disabled" : "";
+        const isPending = this.connectHubBusy && this.connectHubBusyTarget === originalIndex;
+        const pending = isPending ? "Connecting…" : name;
+        return `
+          <button
+            class="tb-connect-hub-wallet-btn"
+            type="button"
+            data-connect-hub-action="connect-traditional"
+            data-wallet-index="${originalIndex}"
+            ${disabled}
+          >
+            <div class="tb-connect-hub-wallet-btn-main">
+              <img src="${icon}" alt="" width="22" height="22" />
+              <span class="tb-connect-hub-wallet-name">${escapeHtml(pending)}</span>
+            </div>
+            <span class="tb-connect-hub-wallet-badge">${isPending ? "..." : "Installed"}</span>
+          </button>
+        `;
+      })
+      .join("");
+
+    const waapBtn = this.connectHubEl?.querySelector<HTMLButtonElement>(".tb-connect-hub-waap-btn");
+    if (waapBtn) {
+      waapBtn.disabled = this.connectHubBusy;
+      waapBtn.textContent =
+        this.connectHubBusy && this.connectHubBusyTarget === "waap"
+          ? "Connecting…"
+          : ".SKI";
+    }
+  }
+
+  private setConnectHubStatus(message: string | null, isError: boolean): void {
+    const statusEl = this.connectHubEl?.querySelector<HTMLElement>("#tb-connect-hub-status");
+    if (!statusEl) return;
+
+    if (!message) {
+      statusEl.textContent = "";
+      statusEl.classList.remove("is-visible", "is-error");
+      return;
+    }
+
+    statusEl.textContent = message;
+    statusEl.classList.add("is-visible");
+    statusEl.classList.toggle("is-error", isError);
+  }
+
+  private async runConnectHubWaaP(): Promise<void> {
+    if (this.connectHubBusy) return;
+    this.connectHubBusy = true;
+    this.connectHubBusyTarget = "waap";
+    this.setConnectHubStatus(null, false);
+    this.renderConnectHubWalletList();
+
+    try {
+      await this.connect();
+      this.closeConnectHub();
+    } catch (err) {
+      console.error("[wallet] .SKI connect failed:", err);
+      this.setConnectHubStatus(resolveErrorMessage(err), true);
+    } finally {
+      this.connectHubBusy = false;
+      this.connectHubBusyTarget = null;
+      if (this.connectHubEl?.classList.contains("is-open")) {
+        this.renderConnectHubWalletList();
+      }
+    }
+  }
+
+  private async runConnectHubTraditional(index: number): Promise<void> {
+    if (this.connectHubBusy) return;
+    this.connectHubBusy = true;
+    this.connectHubBusyTarget = index;
+    this.setConnectHubStatus(null, false);
+    this.renderConnectHubWalletList();
+
+    try {
+      const wallet = getTraditionalWallets()[index] ?? null;
+      if (!wallet) {
+        throw new Error("Selected wallet is no longer available.");
+      }
+      await this.connectTraditional(wallet);
+      this.closeConnectHub();
+    } catch (err) {
+      console.error("[wallet] traditional wallet connect failed:", err);
+      this.setConnectHubStatus(resolveErrorMessage(err), true);
+    } finally {
+      this.connectHubBusy = false;
+      this.connectHubBusyTarget = null;
+      if (this.connectHubEl?.classList.contains("is-open")) {
+        this.renderConnectHubWalletList();
+      }
+    }
   }
 
   async refreshBalance(): Promise<void> {
@@ -426,7 +663,7 @@ class WalletManager {
 
     const current = dAppKit.stores.$connection.get();
     if (!current.isConnected || !hasWaaPName(current.wallet?.name)) {
-      const preferredWaaP = selectPreferredWaaPWallet();
+      const preferredWaaP = await waitForPreferredWaaPWallet();
       if (!preferredWaaP) {
         throw new Error("WaaP wallet is not available. Open connect and choose WaaP first.");
       }
@@ -446,7 +683,7 @@ class WalletManager {
 
     const current = dAppKit.stores.$connection.get();
     if (!current.isConnected || !current.account || !hasWaaPName(current.wallet?.name)) {
-      const preferredWaaP = selectPreferredWaaPWallet();
+      const preferredWaaP = await waitForPreferredWaaPWallet();
       if (!preferredWaaP) {
         throw new Error("WaaP Sui wallet is not available. Open connect and choose WaaP first.");
       }
@@ -576,7 +813,10 @@ class WalletManager {
     const conn = dAppKit.stores.$connection.get();
     const isWaaPWallet = hasWaaPName(conn.wallet?.name);
     if (sender) {
-      transaction.setSenderIfNotSet(sender);
+      // Always align sender with the actively connected Sui account.
+      // If sender drifts from connected account, validators reject with
+      // "Invalid user signature".
+      transaction.setSender(sender);
     }
 
     const failures: unknown[] = [];
@@ -599,7 +839,7 @@ class WalletManager {
     } catch (err) {
       console.warn("[wallet] react-dapp-kit signTransaction failed:", err);
       failures.push(err);
-      if (isWaaPWallet) {
+      if (isWaaPWallet && !this.isRetryableSignatureFailure(err)) {
         throw new Error(this.formatSignFailures(failures));
       }
     }
@@ -641,13 +881,31 @@ class WalletManager {
 
   private formatSignFailures(failures: unknown[]): string {
     const messages = failures
-      .map((err) => (err instanceof Error ? err.message : String(err)))
+      .map((err) => this.normalizeErrorMessage(err instanceof Error ? err.message : String(err)))
       .filter((msg) => msg.length > 0);
     const uniqueMessages = Array.from(new Set(messages));
     if (uniqueMessages.length === 0) {
       return "Failed to sign Sui transaction.";
     }
     return `Failed to sign Sui transaction. ${uniqueMessages.join(" | ")}`;
+  }
+
+  private normalizeErrorMessage(message: string): string {
+    // Some wallet/provider errors arrive URL-encoded.
+    if (!message.includes("%")) return message;
+    try {
+      return decodeURIComponent(message);
+    } catch {
+      return message;
+    }
+  }
+
+  private isRetryableSignatureFailure(err: unknown): boolean {
+    const raw = err instanceof Error ? err.message : String(err);
+    const msg = this.normalizeErrorMessage(raw).toLowerCase();
+    return msg.includes("invalid user signature")
+      || msg.includes("invalid signature was given")
+      || msg.includes("signature is not valid");
   }
 
   private async withWalletRequestTimeout<T>(
@@ -782,7 +1040,7 @@ class WalletManager {
       }
     }
 
-    const preferredWaaP = selectPreferredWaaPWallet();
+    const preferredWaaP = await waitForPreferredWaaPWallet();
     if (preferredWaaP) {
       try {
         const preselected = this.findSigningAccount(preferredWaaP.accounts, features);
@@ -820,6 +1078,17 @@ class WalletManager {
 
   private emit() {
     this.listeners.forEach((l) => l(this.getState()));
+  }
+
+  private async finishInitialHydration(): Promise<void> {
+    try {
+      await waapReady;
+      await this.syncFromDAppKit();
+    } finally {
+      if (!this.hydrating) return;
+      this.hydrating = false;
+      this.emit();
+    }
   }
 
   private async syncFromDAppKit(): Promise<void> {
@@ -1034,4 +1303,25 @@ async function resolveBasePrimaryName(address: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function resolveErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) {
+    return err.message.trim();
+  }
+  const message = String(err ?? "Wallet connection failed.").trim();
+  return message || "Wallet connection failed.";
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeAttribute(value: string): string {
+  return escapeHtml(value);
 }

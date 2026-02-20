@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  createNetworkConfig,
   SuiClientProvider,
   WalletProvider,
   useConnectWallet,
@@ -13,6 +14,7 @@ import {
 } from "@mysten/dapp-kit";
 import type { WalletAccount, WalletWithRequiredFeatures } from "@mysten/wallet-standard";
 import type { Transaction } from "@mysten/sui/transactions";
+import { thunderbunDappKitTheme } from "./dapp-kit-theme";
 
 interface SignRequest {
   transaction: Transaction;
@@ -33,11 +35,11 @@ interface BridgeRuntime {
 const ISLAND_ID = "tb-dapp-kit-react-island";
 const BRIDGE_READY_TIMEOUT_MS = 8_000;
 
-const NETWORKS = {
+const { networkConfig } = createNetworkConfig({
   mainnet: { url: "https://fullnode.mainnet.sui.io:443", network: "mainnet" as const, mvr: {} },
   testnet: { url: "https://fullnode.testnet.sui.io:443", network: "testnet" as const, mvr: {} },
   devnet: { url: "https://fullnode.devnet.sui.io:443", network: "devnet" as const, mvr: {} },
-} as const;
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -336,13 +338,14 @@ function RootApp(): React.ReactElement {
     React.createElement(
       SuiClientProvider,
       {
-        networks: NETWORKS,
+        networks: networkConfig,
         defaultNetwork: "mainnet",
         children: React.createElement(
           WalletProvider,
           {
             autoConnect: true,
             storageKey: "tb-react-dapp-kit",
+            theme: thunderbunDappKitTheme,
             children: React.createElement(RuntimeBridge),
           },
         ),

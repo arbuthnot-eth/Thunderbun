@@ -216,8 +216,7 @@ await wallet.executeSponsoredTx(bytes, [userSignature, sponsorSignature]);</pre>
   });
 
   container.querySelector("#disconnect")?.addEventListener("click", async () => {
-    await wallet.disconnect();
-    renderSettings(container);
+    await wallet.disconnectAndHardReset();
   });
 
   container.querySelector("#connect-wallet")?.addEventListener("click", async () => {

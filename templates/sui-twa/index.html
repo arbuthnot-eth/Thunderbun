@@ -70,14 +70,24 @@
       <aside id="wallet-widget" aria-live="polite">
         <div class="wallet-widget-toolbar">
           <span class="wallet-widget-toolbar-text" id="wallet-widget-toolbar-text">Wallet</span>
-          <button class="wallet-widget-toggle" id="wallet-widget-toggle" aria-label="Collapse wallet widget">−</button>
+          <div class="wallet-widget-toolbar-actions">
+            <button class="btn btn-danger btn--compact is-hidden" id="wallet-widget-disconnect-top">Disconnect</button>
+            <button class="wallet-widget-toggle" id="wallet-widget-toggle" aria-label="Collapse wallet widget">−</button>
+          </div>
         </div>
 
         <div id="wallet-widget-content">
-          <div id="wallet-widget-disconnected">
+          <div id="wallet-widget-loading">
+            <img class="wallet-widget-loading-logo" src="/icons/thunderbun-logo.png" alt="" width="42" height="42" />
+            <div class="wallet-widget-sub">Checking WaaP session…</div>
+          </div>
+
+          <div id="wallet-widget-disconnected" class="is-hidden">
             <div class="wallet-widget-title">Wallet</div>
             <div class="wallet-widget-sub">Not connected</div>
-            <button class="btn btn-primary btn--compact" id="wallet-widget-connect">Connect WaaP</button>
+            <div class="wallet-widget-actions">
+              <button class="btn btn-primary btn--compact" id="wallet-widget-connect">.SKI</button>
+            </div>
           </div>
 
           <div id="wallet-widget-connected" class="is-hidden">
@@ -91,25 +101,24 @@
 
             <div class="wallet-widget-row">
               <span class="wallet-widget-key">Sui</span>
-              <span class="wallet-widget-addr code-text" id="wallet-widget-sui"></span>
-              <button class="btn btn-secondary btn--compact" id="wallet-widget-copy-sui">Copy</button>
+              <div class="wallet-widget-identity">
+                <span class="wallet-widget-name" id="wallet-widget-suins">—</span>
+                <span class="wallet-widget-addr code-text" id="wallet-widget-sui"></span>
+              </div>
+              <button class="wallet-widget-copy-icon" id="wallet-widget-copy-sui" aria-label="Copy Sui address" title="Copy Sui address">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
             </div>
 
             <div class="wallet-widget-row">
               <span class="wallet-widget-key">Base</span>
-              <span class="wallet-widget-addr code-text" id="wallet-widget-base"></span>
-              <button class="btn btn-secondary btn--compact" id="wallet-widget-copy-base">Copy</button>
-            </div>
-
-            <div class="wallet-widget-row">
-              <span class="wallet-widget-key">SuiNS</span>
-              <span class="wallet-widget-addr code-text" id="wallet-widget-suins">—</span>
-              <span class="wallet-widget-spacer" aria-hidden="true"></span>
-            </div>
-
-            <div class="wallet-widget-actions">
-              <button class="btn btn-primary btn--compact" id="wallet-widget-link-base">Link Base</button>
-              <button class="btn btn-secondary btn--compact" id="wallet-widget-disconnect">Disconnect</button>
+              <div class="wallet-widget-identity">
+                <span class="wallet-widget-name" id="wallet-widget-basename">—</span>
+                <span class="wallet-widget-addr code-text" id="wallet-widget-base"></span>
+              </div>
+              <button class="wallet-widget-copy-icon" id="wallet-widget-copy-base" aria-label="Copy Base address" title="Copy Base address">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
             </div>
           </div>
         </div>

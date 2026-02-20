@@ -1,19 +1,33 @@
-import {
-  executeCctpBridge,
-  getBaseSponsorStatus,
-  getCctpMinBaseGasWei,
-  requestBaseGasSponsor,
-  resumePendingBridge,
-  loadPendingBridge,
-  clearPendingBridge,
-  topUpBaseGasFromUsdc,
-  scanPastBurns,
-  mintRecoveredBurn,
-  type CctpPhase,
-  type CctpProgress,
-  type RecoverableBurn,
-} from "../lib/cctp";
+import type { CctpPhase, CctpProgress, RecoverableBurn } from "../lib/cctp";
 import { wallet } from "../wallet";
+
+// Lazy-load the full CCTP module — keeps viem + bridge logic out of the home chunk.
+const cctp = () => import("../lib/cctp");
+
+// Inlined lightweight sync helpers (avoid importing the full cctp module at render time)
+const PENDING_KEY = "cctp-pending-bridge";
+const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_MIN_GAS_WEI = 5_000_000_000_000n;
+
+function loadPendingBridge(): boolean {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { timestamp: number };
+    if (Date.now() - parsed.timestamp > PENDING_TTL_MS) {
+      sessionStorage.removeItem(PENDING_KEY);
+      return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
+
+function getCctpMinBaseGasWei(): bigint {
+  const raw = (import.meta.env as Record<string, string | undefined>)["VITE_CCTP_MIN_BASE_GAS_WEI"]?.trim();
+  if (!raw) return DEFAULT_MIN_GAS_WEI;
+  try { const v = BigInt(raw); return v >= 0n ? v : DEFAULT_MIN_GAS_WEI; } catch { return DEFAULT_MIN_GAS_WEI; }
+}
 
 type BridgePhase = CctpPhase;
 type StepId = "approve" | "burn" | "attestation" | "mint";
@@ -63,6 +77,7 @@ export function renderHome(container: HTMLElement) {
     </div>
   `;
 
+  const sectionEl = container.querySelector<HTMLElement>(".section");
   const body = container.querySelector<HTMLElement>("#home-body")!;
 
   let bridgePhase: BridgePhase = "idle";
@@ -74,10 +89,6 @@ export function renderHome(container: HTMLElement) {
   let gasTopupBusy = false;
   let gasTopupMessage = "";
   let gasTopupError: string | null = null;
-  let sponsorBusy = false;
-  let sponsorMessage = "";
-  let sponsorError: string | null = null;
-  let sponsorConfigured = false;
   let mounted = true;
   let bridgeInFlight = false;
   let activityFeed = loadBridgeActivityFeed();
@@ -86,9 +97,12 @@ export function renderHome(container: HTMLElement) {
   let recoveryScanBusy = false;
   let recoveryScanMessage = "";
   let recoveryScanError: string | null = null;
+  let recoveryTxHashInput = "";
   let recoveryMintingIndex: number | null = null;
   let recoveryMintMessage = "";
   let recoveryMintError: string | null = null;
+  let attestStartTime: number | null = null;
+  let attestTimerId: ReturnType<typeof setInterval> | null = null;
 
   const getActiveGroup = (): BridgeActivityGroup | null => {
     if (!activeGroupId) return null;
@@ -130,7 +144,7 @@ export function renderHome(container: HTMLElement) {
       amountRaw,
       status: "running",
       phase: "approving",
-      message: "Starting CCTP bridge…",
+      message: "Starting CCTP transfer…",
       attestationAttempts: 0,
       digest: null,
       error: null,
@@ -152,225 +166,277 @@ export function renderHome(container: HTMLElement) {
 
   const render = () => {
     const s = wallet.getState();
+    sectionEl?.classList.remove("home-loading-section");
+
+    if (s.hydrating) {
+      sectionEl?.classList.add("home-loading-section");
+      body.innerHTML = `
+        <div class="home-waap-loading-screen">
+          <img class="home-waap-loading-logo" src="/icons/thunderbun-logo.png" alt="" width="176" height="176" />
+          <div class="home-waap-loading-title">Restoring wallet</div>
+          <div class="home-waap-loading-subtitle">Checking for an existing WaaP session…</div>
+        </div>
+      `;
+      return;
+    }
 
     if (s.connected && s.address) {
+      const isBusy = bridgePhase !== "idle" && bridgePhase !== "complete" && bridgePhase !== "error";
+      const quickSend95Raw = s.waapBaseUsdcBalance !== null ? (s.waapBaseUsdcBalance * 95n) / 100n : null;
+      const quickSend95Label = quickSend95Raw !== null && quickSend95Raw > 0n
+        ? formatUsdFromUsdcRaw(quickSend95Raw)
+        : "95%";
+      const hasPending = !!loadPendingBridge();
+      const mustResumePending = hasPending && bridgePhase === "idle";
+
       const phaseBadgeClass = bridgePhase === "complete"
         ? "badge-green"
         : bridgePhase === "error"
           ? "badge-red"
-          : bridgePhase === "idle"
-            ? "badge-blue"
-            : "badge-yellow";
-
-      const isBusy = bridgePhase !== "idle" && bridgePhase !== "complete" && bridgePhase !== "error";
-      const maxUsdc = s.waapBaseUsdcBalance !== null ? formatUsdcDecimal(s.waapBaseUsdcBalance) : "";
-      const hasPending = !!loadPendingBridge();
-      const mustResumePending = hasPending && bridgePhase === "idle";
+          : mustResumePending
+            ? "badge-yellow"
+            : bridgePhase === "idle"
+              ? "badge-blue"
+              : "badge-yellow";
+      const phaseBadgeLabel = mustResumePending ? "Resume" : PHASE_LABELS[bridgePhase];
       const parsedAmount = parseUsdcInput(bridgeAmount);
-      const isDefaultDollar = parsedAmount === 1_000_000n;
       const minBaseGasWei = getCctpMinBaseGasWei();
       const baseGasLow = s.waapBaseAddress !== null
         && s.waapBaseBalance !== null
         && s.waapBaseBalance < minBaseGasWei;
       const activeGroup = getActiveGroup();
       const stepTxMap = activeGroup?.steps ?? activityFeed[0]?.steps ?? createEmptyStepTxMap();
+      const abamGroup = activeGroup ?? activityFeed[0] ?? null;
+      const abamPhase = abamGroup?.phase ?? bridgePhase;
+      const abamStepTxMap = abamGroup?.steps ?? stepTxMap;
+      const abamStatusClass = abamGroup
+        ? (abamGroup.status === "complete" ? "badge-green" : abamGroup.status === "error" ? "badge-red" : "badge-yellow")
+        : "badge-blue";
+
+      const suiAddrFull = wallet.formatAddress(true);
+      const baseAddrFull = s.waapBaseAddress ?? "";
+      const suiDisplay = s.suiPrimaryName ? escapeHtml(s.suiPrimaryName) : truncAddr(suiAddrFull);
+      const baseDisplay = s.waapBasePrimaryName ? escapeHtml(s.waapBasePrimaryName) : (baseAddrFull ? truncAddr(baseAddrFull) : "Not linked");
+      const copyIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+      const checkIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+      const usdcIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#2775CA"/><path d="M12 5.5v13M15.6 8.7c-.8-.7-2-1.2-3.6-1.2-2 0-3.4 1-3.4 2.5 0 1.6 1.2 2.2 3.4 2.6 2.2.4 3.2.9 3.2 2.4 0 1.6-1.4 2.6-3.6 2.6-1.6 0-3-.5-4-1.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+      const baseUsdcRaw = s.waapBaseUsdcBalance ?? 0n;
+      const suiUsdcRaw = s.suiUsdcBalance ?? 0n;
+      const totalUsdcRaw = baseUsdcRaw + suiUsdcRaw;
+      const baseSharePct = ratioPercent(baseUsdcRaw, totalUsdcRaw);
+      const suiSharePct = ratioPercent(suiUsdcRaw, totalUsdcRaw);
+      const baseUsdcDollar = formatUsdFromUsdcRaw(baseUsdcRaw);
+      const suiUsdcDollar = formatUsdFromUsdcRaw(suiUsdcRaw);
+      const quickSend95Disabled = isBusy || !s.waapBaseAddress || quickSend95Raw === null || quickSend95Raw <= 0n;
+      const sendAmountLabel = parsedAmount && parsedAmount > 0n ? formatUsdFromUsdcRaw(parsedAmount) : null;
+      const bamAmountLabel = abamGroup ? `${safeFormatAmount(abamGroup.amountRaw)} USDC` : null;
 
       body.innerHTML = `
-        <div class="card home-minimal">
-          <div class="spread-row">
-            <div>
-              <div class="card-title">Portfolio</div>
-              <div class="card-description">Sui + Base wallet overview.</div>
-            </div>
-            <button class="btn btn-secondary btn--compact" id="home-refresh">Refresh</button>
-          </div>
-
-          <div class="home-minimal-grid">
-            <div class="home-minimal-item">
-              <div class="home-minimal-label">Sui Balance</div>
-              <div class="home-minimal-value code-text">${wallet.formatBalance()}</div>
-              <div class="home-minimal-subvalue code-text">Sui USDC: ${wallet.formatSuiUsdcBalance()}</div>
-            </div>
-            <div class="home-minimal-item">
-              <div class="home-minimal-label">Base USDC</div>
-              <div class="home-minimal-value code-text">${wallet.formatBaseUsdcBalance()}</div>
-            </div>
-            <div class="home-minimal-item">
-              <div class="home-minimal-label">Sui Address</div>
-              <div class="home-minimal-value code-text">${wallet.formatAddress(true)}</div>
-              <div class="home-minimal-subvalue code-text">SuiNS: ${s.suiPrimaryName ? escapeHtml(s.suiPrimaryName) : "—"}</div>
-            </div>
-            <div class="home-minimal-item">
-              <div class="home-minimal-label">Base Address</div>
-              <div class="home-minimal-value code-text">${s.waapBaseAddress ?? "Not linked"}</div>
-            </div>
-          </div>
-
-          <div class="card home-transfer-card">
-            <div class="spread-row">
-              <div>
-                <div class="card-title">CCTP Bridge: Base USDC → Sui USDC</div>
-                <div class="card-description">Burns USDC on Base, Circle attests, mints native USDC on Sui. No wrapping.</div>
-              </div>
-              <span class="badge ${phaseBadgeClass}">${PHASE_LABELS[bridgePhase]}</span>
-            </div>
-
-            ${hasPending && bridgePhase === "idle" ? `
-              <div class="cctp-resume-banner">
-                <span>Pending bridge found from earlier session.</span>
-                <button class="btn btn-primary btn--compact" id="home-resume">Resume</button>
-                <button class="btn btn-secondary btn--compact" id="home-dismiss">Dismiss</button>
-              </div>
-            ` : ""}
-
-            ${baseGasLow ? `
-              <div class="cctp-gas-banner">
-                <div class="cctp-gas-title">Base gas is low for bridge execution.</div>
-                <div class="cctp-gas-subtitle">Thunderbun can swap a small USDC dust amount to ETH automatically.</div>
-                <div class="cctp-gas-actions">
-                  <button class="btn btn-secondary btn--compact" id="home-copy-base-gas"${!s.waapBaseAddress ? " disabled" : ""}>Copy Base Address</button>
-                  ${sponsorConfigured ? `<button class="btn btn-primary btn--compact" id="home-request-sponsor"${sponsorBusy || !s.waapBaseAddress ? " disabled" : ""}>${sponsorBusy ? "Requesting…" : "Request Sponsor"}</button>` : ""}
-                  <button class="btn btn-primary btn--compact" id="home-topup-gas"${gasTopupBusy || !s.waapBaseAddress ? " disabled" : ""}>${gasTopupBusy ? "Topping Up…" : "Top Up Gas (USDC)"}</button>
+        <div class="home-layout">
+          <div class="home-bridge-section">
+              <div class="home-bridge-header">
+                <div>
+                  <div class="home-bridge-title">CCTP Transfer</div>
                 </div>
-                ${sponsorMessage ? `<div class="cctp-gas-status code-text">${escapeHtml(sponsorMessage)}</div>` : ""}
-                ${sponsorError ? `<div class="cctp-gas-error">${escapeHtml(sponsorError)}</div>` : ""}
-                ${gasTopupMessage ? `<div class="cctp-gas-status code-text">${escapeHtml(gasTopupMessage)}</div>` : ""}
-                ${gasTopupError ? `<div class="cctp-gas-error">${escapeHtml(gasTopupError)}</div>` : ""}
+                ${mustResumePending
+                  ? `<button class="badge ${phaseBadgeClass} badge-btn" id="home-resume">${phaseBadgeLabel}</button>`
+                  : `<span class="badge ${phaseBadgeClass}">${phaseBadgeLabel}</span>`}
               </div>
-            ` : ""}
 
-            <div class="cctp-amount-row">
-              <div class="cctp-amount-group">
-                <label class="input-label" for="home-amount">Amount (USDC)</label>
-                <div class="input-row">
-                  <input type="text" id="home-amount" class="input-field code-text"
-                    placeholder="1.00" inputmode="decimal"
-                    value="${escapeAttr(bridgeAmount)}"
-                    ${isBusy || mustResumePending ? "disabled" : ""} />
-                  <button class="btn btn-secondary btn--compact" id="home-max" ${isBusy || mustResumePending || !maxUsdc ? "disabled" : ""}>Max</button>
+              ${baseGasLow ? `
+                <div class="cctp-gas-banner">
+                  <div class="cctp-gas-title">Base gas is low</div>
+                  <div class="cctp-gas-subtitle">Swap a small USDC amount to ETH automatically.</div>
+                  <div class="cctp-gas-actions">
+                    <button class="btn btn-secondary btn--compact" id="home-copy-base-gas"${!s.waapBaseAddress ? " disabled" : ""}>Copy Base Address</button>
+                    <button class="btn btn-primary btn--compact" id="home-topup-gas"${gasTopupBusy || !s.waapBaseAddress ? " disabled" : ""}>${gasTopupBusy ? "Topping Up…" : "Top Up Gas"}</button>
+                  </div>
+                  ${gasTopupMessage ? `<div class="cctp-gas-status code-text">${escapeHtml(gasTopupMessage)}</div>` : ""}
+                  ${gasTopupError ? `<div class="cctp-gas-error">${escapeHtml(gasTopupError)}</div>` : ""}
+                </div>
+              ` : ""}
+
+              <div class="cctp-amount-row">
+                <div class="cctp-amount-group">
+                  <div class="input-row">
+                    <div class="cctp-amount-shell">
+                      <span class="cctp-amount-prefix">$</span>
+                      <input type="text" id="home-amount" class="input-field code-text cctp-amount-input"
+                        placeholder="0.00" inputmode="decimal"
+                        value="${escapeAttr(bridgeAmount)}"
+                        ${isBusy ? "disabled" : ""} />
+                    </div>
+                    <button class="btn btn-secondary btn--compact" id="home-send-95" ${quickSend95Disabled ? "disabled" : ""}>95%</button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="cctp-stepper">
-              ${STEP_NAMES.map((name, i) => {
-                const stepId = STEP_IDS[i];
-                const stepClass = getStepClass(bridgePhase, i);
-                const tx = stepTxMap[stepId];
-                const txHtml = tx
-                  ? `<a class="cctp-step-tx-link code-text" href="${escapeAttr(getExplorerTxUrl(tx.chain, tx.hash, s.network))}" target="_blank" rel="noopener">${escapeHtml(shortHash(tx.hash))}</a>`
-                  : `<span class="cctp-step-tx-empty">No tx yet</span>`;
-                return `
-                  <div class="cctp-step ${stepClass}">
-                    <div class="cctp-step-tx">${txHtml}</div>
-                    <div class="cctp-step-main">
-                      <span class="cctp-step-num">${i + 1}</span>
-                      <span>${name}</span>
+              <!-- Circular progress -->
+              <div class="cctp-circle-wrap">
+                <div class="cctp-share-node cctp-share-node--base">
+                  <div class="cctp-share-circle cctp-share-circle--base" style="--share:${baseSharePct.toFixed(2)}">
+                    <div class="cctp-share-core">
+                      <div class="cctp-share-value code-text">${escapeHtml(baseUsdcDollar)}</div>
+                      <div class="cctp-share-percent">${formatPercent(baseSharePct)}</div>
                     </div>
                   </div>
-                `;
-              }).join("")}
+                  <div class="home-id-row home-id-row--cctp">
+                    <div class="home-id-chain">
+                      <span class="home-id-dot home-id-dot--base"></span>
+                      Base
+                    </div>
+                    <div class="home-id-detail">
+                      <span class="home-id-name code-text" title="${escapeAttr(baseAddrFull)}">${baseDisplay}</span>
+                    </div>
+                    ${baseAddrFull ? `<button class="home-id-copy" data-copy-value="${escapeAttr(baseAddrFull)}" aria-label="Copy Base address" title="Copy">${copyIconSvg}</button>` : ""}
+                  </div>
+                </div>
+                <div class="home-abam-core home-abam-core--cctp">
+                  <div class="home-abam-head">
+                    <span>BAM Events</span>
+                    <div class="home-abam-head-right">
+                      ${bamAmountLabel ? `<div class="home-abam-amount code-text">${usdcIconSvg}<span>${escapeHtml(bamAmountLabel)}</span></div>` : ""}
+                      ${abamGroup ? `<span class="badge ${abamStatusClass}">${escapeHtml(abamGroup.status)}</span>` : `<span class="badge ${abamStatusClass}">idle</span>`}
+                    </div>
+                  </div>
+                  <div class="home-abam-steps">
+                    ${[
+                      { id: "burn" as const, label: "Burn" },
+                      { id: "attestation" as const, label: "Attest" },
+                      { id: "mint" as const, label: "Mint" },
+                    ].map((step, i) => {
+                      const stepClass = getStepClass(abamPhase, STEP_IDS.indexOf(step.id));
+                      const stepId = step.id;
+                      const tx = abamStepTxMap[stepId];
+                      const marker = stepClass === "is-complete"
+                        ? `<span class="home-abam-marker home-abam-marker--check">${checkIconSvg}</span>`
+                        : `<span class="home-abam-marker ${stepClass === "is-active" ? "is-active" : ""}">${i + 1}</span>`;
+                      const label = tx
+                        ? `<a class="home-abam-step-link" href="${escapeAttr(getExplorerTxUrl(tx.chain, tx.hash, s.network))}" target="_blank" rel="noopener">${step.label} ↗</a>`
+                        : `<span>${step.label}</span>`;
+                      return `<div class="home-abam-step ${stepClass}">${marker}${label}</div>`;
+                    }).join("")}
+                  </div>
+                  <div class="home-abam-meta code-text">
+                    ${abamGroup
+                      ? `${escapeHtml(safeFormatAmount(abamGroup.amountRaw))} USDC · ${escapeHtml(formatTimestamp(abamGroup.startedAt))}`
+                      : "No bridge activity yet."}
+                  </div>
+                </div>
+                <div class="cctp-share-node cctp-share-node--sui">
+                  <div class="cctp-share-circle cctp-share-circle--sui" style="--share:${suiSharePct.toFixed(2)}">
+                    <div class="cctp-share-core">
+                      <div class="cctp-share-value code-text">${escapeHtml(suiUsdcDollar)}</div>
+                      <div class="cctp-share-percent">${formatPercent(suiSharePct)}</div>
+                    </div>
+                  </div>
+                  <div class="home-id-row home-id-row--cctp">
+                    <div class="home-id-chain">
+                      <span class="home-id-dot home-id-dot--sui"></span>
+                      Sui
+                    </div>
+                    <div class="home-id-detail">
+                      <span class="home-id-name code-text" title="${escapeAttr(suiAddrFull)}">${suiDisplay}</span>
+                    </div>
+                    <button class="home-id-copy" data-copy-value="${escapeAttr(suiAddrFull)}" aria-label="Copy Sui address" title="Copy">${copyIconSvg}</button>
+                  </div>
+                </div>
+              </div>
+
+              ${bridgeMessage ? `<div class="cctp-status code-text">${escapeHtml(bridgeMessage)}${attestationAttempts > 0 ? ` (attempt ${attestationAttempts})` : ""}${bridgeDigest ? ` · <a class="cctp-digest code-text" href="${escapeAttr(getExplorerTxUrl("sui", bridgeDigest, s.network))}" target="_blank" rel="noopener">${shortDigest(bridgeDigest)}</a>` : ""}</div>` : ""}
+              ${bridgeError ? `<div class="cctp-error">${escapeHtml(bridgeError)}</div>` : ""}
+
+              <div class="home-bridge-actions">
+                <button class="btn btn-secondary" id="home-bridge" ${isBusy || !s.waapBaseAddress ? "disabled" : ""}>${
+                  isBusy ? "Processing…"
+                  : bridgePhase === "complete" ? "Transfer Again"
+                  : bridgePhase === "error" ? "Retry Transfer"
+                  : sendAmountLabel ? `Send ${escapeHtml(sendAmountLabel)} to Sui` : "Send to Sui"
+                }</button>
+                <button class="btn btn-secondary" id="home-bridge-95" ${quickSend95Disabled ? "disabled" : ""}>${isBusy ? "95% in progress…" : `Send 95% (${escapeHtml(quickSend95Label)})`}</button>
+              </div>
             </div>
 
-            ${bridgeMessage ? `<div class="cctp-status code-text">${escapeHtml(bridgeMessage)}${attestationAttempts > 0 ? ` (attempt ${attestationAttempts})` : ""}${bridgeDigest ? ` · <a class="cctp-digest code-text" href="${escapeAttr(getExplorerTxUrl("sui", bridgeDigest, s.network))}" target="_blank" rel="noopener">${shortDigest(bridgeDigest)}</a>` : ""}</div>` : ""}
-            ${bridgeError ? `<div class="cctp-error">${escapeHtml(bridgeError)}</div>` : ""}
-
-            <div class="cctp-activity-feed">
-              <div class="spread-row">
-                <div class="card-title">Recent Bridge Activity</div>
-                <button class="btn btn-secondary btn--compact" id="home-clear-activity"${activityFeed.length === 0 ? " disabled" : ""}>Clear</button>
+          <!-- Sidebar: Activity + Recovery -->
+          <aside class="home-sidebar">
+            <div class="home-activity-section">
+              <div class="spread-row" style="flex-wrap:wrap;gap:6px">
+                <div class="home-bridge-title">Recent Transfers</div>
+                <div class="inline-group--tight">
+                  ${recoveredBurns.some((b) => b.attestationStatus === "complete")
+                    ? `<button class="btn btn-primary btn--compact" id="home-mint-all" ${recoveryMintingIndex !== null ? "disabled" : ""}>${recoveryMintingIndex !== null ? "Minting…" : "Mint All"}</button>`
+                    : ""}
+                  <button class="btn btn-secondary btn--compact" id="home-scan-burns" ${recoveryScanBusy ? "disabled" : ""}>${recoveryScanBusy ? "Scanning…" : "Scan Burns"}</button>
+                  <button class="btn btn-secondary btn--compact" id="home-clear-activity"${activityFeed.length === 0 ? " disabled" : ""}>Clear</button>
+                </div>
               </div>
+              <div class="recovery-tx-row">
+                <input
+                  type="text"
+                  id="home-recover-tx"
+                  class="input-field code-text"
+                  placeholder="Base tx hash or Basescan URL"
+                  value="${escapeAttr(recoveryTxHashInput)}"
+                  ${recoveryScanBusy || recoveryMintingIndex !== null ? "disabled" : ""}
+                />
+                <button
+                  class="btn btn-secondary btn--compact"
+                  id="home-recover-by-tx"
+                  ${recoveryScanBusy || recoveryMintingIndex !== null ? "disabled" : ""}
+                >Load Tx</button>
+              </div>
+              ${recoveryScanMessage ? `<div class="cctp-status code-text">${escapeHtml(recoveryScanMessage)}</div>` : ""}
+              ${recoveryScanError ? `<div class="cctp-error">${escapeHtml(recoveryScanError)}</div>` : ""}
+              ${recoveryMintMessage ? `<div class="recovery-mint-status code-text">${escapeHtml(recoveryMintMessage)}</div>` : ""}
+              ${recoveryMintError ? `<div class="recovery-mint-error">${escapeHtml(recoveryMintError)}</div>` : ""}
+              ${recoveredBurns.length > 0 ? `
+                <div class="recovery-burn-list">
+                  ${recoveredBurns.map((burn, i) => `
+                    <div class="recovery-burn-item">
+                      <div class="recovery-burn-info">
+                        <div class="recovery-burn-tx code-text">${escapeHtml(shortHash(burn.burnTxHash))} · ${escapeHtml(formatRecoveryUsdc(burn.amount))}</div>
+                        <div class="recovery-burn-meta">Nonce ${burn.nonce.toString()} · Block ${burn.blockNumber.toLocaleString()}</div>
+                      </div>
+                      <div>
+                        ${burn.attestationStatus === "complete"
+                          ? `<button class="btn btn-primary btn--compact" data-recovery-idx="${i}" ${recoveryMintingIndex !== null ? "disabled" : ""}>${recoveryMintingIndex === i ? "Minting…" : "Mint on Sui"}</button>`
+                          : burn.attestationStatus === "minted"
+                            ? burn.mintDigest
+                              ? `<a class="badge badge-green" href="${escapeAttr(getExplorerTxUrl("sui", burn.mintDigest, s.network))}" target="_blank" rel="noopener">Minted ↗</a>`
+                              : `<span class="badge badge-green">Minted</span>`
+                            : burn.attestationStatus === "pending"
+                              ? `<span class="badge badge-yellow">Pending</span>`
+                              : `<span class="badge badge-red">Unknown</span>`
+                        }
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+              ` : ""}
               ${activityFeed.length === 0
-                ? `<div class="cctp-activity-empty">No bridge groups yet.</div>`
-                : `<div class="cctp-activity-list">${activityFeed.map((group) => renderActivityGroup(group)).join("")}</div>`}
+                ? `<div class="cctp-activity-empty">No transfers yet.</div>`
+                : `<div class="cctp-activity-list">${activityFeed.map((group) => renderActivityGroup(group, s.network)).join("")}</div>`}
             </div>
-
-            <div class="home-minimal-actions">
-              <button class="btn btn-primary" id="home-bridge" ${isBusy || !s.waapBaseAddress ? "disabled" : ""}>${
-                isBusy ? "Processing…"
-                : mustResumePending ? "Resume Pending Bridge"
-                : bridgePhase === "complete" ? "Bridge Again"
-                : bridgePhase === "error" ? "Retry Bridge"
-                : isDefaultDollar ? "Send $1 to Sui" : "Bridge to Sui"
-              }</button>
-              <button class="btn btn-secondary" id="home-sdk-route"${!s.connected ? " disabled" : ""}>Use SDK Route (Ika/WaaP)</button>
-            </div>
-            <div class="card-description">Fallback: SDK route in Cross-Chain section (Ika/WaaP path).</div>
-          </div>
-
-          <div class="card">
-            <div class="spread-row">
-              <div>
-                <div class="card-title">Burn Recovery</div>
-                <div class="card-description">Scan Base for past USDC burns and mint any with completed attestations.</div>
-              </div>
-              <div class="inline-group--tight">
-                ${recoveredBurns.some((b) => b.attestationStatus === "complete")
-                  ? `<button class="btn btn-primary btn--compact" id="home-mint-all" ${recoveryMintingIndex !== null ? "disabled" : ""}>${recoveryMintingIndex !== null ? "Minting…" : "Mint All"}</button>`
-                  : ""}
-                <button class="btn btn-primary btn--compact" id="home-scan-burns" ${recoveryScanBusy ? "disabled" : ""}>${recoveryScanBusy ? "Scanning…" : "Scan Burns"}</button>
-              </div>
-            </div>
-            ${recoveryScanMessage ? `<div class="cctp-status code-text">${escapeHtml(recoveryScanMessage)}</div>` : ""}
-            ${recoveryScanError ? `<div class="cctp-error">${escapeHtml(recoveryScanError)}</div>` : ""}
-            ${recoveryMintMessage ? `<div class="recovery-mint-status code-text">${escapeHtml(recoveryMintMessage)}</div>` : ""}
-            ${recoveryMintError ? `<div class="recovery-mint-error">${escapeHtml(recoveryMintError)}</div>` : ""}
-            ${recoveredBurns.length > 0 ? `
-              <div class="recovery-burn-list">
-                ${recoveredBurns.map((burn, i) => `
-                  <div class="recovery-burn-item">
-                    <div class="recovery-burn-info">
-                      <div class="recovery-burn-tx code-text">${escapeHtml(shortHash(burn.burnTxHash))} · ${escapeHtml(formatRecoveryUsdc(burn.amount))}</div>
-                      <div class="recovery-burn-meta">Nonce ${burn.nonce.toString()} · Block ${burn.blockNumber.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      ${burn.attestationStatus === "complete"
-                        ? `<button class="btn btn-primary btn--compact" data-recovery-idx="${i}" ${recoveryMintingIndex !== null ? "disabled" : ""}>${recoveryMintingIndex === i ? "Minting…" : "Mint on Sui"}</button>`
-                        : burn.attestationStatus === "minted"
-                          ? burn.mintDigest
-                            ? `<a class="badge badge-green" href="${escapeAttr(getExplorerTxUrl("sui", burn.mintDigest, s.network))}" target="_blank" rel="noopener">Minted ↗</a>`
-                            : `<span class="badge badge-green">Minted</span>`
-                          : burn.attestationStatus === "pending"
-                            ? `<span class="badge badge-yellow">Pending</span>`
-                            : `<span class="badge badge-red">Unknown</span>`
-                      }
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
-            ` : ""}
-          </div>
-
-          <div class="home-minimal-actions">
-            <button class="btn btn-primary btn--compact" id="home-link-base">${s.waapBaseAddress ? "Re-link Base" : "Link Base"}</button>
-            <button class="btn btn-secondary btn--compact" id="home-open-suins">Open SuiNS</button>
-            <button class="btn btn-secondary btn--compact" id="home-disconnect-waap">Disconnect WaaP</button>
-          </div>
+          </aside>
         </div>
       `;
 
       // Event handlers
-      body.querySelector("#home-disconnect-waap")?.addEventListener("click", () => {
-        wallet.disconnectWaaP().catch((err) => console.error("[home] failed disconnecting WaaP", err));
+      body.querySelectorAll<HTMLButtonElement>(".home-id-copy").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const value = btn.dataset.copyValue;
+          if (!value) return;
+          try {
+            await navigator.clipboard.writeText(value);
+            btn.innerHTML = checkIconSvg;
+            btn.classList.add("is-copied");
+            setTimeout(() => {
+              btn.innerHTML = copyIconSvg;
+              btn.classList.remove("is-copied");
+            }, 1200);
+          } catch { /* ignore */ }
+        });
       });
-      body.querySelector("#home-refresh")?.addEventListener("click", async () => {
-        await wallet.refreshBalance();
-      });
-      body.querySelector<HTMLButtonElement>("#home-link-base")?.addEventListener("click", async (ev) => {
-        const btn = ev.currentTarget as HTMLButtonElement;
-        btn.disabled = true;
-        const original = btn.textContent;
-        btn.textContent = "Linking…";
-        try {
-          await wallet.linkWaaPBaseAddress();
-        } catch (err) {
-          console.error("[home] failed linking WaaP Base", err);
-        } finally {
-          btn.disabled = false;
-          btn.textContent = original ?? "Link Base";
-        }
-      });
-      body.querySelector("#home-open-suins")?.addEventListener("click", () => gotoSection("suins"));
       body.querySelector<HTMLButtonElement>("#home-copy-base-gas")?.addEventListener("click", async (ev) => {
         const btn = ev.currentTarget as HTMLButtonElement;
         const baseAddress = wallet.getState().waapBaseAddress;
@@ -390,9 +456,6 @@ export function renderHome(container: HTMLElement) {
       body.querySelector<HTMLButtonElement>("#home-topup-gas")?.addEventListener("click", () => {
         void runGasTopup();
       });
-      body.querySelector<HTMLButtonElement>("#home-request-sponsor")?.addEventListener("click", () => {
-        void runBaseSponsor();
-      });
 
       // Amount input — preserve value in closure
       const amountInput = body.querySelector<HTMLInputElement>("#home-amount");
@@ -400,20 +463,26 @@ export function renderHome(container: HTMLElement) {
         bridgeAmount = amountInput.value;
       });
 
-      // Max button
-      body.querySelector("#home-max")?.addEventListener("click", () => {
-        if (s.waapBaseUsdcBalance !== null) {
-          bridgeAmount = formatUsdcDecimal(s.waapBaseUsdcBalance);
-          if (amountInput) amountInput.value = bridgeAmount;
+      const runQuickBridge95 = () => {
+        if (s.waapBaseUsdcBalance === null) return;
+        const ninetyFive = (s.waapBaseUsdcBalance * 95n) / 100n;
+        if (ninetyFive <= 0n) {
+          bridgeError = "Not enough Base USDC to send 95%.";
+          render();
+          return;
         }
-      });
+        bridgeAmount = formatUsdcDecimal(ninetyFive);
+        if (amountInput) amountInput.value = bridgeAmount;
+        if (bridgePhase === "complete" || bridgePhase === "error") {
+          resetBridge();
+        }
+        void runCctpBridge();
+      };
+      body.querySelector("#home-send-95")?.addEventListener("click", runQuickBridge95);
+      body.querySelector("#home-bridge-95")?.addEventListener("click", runQuickBridge95);
 
       // Bridge button
       body.querySelector("#home-bridge")?.addEventListener("click", () => {
-        if (mustResumePending) {
-          void runResume();
-          return;
-        }
         if (bridgePhase === "complete" || bridgePhase === "error") {
           resetBridge();
           render();
@@ -421,19 +490,10 @@ export function renderHome(container: HTMLElement) {
         }
         void runCctpBridge();
       });
-      body.querySelector("#home-sdk-route")?.addEventListener("click", () => {
-        gotoSection("crosschain");
-      });
 
-      // Resume button
+      // Resume badge-button
       body.querySelector("#home-resume")?.addEventListener("click", () => {
         void runResume();
-      });
-
-      // Dismiss pending
-      body.querySelector("#home-dismiss")?.addEventListener("click", () => {
-        clearPendingBridge();
-        render();
       });
 
       body.querySelector("#home-clear-activity")?.addEventListener("click", () => {
@@ -446,6 +506,19 @@ export function renderHome(container: HTMLElement) {
       body.querySelector("#home-scan-burns")?.addEventListener("click", () => {
         void runRecoveryScan();
       });
+      const recoverTxInput = body.querySelector<HTMLInputElement>("#home-recover-tx");
+      recoverTxInput?.addEventListener("input", () => {
+        recoveryTxHashInput = recoverTxInput.value;
+      });
+      recoverTxInput?.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          void runRecoveryByTxHash();
+        }
+      });
+      body.querySelector("#home-recover-by-tx")?.addEventListener("click", () => {
+        void runRecoveryByTxHash();
+      });
       body.querySelector("#home-mint-all")?.addEventListener("click", () => {
         void runRecoveryMintAll();
       });
@@ -456,32 +529,39 @@ export function renderHome(container: HTMLElement) {
         });
       });
 
+      // Ensure prior timer gets cleared as view re-renders.
+      if (attestTimerId !== null) { clearInterval(attestTimerId); attestTimerId = null; }
+
     } else {
       body.innerHTML = `
-        <div class="card home-minimal">
-          <div class="card-title">Connect Wallet</div>
-          <div class="card-description">Use WaaP to load Sui + Base balances and bridge Base USDC to Sui via CCTP.</div>
-          <button class="btn btn-primary" id="home-connect">Connect WaaP</button>
+        <div class="home-panel home-panel--connect">
+          <div class="home-connect-hero">
+            <img class="home-connect-logo" src="/icons/thunderbun-logo.png" alt="" width="56" height="56" />
+            <div class="home-panel-title">.Sui Key-In</div>
+            <div class="home-panel-sub">Link your Sui + Base accounts to view balances and bridge USDC via CCTP.</div>
+          </div>
+          <div class="home-connect-actions">
+            <button class="btn btn-primary btn-keyin" id="home-connect">.SKI</button>
+            <button class="btn btn-secondary" id="home-connect-traditional">Traditional Wallets</button>
+          </div>
         </div>
       `;
 
-      const btn = body.querySelector<HTMLButtonElement>("#home-connect");
-      btn?.addEventListener("click", async () => {
-        btn.disabled = true;
-        btn.textContent = "Connecting…";
-        try {
-          await wallet.connect();
-        } catch (err) {
-          console.error(err);
-        } finally {
-          btn.disabled = false;
-          btn.textContent = "Connect WaaP";
-        }
+      body.querySelector<HTMLButtonElement>("#home-connect")?.addEventListener("click", () => {
+        wallet.openConnectModal();
+      });
+      body.querySelector<HTMLButtonElement>("#home-connect-traditional")?.addEventListener("click", () => {
+        wallet.openConnectModal();
       });
     }
   };
 
   function onProgress(p: CctpProgress): void {
+    if (p.phase === "attesting" && attestStartTime === null) {
+      attestStartTime = Date.now();
+    } else if (p.phase !== "attesting") {
+      attestStartTime = null;
+    }
     bridgePhase = p.phase;
     bridgeMessage = p.message;
     if (p.attemptCount !== undefined) attestationAttempts = p.attemptCount;
@@ -527,7 +607,7 @@ export function renderHome(container: HTMLElement) {
     bridgeDigest = null;
     attestationAttempts = 0;
     bridgePhase = "approving";
-    bridgeMessage = "Starting CCTP bridge…";
+    bridgeMessage = "Starting CCTP transfer…";
     beginActivityGroup(rawAmount.toString(), wallet.getState().network);
     render();
 
@@ -536,10 +616,11 @@ export function renderHome(container: HTMLElement) {
       if (!conn.connected) await wallet.connect();
       if (!wallet.getState().waapBaseAddress) await wallet.linkWaaPBaseAddress();
 
-      const result = await executeCctpBridge({ amount: rawAmount }, onProgress);
+      const mod = await cctp();
+      const result = await mod.executeCctpBridge({ amount: rawAmount }, onProgress);
       bridgeDigest = result.digest;
       bridgePhase = "complete";
-      bridgeMessage = "Bridge complete. Native USDC minted on Sui.";
+      bridgeMessage = "Transfer complete. Native USDC minted on Sui.";
       bridgeError = null;
       attachStepTx("mint", result.digest, "sui");
       updateActiveGroup((group) => {
@@ -555,14 +636,14 @@ export function renderHome(container: HTMLElement) {
       const message = err instanceof Error ? err.message : String(err);
       bridgePhase = "error";
       bridgeError = message;
-      bridgeMessage = "Bridge failed.";
+      bridgeMessage = "Transfer failed.";
       updateActiveGroup((group) => {
         group.status = "error";
         group.phase = "error";
         group.error = message;
         group.message = bridgeMessage;
       });
-      console.error("[home] CCTP bridge failed", err);
+      console.error("[home] CCTP transfer failed", err);
     } finally {
       bridgeInFlight = false;
     }
@@ -573,7 +654,8 @@ export function renderHome(container: HTMLElement) {
   async function runResume(): Promise<void> {
     if (bridgeInFlight) return;
     bridgeInFlight = true;
-    const pending = loadPendingBridge();
+    const mod = await cctp();
+    const pending = mod.loadPendingBridge();
     if (pending) {
       const existing = activityFeed.find((group) => group.steps.burn?.hash.toLowerCase() === pending.burnTxHash.toLowerCase());
       if (existing) {
@@ -591,15 +673,16 @@ export function renderHome(container: HTMLElement) {
     bridgeError = null;
     bridgeDigest = null;
     attestationAttempts = 0;
+    attestStartTime = Date.now();
     bridgePhase = "attesting";
     bridgeMessage = "Resuming attestation polling…";
     render();
 
     try {
-      const result = await resumePendingBridge(onProgress);
+      const result = await mod.resumePendingBridge(onProgress);
       bridgeDigest = result.digest;
       bridgePhase = "complete";
-      bridgeMessage = "Bridge complete (resumed). Native USDC minted on Sui.";
+      bridgeMessage = "Transfer complete (resumed). Native USDC minted on Sui.";
       bridgeError = null;
       attachStepTx("mint", result.digest, "sui");
       updateActiveGroup((group) => {
@@ -638,7 +721,8 @@ export function renderHome(container: HTMLElement) {
     render();
 
     try {
-      await topUpBaseGasFromUsdc((message) => {
+      const mod = await cctp();
+      await mod.topUpBaseGasFromUsdc((message) => {
         gasTopupMessage = message;
         if (mounted) render();
       });
@@ -650,31 +734,6 @@ export function renderHome(container: HTMLElement) {
       gasTopupMessage = "";
     } finally {
       gasTopupBusy = false;
-      if (mounted) render();
-    }
-  }
-
-  async function runBaseSponsor(): Promise<void> {
-    if (sponsorBusy) return;
-    sponsorBusy = true;
-    sponsorError = null;
-    sponsorMessage = "Requesting sponsored gas transfer…";
-    render();
-
-    try {
-      const res = await requestBaseGasSponsor((message) => {
-        sponsorMessage = message;
-        if (mounted) render();
-      });
-      sponsorMessage = `Sponsor tx submitted: ${shortHash(res.txHash)}`;
-      sponsorError = null;
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      await wallet.refreshBalance();
-    } catch (err) {
-      sponsorError = err instanceof Error ? err.message : String(err);
-      sponsorMessage = "";
-    } finally {
-      sponsorBusy = false;
       if (mounted) render();
     }
   }
@@ -691,11 +750,64 @@ export function renderHome(container: HTMLElement) {
     render();
 
     try {
-      recoveredBurns = await scanPastBurns((msg) => {
+      const mod = await cctp();
+      recoveredBurns = await mod.scanPastBurns((msg) => {
         recoveryScanMessage = msg;
         if (mounted) render();
       });
       recoveryScanError = null;
+    } catch (err) {
+      recoveryScanError = err instanceof Error ? err.message : String(err);
+      recoveryScanMessage = "";
+    } finally {
+      recoveryScanBusy = false;
+      if (mounted) render();
+    }
+  }
+
+  async function runRecoveryByTxHash(): Promise<void> {
+    if (recoveryScanBusy || recoveryMintingIndex !== null) return;
+
+    const input = recoveryTxHashInput.trim();
+    if (!input) {
+      recoveryScanError = "Enter a Base tx hash or Basescan URL.";
+      if (mounted) render();
+      return;
+    }
+
+    recoveryScanBusy = true;
+    recoveryScanError = null;
+    recoveryScanMessage = "Loading burn transaction…";
+    recoveryMintError = null;
+    recoveryMintMessage = "";
+    render();
+
+    try {
+      const mod = await cctp();
+      const burn = await mod.recoverBurnByTxHash(input, (msg) => {
+        recoveryScanMessage = msg;
+        if (mounted) render();
+      });
+
+      const existingIndex = recoveredBurns.findIndex(
+        (item) => item.burnTxHash.toLowerCase() === burn.burnTxHash.toLowerCase(),
+      );
+      if (existingIndex >= 0) {
+        recoveredBurns[existingIndex] = burn;
+      } else {
+        recoveredBurns.unshift(burn);
+      }
+      recoveryTxHashInput = burn.burnTxHash;
+
+      if (burn.attestationStatus === "complete") {
+        recoveryScanMessage = `Loaded ${shortHash(burn.burnTxHash)}. Attestation is complete and ready to mint.`;
+      } else if (burn.attestationStatus === "minted") {
+        recoveryScanMessage = `Loaded ${shortHash(burn.burnTxHash)}. This burn is already minted on Sui.`;
+      } else if (burn.attestationStatus === "pending") {
+        recoveryScanMessage = `Loaded ${shortHash(burn.burnTxHash)}. Circle attestation is still pending.`;
+      } else {
+        recoveryScanMessage = `Loaded ${shortHash(burn.burnTxHash)}.`;
+      }
     } catch (err) {
       recoveryScanError = err instanceof Error ? err.message : String(err);
       recoveryScanMessage = "";
@@ -716,7 +828,8 @@ export function renderHome(container: HTMLElement) {
     render();
 
     try {
-      const result = await mintRecoveredBurn(burn, (p) => {
+      const mod = await cctp();
+      const result = await mod.mintRecoveredBurn(burn, (p) => {
         recoveryMintMessage = p.message;
         if (mounted) render();
       });
@@ -747,6 +860,7 @@ export function renderHome(container: HTMLElement) {
       .filter((e) => e.burn.attestationStatus === "complete");
     if (mintable.length === 0) return;
 
+    const mod = await cctp();
     let minted = 0;
     let failed = 0;
     for (const { burn, idx } of mintable) {
@@ -756,7 +870,7 @@ export function renderHome(container: HTMLElement) {
       render();
 
       try {
-        const result = await mintRecoveredBurn(burn, (p) => {
+        const result = await mod.mintRecoveredBurn(burn, (p) => {
           recoveryMintMessage = `Minting ${minted + 1} of ${mintable.length}: ${p.message}`;
           if (mounted) render();
         });
@@ -790,6 +904,8 @@ export function renderHome(container: HTMLElement) {
     bridgeDigest = null;
     bridgeError = null;
     attestationAttempts = 0;
+    attestStartTime = null;
+    if (attestTimerId !== null) { clearInterval(attestTimerId); attestTimerId = null; }
   }
 
   const unsub = wallet.subscribe(() => {
@@ -800,16 +916,17 @@ export function renderHome(container: HTMLElement) {
   cleanup(container, () => {
     mounted = false;
     unsub();
+    if (attestTimerId !== null) { clearInterval(attestTimerId); attestTimerId = null; }
   });
 
-  void (async () => {
-    const status = await getBaseSponsorStatus();
-    sponsorConfigured = status.configured;
-    if (mounted) render();
-  })();
 }
 
 // ── Step stepper logic ───────────────────────────────────────────────────
+
+function truncAddr(addr: string): string {
+  if (addr.length <= 18) return addr;
+  return `${addr.slice(0, 9)}…${addr.slice(-7)}`;
+}
 
 function getStepClass(phase: BridgePhase, stepIndex: number): string {
   const phaseOrder: BridgePhase[] = ["approving", "burning", "attesting", "minting"];
@@ -824,11 +941,6 @@ function getStepClass(phase: BridgePhase, stepIndex: number): string {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
-
-function gotoSection(id: string): void {
-  const app = (window as unknown as Record<string, { showSection: (sectionId: string) => void }>).__app;
-  app?.showSection(id);
-}
 
 function cleanup(container: HTMLElement, unsub: () => void) {
   const obs = new MutationObserver(() => {
@@ -853,8 +965,10 @@ function shortHash(hash: string): string {
 function parseUsdcInput(value: string): bigint | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  if (!/^\d+(\.\d{0,6})?$/.test(trimmed)) return null;
-  const [whole, frac = ""] = trimmed.split(".");
+  const normalized = trimmed.replace(/\$/g, "").replace(/,/g, "");
+  if (!/^(\d+(\.\d{0,6})?|\.\d{1,6})$/.test(normalized)) return null;
+  const canonical = normalized.startsWith(".") ? `0${normalized}` : normalized;
+  const [whole, frac = ""] = canonical.split(".");
   const fracPadded = (frac + "000000").slice(0, 6);
   return BigInt(whole) * 1_000_000n + BigInt(fracPadded);
 }
@@ -867,9 +981,27 @@ function formatUsdcDecimal(raw: bigint): string {
   return `${whole}.${padded}`;
 }
 
+function formatUsdFromUsdcRaw(raw: bigint): string {
+  const roundedCents = (raw + 5_000n) / 10_000n;
+  const whole = roundedCents / 100n;
+  const cents = roundedCents % 100n;
+  return `$${whole.toString()}.${cents.toString().padStart(2, "0")}`;
+}
+
 function formatRecoveryUsdc(raw: bigint): string {
   const decimal = formatUsdcDecimal(raw);
   return `${decimal} USDC`;
+}
+
+function ratioPercent(part: bigint, total: bigint): number {
+  if (part <= 0n || total <= 0n) return 0;
+  const clampedPart = part > total ? total : part;
+  const basisPoints = (clampedPart * 10_000n) / total;
+  return Number(basisPoints) / 100;
+}
+
+function formatPercent(value: number): string {
+  return `${Math.max(0, Math.min(100, value)).toFixed(1)}%`;
 }
 
 function createEmptyStepTxMap(): StepTxMap {
@@ -903,33 +1035,34 @@ function saveBridgeActivityFeed(feed: BridgeActivityGroup[]): void {
   }
 }
 
-function renderActivityGroup(group: BridgeActivityGroup): string {
+function renderActivityGroup(group: BridgeActivityGroup, _currentNetwork?: string): string {
   const statusClass = group.status === "complete"
     ? "badge-green"
     : group.status === "error"
       ? "badge-red"
       : "badge-yellow";
   const amount = safeFormatAmount(group.amountRaw);
+  const net = group.network;
+
+  const stepLinks = STEP_IDS.map((stepId, index) => {
+    const label = STEP_NAMES[index];
+    const tx = group.steps[stepId];
+    if (tx) {
+      return `<a class="cctp-activity-link" href="${escapeAttr(getExplorerTxUrl(tx.chain, tx.hash, net))}" target="_blank" rel="noopener">${escapeHtml(label)} ↗</a>`;
+    }
+    return `<span class="cctp-activity-step-pending">${escapeHtml(label)}</span>`;
+  }).join("");
 
   return `
     <div class="cctp-activity-item">
       <div class="cctp-activity-head">
         <div class="cctp-activity-title">${escapeHtml(amount)} USDC</div>
         ${group.status === "complete" && group.digest
-          ? `<a class="badge ${statusClass}" href="${escapeAttr(getExplorerTxUrl("sui", group.digest, group.network))}" target="_blank" rel="noopener">${escapeHtml(group.status)} ↗</a>`
+          ? `<a class="badge ${statusClass}" href="${escapeAttr(getExplorerTxUrl("sui", group.digest, net))}" target="_blank" rel="noopener">${escapeHtml(group.status)} ↗</a>`
           : `<span class="badge ${statusClass}">${escapeHtml(group.status)}</span>`}
       </div>
-      <div class="cctp-activity-meta code-text">${escapeHtml(formatTimestamp(group.startedAt))} · ${escapeHtml(group.network)}</div>
-      <div class="cctp-activity-step-row">
-        ${STEP_IDS.map((stepId, index) => {
-          const stepLabel = STEP_NAMES[index];
-          const tx = group.steps[stepId];
-          const txLine = tx
-            ? `<a class="cctp-activity-link code-text" href="${escapeAttr(getExplorerTxUrl(tx.chain, tx.hash, group.network))}" target="_blank" rel="noopener">${escapeHtml(shortHash(tx.hash))}</a>`
-            : `<span class="cctp-activity-empty-tx">—</span>`;
-          return `<div class="cctp-activity-step"><span class="cctp-activity-step-label">${escapeHtml(stepLabel)}</span>${txLine}</div>`;
-        }).join("")}
-      </div>
+      <div class="cctp-activity-meta code-text">${escapeHtml(formatTimestamp(group.startedAt))}</div>
+      <div class="cctp-activity-step-links">${stepLinks}</div>
       ${group.error ? `<div class="cctp-activity-error">${escapeHtml(group.error)}</div>` : ""}
     </div>
   `;

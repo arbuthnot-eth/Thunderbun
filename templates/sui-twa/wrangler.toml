@@ -38,6 +38,17 @@ NETWORK = "testnet"
 # BASE_SPONSOR_RPC_URL = "https://sepolia.base.org"
 # BASE_SPONSOR_AMOUNT_WEI = "200000000000000"
 # BASE_SPONSOR_COOLDOWN_MS = "1800000"
+# Optional Ika invisible deposit vars:
+# IKA_BASE_RPC_URL = "https://sepolia.base.org"
+# IKA_POLICY_MAX_BURN_RAW = "5000000000"
+# IKA_POLICY_SESSION_MS = "0"
+# IKA_SCAN_LOOKBACK_BLOCKS = "60000"
+# IKA_MIN_BASE_CONFIRMATIONS = "2"
+# IKA_MIN_DEPOSIT_RAW = "1000"
+# IKA_AUTO_SETTLE = "true"
+# IKA_MINT_GAS_BUDGET = "50000000"
+# Secret required (set via `wrangler secret put IKA_DWALLET_MASTER_SEED`)
+# Optional secret: `wrangler secret put SPONSOR_PRIVATE_KEY` for auto-mint signing
 
 # Production overrides
 [env.production]
@@ -52,6 +63,15 @@ NETWORK = "mainnet"
 # BASE_SPONSOR_RPC_URL = "https://mainnet.base.org"
 # BASE_SPONSOR_AMOUNT_WEI = "200000000000000"
 # BASE_SPONSOR_COOLDOWN_MS = "1800000"
+# Optional Ika invisible deposit vars:
+# IKA_BASE_RPC_URL = "https://mainnet.base.org"
+# IKA_POLICY_MAX_BURN_RAW = "5000000000"
+# IKA_POLICY_SESSION_MS = "0"
+# IKA_SCAN_LOOKBACK_BLOCKS = "60000"
+# IKA_MIN_BASE_CONFIRMATIONS = "2"
+# IKA_MIN_DEPOSIT_RAW = "1000"
+# IKA_AUTO_SETTLE = "true"
+# IKA_MINT_GAS_BUDGET = "50000000"
 
 # Preview / staging
 [env.preview]

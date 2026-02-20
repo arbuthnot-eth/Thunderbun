@@ -3,14 +3,45 @@ import "./init-waap";
 import { initReactDappKitIsland } from "./react/dapp-kit-island";
 import { wallet } from "./wallet";
 
-const CRITICAL_CACHE_RESET_VERSION = "2026-02-20-waap-origin-fix-3";
+const CRITICAL_CACHE_RESET_VERSION = "2026-02-20-root-canonical-cache-fix";
 const CACHE_RESET_DONE_KEY = "tb_critical_cache_reset_done";
 const CACHE_RESET_RELOAD_PREFIX = "tb_critical_cache_reset_reloaded";
+const HARD_RESET_PARAM = "tb_hard_reset";
 
-void runCriticalCacheReset();
-initReactDappKitIsland();
+void bootstrapApp();
 
-async function runCriticalCacheReset(): Promise<void> {
+async function bootstrapApp(): Promise<void> {
+  const hardResetRequested = hasHardResetParam();
+  const isReloading = await runCriticalCacheReset(hardResetRequested);
+  if (isReloading) return;
+  if (hardResetRequested) {
+    stripHardResetParamFromUrl();
+  }
+  initReactDappKitIsland();
+}
+
+function hasHardResetParam(): boolean {
+  try {
+    return new URL(window.location.href).searchParams.has(HARD_RESET_PARAM);
+  } catch {
+    return false;
+  }
+}
+
+function stripHardResetParamFromUrl(): void {
+  try {
+    const nextUrl = new URL(window.location.href);
+    if (!nextUrl.searchParams.has(HARD_RESET_PARAM)) return;
+    nextUrl.searchParams.delete(HARD_RESET_PARAM);
+    const nextSearch = nextUrl.searchParams.toString();
+    const canonicalPath = `${nextUrl.pathname}${nextSearch ? `?${nextSearch}` : ""}${nextUrl.hash}`;
+    window.history.replaceState(window.history.state, "", canonicalPath || "/");
+  } catch {
+    /* ignore */
+  }
+}
+
+async function runCriticalCacheReset(force: boolean): Promise<boolean> {
   let alreadyDone = false;
   try {
     alreadyDone =
@@ -19,7 +50,7 @@ async function runCriticalCacheReset(): Promise<void> {
   } catch {
     alreadyDone = false;
   }
-  if (alreadyDone) return;
+  if (alreadyDone && !force) return false;
 
   let touched = false;
 
@@ -57,7 +88,7 @@ async function runCriticalCacheReset(): Promise<void> {
     /* ignore */
   }
 
-  if (!touched) return;
+  if (!touched) return false;
 
   const reloadKey = `${CACHE_RESET_RELOAD_PREFIX}:${CRITICAL_CACHE_RESET_VERSION}`;
   let alreadyReloaded = false;
@@ -72,11 +103,13 @@ async function runCriticalCacheReset(): Promise<void> {
 
   if (!alreadyReloaded) {
     window.location.reload();
+    return true;
   }
+  return false;
 }
 
 export type SectionId =
-  | "home" | "suins" | "walrus" | "deepbook"
+  | "base" | "suins" | "walrus" | "deepbook"
   | "seal" | "nft" | "zkproof" | "ika" | "crosschain" | "passkeys" | "settings";
 
 interface NavItem {
@@ -87,7 +120,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { id: "home",     label: "Home",           icon: "⚡", group: "core" },
+  { id: "base",     label: "Base",           icon: "⚡", group: "core" },
   { id: "settings", label: "Settings",       icon: "⚙️", group: "more" },
   { id: "suins",    label: "SuiNS",          icon: "🔖", group: "ecosystem" },
   { id: "walrus",   label: "Walrus Storage", icon: "🐋", group: "ecosystem" },
@@ -109,7 +142,7 @@ const EXTERNAL: { label: string; href: string; icon: string }[] = [
 ];
 
 const RENDERERS: Record<SectionId, () => Promise<{ default: (el: HTMLElement) => void }>> = {
-  home:     () => import("./sections/home").then(m => ({ default: m.renderHome })),
+  base:     () => import("./sections/home").then(m => ({ default: m.renderHome })),
   suins:    () => import("./sections/suins").then(m => ({ default: m.renderSuiNS })),
   walrus:   () => import("./sections/walrus").then(m => ({ default: m.renderWalrus })),
   deepbook: () => import("./sections/deepbook").then(m => ({ default: m.renderDeepBook })),
@@ -123,7 +156,7 @@ const RENDERERS: Record<SectionId, () => Promise<{ default: (el: HTMLElement) =>
 };
 
 class App {
-  private current: SectionId = "home";
+  private current: SectionId = "base";
 
   private main: HTMLElement;
 
@@ -132,7 +165,7 @@ class App {
     this.setupSidebarDrawer();
     this.buildNav();
     this.watchWallet();
-    this.showSection("home");
+    this.showSection("base");
     (window as unknown as Record<string, unknown>).__app = this;
   }
 
@@ -216,15 +249,16 @@ class App {
   private watchWallet() {
     const widgetToggleBtn = document.getElementById("wallet-widget-toggle") as HTMLButtonElement | null;
     const widgetToolbarText = document.getElementById("wallet-widget-toolbar-text");
+    const loading = document.getElementById("wallet-widget-loading");
     const disconnected = document.getElementById("wallet-widget-disconnected");
     const connected = document.getElementById("wallet-widget-connected");
     const suiAddr = document.getElementById("wallet-widget-sui");
     const baseAddr = document.getElementById("wallet-widget-base");
     const suinsName = document.getElementById("wallet-widget-suins");
+    const baseName = document.getElementById("wallet-widget-basename");
     const balance = document.getElementById("wallet-widget-balance");
     const connectBtn = document.getElementById("wallet-widget-connect") as HTMLButtonElement | null;
-    const disconnectBtn = document.getElementById("wallet-widget-disconnect") as HTMLButtonElement | null;
-    const linkBaseBtn = document.getElementById("wallet-widget-link-base") as HTMLButtonElement | null;
+    const disconnectBtn = document.getElementById("wallet-widget-disconnect-top") as HTMLButtonElement | null;
     const copySuiBtn = document.getElementById("wallet-widget-copy-sui") as HTMLButtonElement | null;
     const copyBaseBtn = document.getElementById("wallet-widget-copy-base") as HTMLButtonElement | null;
     const collapseStorageKey = "tb_wallet_widget_collapsed";
@@ -274,35 +308,12 @@ class App {
       }
     };
 
-    connectBtn?.addEventListener("click", async () => {
-      connectBtn.disabled = true;
-      connectBtn.textContent = "Connecting…";
-      try {
-        await wallet.connect();
-      } catch (err) {
-        console.error("[main] wallet connect failed:", err);
-      } finally {
-        connectBtn.disabled = false;
-        connectBtn.textContent = "Connect WaaP";
-      }
+    connectBtn?.addEventListener("click", () => {
+      wallet.openConnectModal();
     });
 
     disconnectBtn?.addEventListener("click", () => {
-      wallet.disconnectWaaP().catch((err) => console.error("[main] waap disconnect failed:", err));
-    });
-
-    linkBaseBtn?.addEventListener("click", async () => {
-      linkBaseBtn.disabled = true;
-      const original = linkBaseBtn.textContent;
-      linkBaseBtn.textContent = "Linking…";
-      try {
-        await wallet.linkWaaPBaseAddress();
-      } catch (err) {
-        console.error("[main] link base failed:", err);
-      } finally {
-        linkBaseBtn.disabled = false;
-        linkBaseBtn.textContent = original;
-      }
+      wallet.disconnectAndHardReset().catch((err) => console.error("[main] waap disconnect failed:", err));
     });
 
     copySuiBtn?.addEventListener("click", () => {
@@ -313,9 +324,25 @@ class App {
     });
 
     wallet.subscribe((s) => {
+      if (s.hydrating) {
+        loading?.classList.remove("is-hidden");
+        disconnected?.classList.add("is-hidden");
+        connected?.classList.add("is-hidden");
+        disconnectBtn?.classList.add("is-hidden");
+        if (disconnectBtn) disconnectBtn.disabled = true;
+        if (copySuiBtn) copySuiBtn.disabled = true;
+        if (copyBaseBtn) copyBaseBtn.disabled = true;
+        if (widgetToolbarText) widgetToolbarText.textContent = "Restoring wallet…";
+        return;
+      }
+
+      loading?.classList.add("is-hidden");
+
       if (s.connected && s.address) {
         disconnected?.classList.add("is-hidden");
         connected?.classList.remove("is-hidden");
+        disconnectBtn?.classList.remove("is-hidden");
+        if (disconnectBtn) disconnectBtn.disabled = false;
 
         if (suiAddr) {
           suiAddr.textContent = shortAddress(s.address);
@@ -333,8 +360,13 @@ class App {
         }
 
         if (suinsName) {
-          suinsName.textContent = s.suiPrimaryName ?? "No primary";
-          suinsName.setAttribute("title", s.suiPrimaryName ?? "No primary");
+          suinsName.textContent = s.suiPrimaryName ?? "—";
+          suinsName.setAttribute("title", s.suiPrimaryName ?? "No SuiNS name");
+        }
+
+        if (baseName) {
+          baseName.textContent = s.waapBasePrimaryName ?? "—";
+          baseName.setAttribute("title", s.waapBasePrimaryName ?? "No Base name");
         }
 
         if (balance) {
@@ -347,18 +379,17 @@ class App {
             : `Connected · ${wallet.formatBalance()}`;
         }
 
-        if (linkBaseBtn) {
-          linkBaseBtn.textContent = s.waapBaseAddress ? "Re-link Base" : "Link Base";
-        }
-
         if (copySuiBtn) copySuiBtn.disabled = false;
         if (copyBaseBtn) copyBaseBtn.disabled = !s.waapBaseAddress;
       } else {
         disconnected?.classList.remove("is-hidden");
         connected?.classList.add("is-hidden");
+        disconnectBtn?.classList.add("is-hidden");
+        if (disconnectBtn) disconnectBtn.disabled = true;
         if (copySuiBtn) copySuiBtn.disabled = true;
         if (copyBaseBtn) copyBaseBtn.disabled = true;
         if (suinsName) suinsName.textContent = "—";
+        if (baseName) baseName.textContent = "—";
         if (widgetToolbarText) widgetToolbarText.textContent = "Wallet";
       }
     });
@@ -366,7 +397,8 @@ class App {
 }
 
 function shortAddress(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+  if (address.length <= 18) return address;
+  return `${address.slice(0, 9)}…${address.slice(-7)}`;
 }
 
 export const app = new App();

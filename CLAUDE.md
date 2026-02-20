@@ -34,7 +34,7 @@ cd templates/sui-twa
 bun install
 bun run dev          # Vite dev server → localhost:5173
 bun run build        # Production build
-bun run deploy       # Cloudflare Workers deploy
+npx wrangler deploy --env production  # Deploy to Cloudflare Workers (thunderbun.ai)
 bun run twa:init     # Bubblewrap wizard (Android)
 bun run twa:build    # Android .aab for Play Store
 ```

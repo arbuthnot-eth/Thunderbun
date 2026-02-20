@@ -403,7 +403,7 @@ export async function waitForAttestation(
 
   const statusSuffix = lastStatus ? ` Last Iris status: ${lastStatus.replace(/_/g, " ")}.` : "";
   const delaySuffix = lastDelayReason ? ` Delay reason: ${lastDelayReason.replace(/_/g, " ")}.` : "";
-  throw new Error(`Attestation timed out. The bridge is still pending — you can retry later.${statusSuffix}${delaySuffix}`);
+  throw new Error(`Attestation timed out. The transfer is still pending — you can retry later.${statusSuffix}${delaySuffix}`);
 }
 
 // ── Phase 3: Mint on Sui ─────────────────────────────────────────────────
@@ -611,7 +611,7 @@ export async function resumePendingBridge(
   progress?: (p: CctpProgress) => void,
 ): Promise<CctpMintResult> {
   const pending = loadPendingBridge();
-  if (!pending) throw new Error("No pending bridge found.");
+  if (!pending) throw new Error("No pending transfer found.");
 
   const messageBytes = hexToBytes(pending.messageBytesHex);
 
@@ -1051,6 +1051,24 @@ export interface RecoverableBurn {
   mintDigest: string | null;
 }
 
+interface BaseLogEntry {
+  address?: string;
+  transactionHash?: string;
+  topics?: string[];
+  data?: string;
+  blockNumber?: string;
+}
+
+interface ParsedDepositForBurnLog {
+  burnTxHash: string;
+  nonce: bigint;
+  amount: bigint;
+  mintRecipient: string;
+  destinationDomain: number;
+  depositor: string;
+  blockNumber: number;
+}
+
 function getBaseRpcUrl(network: Network): string {
   return network === "testnet" ? "https://sepolia.base.org" : "https://mainnet.base.org";
 }
@@ -1064,6 +1082,143 @@ async function baseRpcCall(rpcUrl: string, method: string, params: unknown[]): P
   const body = await res.json() as { result?: unknown; error?: { message?: string } };
   if (body.error) throw new Error(body.error.message ?? JSON.stringify(body.error));
   return body.result;
+}
+
+function normalizeBaseTxHash(value: string): string {
+  const match = value.trim().match(/0x[0-9a-fA-F]{64}/);
+  if (!match) {
+    throw new Error("Invalid Base transaction hash. Paste a 0x-prefixed 32-byte hash or Basescan URL.");
+  }
+  return match[0].toLowerCase();
+}
+
+function parseDepositForBurnLog(log: BaseLogEntry): ParsedDepositForBurnLog | null {
+  if (!log || !Array.isArray(log.topics)) return null;
+  if (log.topics.length < 4) return null;
+  if (log.topics[0]?.toLowerCase() !== DEPOSIT_FOR_BURN_TOPIC.toLowerCase()) return null;
+
+  const txHash = typeof log.transactionHash === "string" ? log.transactionHash.toLowerCase() : "";
+  if (!/^0x[0-9a-f]{64}$/.test(txHash)) return null;
+
+  const dataRaw = typeof log.data === "string" ? log.data : "";
+  const dataHex = dataRaw.startsWith("0x") ? dataRaw.slice(2) : dataRaw;
+  if (dataHex.length < 192) return null;
+
+  const depositorTopic = log.topics[3].startsWith("0x") ? log.topics[3].slice(2) : log.topics[3];
+  if (!/^[0-9a-fA-F]{64}$/.test(depositorTopic)) return null;
+
+  const nonce = BigInt(log.topics[1]);
+  const amount = BigInt("0x" + dataHex.slice(0, 64));
+  const mintRecipient = ("0x" + dataHex.slice(64, 128)).toLowerCase();
+  const destinationDomain = Number("0x" + dataHex.slice(128, 192));
+  const depositor = ("0x" + depositorTopic.slice(24)).toLowerCase();
+  const blockNumber = typeof log.blockNumber === "string" ? Number(log.blockNumber) : 0;
+
+  return {
+    burnTxHash: txHash,
+    nonce,
+    amount,
+    mintRecipient,
+    destinationDomain,
+    depositor,
+    blockNumber,
+  };
+}
+
+async function buildRecoverableBurn(
+  parsed: ParsedDepositForBurnLog,
+  config: ReturnType<typeof getCctpConfig>,
+  rpcUrl: string,
+  cachedReceipt?: Record<string, unknown>,
+): Promise<RecoverableBurn> {
+  const irisResult = await fetchIrisMessageByTxHash(
+    config.irisApiUrl,
+    config.baseDomain,
+    parsed.burnTxHash,
+  );
+
+  let attestationStatus: RecoverableBurn["attestationStatus"] = "unknown";
+  let attestation: string | null = null;
+  let messageBytes: Uint8Array | null = null;
+  let messageHash: string | null = null;
+
+  if (irisResult) {
+    if (irisResult.status === "complete" && irisResult.attestation) {
+      attestationStatus = irisResult.destinationTxHash ? "minted" : "complete";
+      attestation = irisResult.attestation;
+
+      if (irisResult.message) {
+        messageBytes = hexToBytes(irisResult.message);
+      } else {
+        // Fallback: extract MessageSent from tx receipt
+        try {
+          const receipt = cachedReceipt ?? await baseRpcCall(rpcUrl, "eth_getTransactionReceipt", [parsed.burnTxHash]) as Record<string, unknown>;
+          const extracted = await extractMessageSent(receipt);
+          messageBytes = extracted.messageBytes;
+          messageHash = extracted.messageHash;
+        } catch {
+          console.warn(`[recovery] failed to extract MessageSent from receipt for ${parsed.burnTxHash}`);
+        }
+      }
+
+      if (messageBytes && !messageHash) {
+        const { keccak256 } = await import("viem");
+        messageHash = keccak256(messageBytes);
+      }
+    } else {
+      attestationStatus = "pending";
+    }
+  }
+
+  return {
+    burnTxHash: parsed.burnTxHash,
+    nonce: parsed.nonce,
+    amount: parsed.amount,
+    mintRecipient: parsed.mintRecipient,
+    destinationDomain: parsed.destinationDomain,
+    depositor: parsed.depositor,
+    blockNumber: parsed.blockNumber,
+    attestationStatus,
+    attestation,
+    messageBytes,
+    messageHash,
+    mintDigest: null,
+  };
+}
+
+export async function recoverBurnByTxHash(
+  txHashInput: string,
+  progress?: (msg: string) => void,
+  network?: Network,
+): Promise<RecoverableBurn> {
+  const net = network ?? wallet.getState().network;
+  const config = getCctpConfig(net);
+  const txHash = normalizeBaseTxHash(txHashInput);
+  const rpcUrl = getBaseRpcUrl(net);
+
+  progress?.(`Loading Base tx ${txHash.slice(0, 10)}…`);
+  const receipt = await baseRpcCall(rpcUrl, "eth_getTransactionReceipt", [txHash]) as Record<string, unknown> | null;
+  if (!receipt) {
+    throw new Error(`Base transaction not found on ${net}.`);
+  }
+
+  const logs = (receipt.logs as BaseLogEntry[] | undefined) ?? [];
+  const parsed = logs
+    .map((log) => parseDepositForBurnLog(log))
+    .find((entry): entry is ParsedDepositForBurnLog => entry !== null);
+
+  if (!parsed) {
+    throw new Error("This transaction does not include a CCTP DepositForBurn event.");
+  }
+
+  if (parsed.destinationDomain !== config.suiDomain) {
+    throw new Error(
+      `This burn targets CCTP domain ${parsed.destinationDomain}, not Sui domain ${config.suiDomain}.`,
+    );
+  }
+
+  progress?.("Checking Circle attestation status…");
+  return buildRecoverableBurn(parsed, config, rpcUrl, receipt);
 }
 
 export async function scanPastBurns(
@@ -1081,20 +1236,13 @@ export async function scanPastBurns(
   const blockHex = await baseRpcCall(rpcUrl, "eth_blockNumber", []) as string;
   const currentBlock = Number(blockHex);
 
-  const blocksToScan = 1_300_000; // ~30 days at 2s/block
+  const blocksToScan = Math.max(1, Math.floor(readNumberEnv("VITE_CCTP_RECOVERY_BLOCKS_TO_SCAN", 1_300_000))); // ~30 days at 2s/block
   const fromBlock = Math.max(0, currentBlock - blocksToScan);
   const chunkSize = 50_000;
 
   const paddedDepositor = "0x" + baseAddress.slice(2).toLowerCase().padStart(64, "0");
 
-  interface LogEntry {
-    transactionHash: string;
-    topics: string[];
-    data: string;
-    blockNumber: string;
-  }
-
-  const allLogs: LogEntry[] = [];
+  const allLogs: BaseLogEntry[] = [];
 
   for (let start = fromBlock; start <= currentBlock; start += chunkSize) {
     const end = Math.min(start + chunkSize - 1, currentBlock);
@@ -1108,7 +1256,7 @@ export async function scanPastBurns(
         topics: [DEPOSIT_FOR_BURN_TOPIC, null, null, paddedDepositor],
         fromBlock: "0x" + start.toString(16),
         toBlock: "0x" + end.toString(16),
-      }]) as LogEntry[];
+      }]) as BaseLogEntry[];
 
       if (Array.isArray(logs) && logs.length > 0) {
         allLogs.push(...logs);
@@ -1130,66 +1278,10 @@ export async function scanPastBurns(
   for (let i = 0; i < allLogs.length; i++) {
     const log = allLogs[i];
     progress?.(`Checking attestation ${i + 1}/${allLogs.length}…`);
-
-    const nonce = BigInt(log.topics[1]);
-    const dataHex = log.data.startsWith("0x") ? log.data.slice(2) : log.data;
-    const amount = BigInt("0x" + dataHex.slice(0, 64));
-    const mintRecipient = "0x" + dataHex.slice(64, 128);
-    const destinationDomain = Number("0x" + dataHex.slice(128, 192));
-
-    const irisResult = await fetchIrisMessageByTxHash(
-      config.irisApiUrl,
-      config.baseDomain,
-      log.transactionHash,
-    );
-
-    let attestationStatus: RecoverableBurn["attestationStatus"] = "unknown";
-    let attestation: string | null = null;
-    let messageBytes: Uint8Array | null = null;
-    let messageHash: string | null = null;
-
-    if (irisResult) {
-      if (irisResult.status === "complete" && irisResult.attestation) {
-        attestationStatus = irisResult.destinationTxHash ? "minted" : "complete";
-        attestation = irisResult.attestation;
-
-        if (irisResult.message) {
-          messageBytes = hexToBytes(irisResult.message);
-        } else {
-          // Fallback: extract MessageSent from tx receipt
-          try {
-            const receipt = await baseRpcCall(rpcUrl, "eth_getTransactionReceipt", [log.transactionHash]) as Record<string, unknown>;
-            const extracted = await extractMessageSent(receipt);
-            messageBytes = extracted.messageBytes;
-            messageHash = extracted.messageHash;
-          } catch {
-            console.warn(`[recovery] failed to extract MessageSent from receipt for ${log.transactionHash}`);
-          }
-        }
-
-        if (messageBytes && !messageHash) {
-          const { keccak256 } = await import("viem");
-          messageHash = keccak256(messageBytes);
-        }
-      } else {
-        attestationStatus = "pending";
-      }
-    }
-
-    burns.push({
-      burnTxHash: log.transactionHash,
-      nonce,
-      amount,
-      mintRecipient,
-      destinationDomain,
-      depositor: baseAddress,
-      blockNumber: Number(log.blockNumber),
-      attestationStatus,
-      attestation,
-      messageBytes,
-      messageHash,
-      mintDigest: null,
-    });
+    const parsed = parseDepositForBurnLog(log);
+    if (!parsed) continue;
+    const burn = await buildRecoverableBurn(parsed, config, rpcUrl);
+    burns.push(burn);
   }
 
   const readyCount = burns.filter(b => b.attestationStatus === "complete").length;
