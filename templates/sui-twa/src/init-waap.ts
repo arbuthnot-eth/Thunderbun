@@ -10,6 +10,19 @@ export interface WaapInitStatus {
   blockedLikely: boolean;
 }
 
+type RegisterWalletFn = (wallet: unknown) => void;
+
+declare global {
+  interface Window {
+    __tbWaapReadyPromise?: Promise<void>;
+    __tbWaapSuiWallet?: unknown;
+    __tbWaapSuiRegistered?: boolean;
+    __tbWaapEvmInitialized?: boolean;
+    __tbWaapInitCount?: number;
+    __tbRegisterWalletFn?: RegisterWalletFn;
+  }
+}
+
 const WAAP_IFRAME_URL = "https://waap.xyz/iframe";
 const WAAP_BOOT_TIMEOUT_MS = 7000;
 const WAAP_IFRAME_IDS = ["waap-wallet-iframe", "silk-wallet-iframe"] as const;
@@ -102,8 +115,21 @@ async function waitForWaapIframeReady(timeoutMs = WAAP_BOOT_TIMEOUT_MS): Promise
   return false;
 }
 
-export const waapReady = (async () => {
+function createWaapReadyPromise(): Promise<void> {
+  return (async () => {
+    window.__tbWaapInitCount = (window.__tbWaapInitCount ?? 0) + 1;
+    if (window.__tbWaapInitCount > 1) {
+      console.warn(`[init-waap] duplicate init attempt detected (#${window.__tbWaapInitCount}); reusing singleton.`);
+    }
+
   try {
+    if (window.__tbWaapSuiWallet && window.__tbWaapSuiRegistered && window.__tbWaapEvmInitialized) {
+      waapInitStatus.ready = true;
+      waapInitStatus.reason = null;
+      waapInitStatus.blockedLikely = false;
+      return;
+    }
+
     const booted = await canBootWaapIframe();
     if (!booted) {
       waapInitStatus.ready = false;
@@ -115,12 +141,14 @@ export const waapReady = (async () => {
 
     const { initWaaP, initWaaPSui } = await import("@human.tech/waap-sdk");
     const { registerWallet } = await import("@mysten/wallet-standard");
+    window.__tbRegisterWalletFn = registerWallet as RegisterWalletFn;
 
     // Initialize Sui wallet first. Avoid extra config here because the SDK
     // currently pings the iframe immediately when config/project is present.
-    const w = initWaaPSui({
+    const w = window.__tbWaapSuiWallet ?? initWaaPSui({
       useStaging: false,
     });
+    window.__tbWaapSuiWallet = w;
 
     // Ensure iframe is actually cross-origin-loaded before booting EVM provider.
     // This avoids transient "target origin mismatch" failures during early boot.
@@ -133,12 +161,18 @@ export const waapReady = (async () => {
       return;
     }
 
-    registerWallet(w as unknown as Parameters<typeof registerWallet>[0]);
+    if (!window.__tbWaapSuiRegistered) {
+      registerWallet(w as unknown as Parameters<typeof registerWallet>[0]);
+      window.__tbWaapSuiRegistered = true;
+    }
 
     // Boot EVM provider so window.waap is available for Base address linking.
-    initWaaP({
-      useStaging: false,
-    });
+    if (!window.__tbWaapEvmInitialized) {
+      initWaaP({
+        useStaging: false,
+      });
+      window.__tbWaapEvmInitialized = true;
+    }
 
     waapInitStatus.ready = true;
     waapInitStatus.reason = null;
@@ -149,4 +183,12 @@ export const waapReady = (async () => {
     waapInitStatus.blockedLikely = false;
     console.warn("[init-waap] WaaP SDK not available:", err);
   }
+  })();
+}
+
+export const waapReady = (() => {
+  if (!window.__tbWaapReadyPromise) {
+    window.__tbWaapReadyPromise = createWaapReadyPromise();
+  }
+  return window.__tbWaapReadyPromise;
 })();

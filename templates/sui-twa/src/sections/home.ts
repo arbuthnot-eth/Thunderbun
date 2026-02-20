@@ -13,6 +13,30 @@ import {
 import { wallet } from "../wallet";
 
 type BridgePhase = CctpPhase;
+type StepId = "approve" | "burn" | "attestation" | "mint";
+type TxChain = "base" | "sui";
+
+interface StepTxRef {
+  hash: string;
+  chain: TxChain;
+}
+
+type StepTxMap = Record<StepId, StepTxRef | null>;
+
+interface BridgeActivityGroup {
+  id: string;
+  startedAt: number;
+  updatedAt: number;
+  network: string;
+  amountRaw: string;
+  status: "running" | "complete" | "error";
+  phase: BridgePhase;
+  message: string;
+  attestationAttempts: number;
+  digest: string | null;
+  error: string | null;
+  steps: StepTxMap;
+}
 
 const PHASE_LABELS: Record<BridgePhase, string> = {
   idle: "Ready",
@@ -25,6 +49,9 @@ const PHASE_LABELS: Record<BridgePhase, string> = {
 };
 
 const STEP_NAMES = ["Approve", "Burn", "Attestation", "Mint"];
+const STEP_IDS: StepId[] = ["approve", "burn", "attestation", "mint"];
+const CCTP_ACTIVITY_STORAGE_KEY = "tb-cctp-activity-feed-v1";
+const CCTP_ACTIVITY_LIMIT = 20;
 
 export function renderHome(container: HTMLElement) {
   container.innerHTML = `
@@ -49,6 +76,69 @@ export function renderHome(container: HTMLElement) {
   let sponsorError: string | null = null;
   let sponsorConfigured = false;
   let mounted = true;
+  let bridgeInFlight = false;
+  let activityFeed = loadBridgeActivityFeed();
+  let activeGroupId: string | null = activityFeed[0]?.id ?? null;
+
+  const getActiveGroup = (): BridgeActivityGroup | null => {
+    if (!activeGroupId) return null;
+    return activityFeed.find((group) => group.id === activeGroupId) ?? null;
+  };
+
+  const persistActivityFeed = (): void => {
+    saveBridgeActivityFeed(activityFeed);
+  };
+
+  const upsertActivityGroup = (group: BridgeActivityGroup): void => {
+    const idx = activityFeed.findIndex((item) => item.id === group.id);
+    if (idx >= 0) {
+      activityFeed[idx] = group;
+    } else {
+      activityFeed.unshift(group);
+    }
+    activityFeed.sort((a, b) => b.updatedAt - a.updatedAt);
+    if (activityFeed.length > CCTP_ACTIVITY_LIMIT) {
+      activityFeed = activityFeed.slice(0, CCTP_ACTIVITY_LIMIT);
+    }
+    persistActivityFeed();
+  };
+
+  const updateActiveGroup = (mutator: (group: BridgeActivityGroup) => void): void => {
+    const group = getActiveGroup();
+    if (!group) return;
+    mutator(group);
+    group.updatedAt = Date.now();
+    upsertActivityGroup(group);
+  };
+
+  const beginActivityGroup = (amountRaw: string, network: string): BridgeActivityGroup => {
+    const next: BridgeActivityGroup = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+      network,
+      amountRaw,
+      status: "running",
+      phase: "approving",
+      message: "Starting CCTP bridge…",
+      attestationAttempts: 0,
+      digest: null,
+      error: null,
+      steps: createEmptyStepTxMap(),
+    };
+    activeGroupId = next.id;
+    upsertActivityGroup(next);
+    return next;
+  };
+
+  const attachStepTx = (step: StepId, hash: string, chain: TxChain): void => {
+    updateActiveGroup((group) => {
+      group.steps[step] = { hash, chain };
+      if (step === "burn" && !group.steps.attestation) {
+        group.steps.attestation = { hash, chain };
+      }
+    });
+  };
 
   const render = () => {
     const s = wallet.getState();
@@ -72,6 +162,8 @@ export function renderHome(container: HTMLElement) {
       const baseGasLow = s.waapBaseAddress !== null
         && s.waapBaseBalance !== null
         && s.waapBaseBalance < minBaseGasWei;
+      const activeGroup = getActiveGroup();
+      const stepTxMap = activeGroup?.steps ?? activityFeed[0]?.steps ?? createEmptyStepTxMap();
 
       body.innerHTML = `
         <div class="card home-minimal">
@@ -96,6 +188,7 @@ export function renderHome(container: HTMLElement) {
             <div class="home-minimal-item">
               <div class="home-minimal-label">Sui Address</div>
               <div class="home-minimal-value code-text">${wallet.formatAddress(true)}</div>
+              <div class="home-minimal-subvalue code-text">SuiNS: ${s.suiPrimaryName ? escapeHtml(s.suiPrimaryName) : "—"}</div>
             </div>
             <div class="home-minimal-item">
               <div class="home-minimal-label">Base Address</div>
@@ -151,13 +244,36 @@ export function renderHome(container: HTMLElement) {
 
             <div class="cctp-stepper">
               ${STEP_NAMES.map((name, i) => {
+                const stepId = STEP_IDS[i];
                 const stepClass = getStepClass(bridgePhase, i);
-                return `<div class="cctp-step ${stepClass}"><span class="cctp-step-num">${i + 1}</span><span>${name}</span></div>`;
+                const tx = stepTxMap[stepId];
+                const txHtml = tx
+                  ? `<a class="cctp-step-tx-link code-text" href="${escapeAttr(getExplorerTxUrl(tx.chain, tx.hash, s.network))}" target="_blank" rel="noopener">${escapeHtml(shortHash(tx.hash))}</a>`
+                  : `<span class="cctp-step-tx-empty">No tx yet</span>`;
+                return `
+                  <div class="cctp-step ${stepClass}">
+                    <div class="cctp-step-tx">${txHtml}</div>
+                    <div class="cctp-step-main">
+                      <span class="cctp-step-num">${i + 1}</span>
+                      <span>${name}</span>
+                    </div>
+                  </div>
+                `;
               }).join("")}
             </div>
 
             ${bridgeMessage ? `<div class="cctp-status code-text">${escapeHtml(bridgeMessage)}${attestationAttempts > 0 ? ` (attempt ${attestationAttempts})` : ""}${bridgeDigest ? ` · <span class="cctp-digest">${shortDigest(bridgeDigest)}</span>` : ""}</div>` : ""}
             ${bridgeError ? `<div class="cctp-error">${escapeHtml(bridgeError)}</div>` : ""}
+
+            <div class="cctp-activity-feed">
+              <div class="spread-row">
+                <div class="card-title">Recent Bridge Activity</div>
+                <button class="btn btn-secondary btn--compact" id="home-clear-activity"${activityFeed.length === 0 ? " disabled" : ""}>Clear</button>
+              </div>
+              ${activityFeed.length === 0
+                ? `<div class="cctp-activity-empty">No bridge groups yet.</div>`
+                : `<div class="cctp-activity-list">${activityFeed.map((group) => renderActivityGroup(group)).join("")}</div>`}
+            </div>
 
             <div class="home-minimal-actions">
               <button class="btn btn-primary" id="home-bridge" ${isBusy || !s.waapBaseAddress ? "disabled" : ""}>${
@@ -267,6 +383,13 @@ export function renderHome(container: HTMLElement) {
         render();
       });
 
+      body.querySelector("#home-clear-activity")?.addEventListener("click", () => {
+        activityFeed = [];
+        activeGroupId = null;
+        saveBridgeActivityFeed(activityFeed);
+        render();
+      });
+
     } else {
       body.innerHTML = `
         <div class="card home-minimal">
@@ -296,10 +419,28 @@ export function renderHome(container: HTMLElement) {
     bridgePhase = p.phase;
     bridgeMessage = p.message;
     if (p.attemptCount !== undefined) attestationAttempts = p.attemptCount;
+    updateActiveGroup((group) => {
+      group.phase = p.phase;
+      group.message = p.message;
+      if (p.attemptCount !== undefined) {
+        group.attestationAttempts = p.attemptCount;
+      }
+      if (p.txHash && p.step) {
+        const chain = p.txChain ?? (p.step === "mint" ? "sui" : "base");
+        group.steps[p.step] = { hash: p.txHash, chain };
+        if (p.step === "burn" && !group.steps.attestation) {
+          group.steps.attestation = { hash: p.txHash, chain };
+        }
+      }
+      if (p.phase === "complete") {
+        group.status = "complete";
+      }
+    });
     if (mounted) render();
   }
 
   async function runCctpBridge(): Promise<void> {
+    if (bridgeInFlight) return;
     if (bridgePhase !== "idle" && bridgePhase !== "complete" && bridgePhase !== "error") return;
     if (!mounted) return;
 
@@ -315,11 +456,13 @@ export function renderHome(container: HTMLElement) {
       return;
     }
 
+    bridgeInFlight = true;
     bridgeError = null;
     bridgeDigest = null;
     attestationAttempts = 0;
     bridgePhase = "approving";
     bridgeMessage = "Starting CCTP bridge…";
+    beginActivityGroup(rawAmount.toString(), wallet.getState().network);
     render();
 
     try {
@@ -332,6 +475,14 @@ export function renderHome(container: HTMLElement) {
       bridgePhase = "complete";
       bridgeMessage = "Bridge complete. Native USDC minted on Sui.";
       bridgeError = null;
+      attachStepTx("mint", result.digest, "sui");
+      updateActiveGroup((group) => {
+        group.status = "complete";
+        group.phase = "complete";
+        group.digest = result.digest;
+        group.error = null;
+        group.message = bridgeMessage;
+      });
 
       await wallet.refreshBalance();
     } catch (err) {
@@ -339,13 +490,38 @@ export function renderHome(container: HTMLElement) {
       bridgePhase = "error";
       bridgeError = message;
       bridgeMessage = "Bridge failed.";
+      updateActiveGroup((group) => {
+        group.status = "error";
+        group.phase = "error";
+        group.error = message;
+        group.message = bridgeMessage;
+      });
       console.error("[home] CCTP bridge failed", err);
+    } finally {
+      bridgeInFlight = false;
     }
 
     if (mounted) render();
   }
 
   async function runResume(): Promise<void> {
+    if (bridgeInFlight) return;
+    bridgeInFlight = true;
+    const pending = loadPendingBridge();
+    if (pending) {
+      const existing = activityFeed.find((group) => group.steps.burn?.hash.toLowerCase() === pending.burnTxHash.toLowerCase());
+      if (existing) {
+        activeGroupId = existing.id;
+      } else {
+        const resumed = beginActivityGroup(pending.amount, pending.network);
+        resumed.phase = "attesting";
+        resumed.message = "Resuming attestation polling…";
+        resumed.steps.burn = { hash: pending.burnTxHash, chain: "base" };
+        resumed.steps.attestation = { hash: pending.burnTxHash, chain: "base" };
+        upsertActivityGroup(resumed);
+      }
+    }
+
     bridgeError = null;
     bridgeDigest = null;
     attestationAttempts = 0;
@@ -359,6 +535,14 @@ export function renderHome(container: HTMLElement) {
       bridgePhase = "complete";
       bridgeMessage = "Bridge complete (resumed). Native USDC minted on Sui.";
       bridgeError = null;
+      attachStepTx("mint", result.digest, "sui");
+      updateActiveGroup((group) => {
+        group.status = "complete";
+        group.phase = "complete";
+        group.digest = result.digest;
+        group.error = null;
+        group.message = bridgeMessage;
+      });
 
       await wallet.refreshBalance();
     } catch (err) {
@@ -366,7 +550,15 @@ export function renderHome(container: HTMLElement) {
       bridgePhase = "error";
       bridgeError = message;
       bridgeMessage = "Resume failed.";
+      updateActiveGroup((group) => {
+        group.status = "error";
+        group.phase = "error";
+        group.error = message;
+        group.message = bridgeMessage;
+      });
       console.error("[home] CCTP resume failed", err);
+    } finally {
+      bridgeInFlight = false;
     }
 
     if (mounted) render();
@@ -502,6 +694,94 @@ function formatUsdcDecimal(raw: bigint): string {
   if (fractional === 0n) return whole.toString();
   const padded = fractional.toString().padStart(6, "0").replace(/0+$/, "");
   return `${whole}.${padded}`;
+}
+
+function createEmptyStepTxMap(): StepTxMap {
+  return {
+    approve: null,
+    burn: null,
+    attestation: null,
+    mint: null,
+  };
+}
+
+function loadBridgeActivityFeed(): BridgeActivityGroup[] {
+  try {
+    const raw = localStorage.getItem(CCTP_ACTIVITY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as BridgeActivityGroup[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item === "object" && typeof item.id === "string")
+      .slice(0, CCTP_ACTIVITY_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveBridgeActivityFeed(feed: BridgeActivityGroup[]): void {
+  try {
+    localStorage.setItem(CCTP_ACTIVITY_STORAGE_KEY, JSON.stringify(feed.slice(0, CCTP_ACTIVITY_LIMIT)));
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
+function renderActivityGroup(group: BridgeActivityGroup): string {
+  const statusClass = group.status === "complete"
+    ? "badge-green"
+    : group.status === "error"
+      ? "badge-red"
+      : "badge-yellow";
+  const amount = safeFormatAmount(group.amountRaw);
+
+  return `
+    <div class="cctp-activity-item">
+      <div class="cctp-activity-head">
+        <div class="cctp-activity-title">${escapeHtml(amount)} USDC</div>
+        <span class="badge ${statusClass}">${escapeHtml(group.status)}</span>
+      </div>
+      <div class="cctp-activity-meta code-text">${escapeHtml(formatTimestamp(group.startedAt))} · ${escapeHtml(group.network)}</div>
+      <div class="cctp-activity-step-row">
+        ${STEP_IDS.map((stepId, index) => {
+          const stepLabel = STEP_NAMES[index];
+          const tx = group.steps[stepId];
+          const txLine = tx
+            ? `<a class="cctp-activity-link code-text" href="${escapeAttr(getExplorerTxUrl(tx.chain, tx.hash, group.network))}" target="_blank" rel="noopener">${escapeHtml(shortHash(tx.hash))}</a>`
+            : `<span class="cctp-activity-empty-tx">—</span>`;
+          return `<div class="cctp-activity-step"><span class="cctp-activity-step-label">${escapeHtml(stepLabel)}</span>${txLine}</div>`;
+        }).join("")}
+      </div>
+      ${group.error ? `<div class="cctp-activity-error">${escapeHtml(group.error)}</div>` : ""}
+    </div>
+  `;
+}
+
+function getExplorerTxUrl(chain: TxChain, hash: string, network: string): string {
+  if (chain === "base") {
+    return network === "mainnet"
+      ? `https://basescan.org/tx/${hash}`
+      : `https://sepolia.basescan.org/tx/${hash}`;
+  }
+  if (network === "mainnet") return `https://suiscan.xyz/tx/${hash}`;
+  if (network === "testnet") return `https://suiscan.xyz/testnet/tx/${hash}`;
+  return `https://suiscan.xyz/devnet/tx/${hash}`;
+}
+
+function formatTimestamp(timestamp: number): string {
+  try {
+    return new Date(timestamp).toLocaleString();
+  } catch {
+    return String(timestamp);
+  }
+}
+
+function safeFormatAmount(raw: string): string {
+  try {
+    return formatUsdcDecimal(BigInt(raw));
+  } catch {
+    return raw;
+  }
 }
 
 function escapeHtml(value: string): string {

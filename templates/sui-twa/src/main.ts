@@ -1,12 +1,14 @@
 import "./style.css";
 import "./init-waap";
+import { initReactDappKitIsland } from "./react/dapp-kit-island";
 import { wallet } from "./wallet";
 
-const CRITICAL_CACHE_RESET_VERSION = "2026-02-20-waap-origin-fix-1";
+const CRITICAL_CACHE_RESET_VERSION = "2026-02-20-waap-origin-fix-3";
 const CACHE_RESET_DONE_KEY = "tb_critical_cache_reset_done";
 const CACHE_RESET_RELOAD_PREFIX = "tb_critical_cache_reset_reloaded";
 
 void runCriticalCacheReset();
+initReactDappKitIsland();
 
 async function runCriticalCacheReset(): Promise<void> {
   let alreadyDone = false;
@@ -218,6 +220,7 @@ class App {
     const connected = document.getElementById("wallet-widget-connected");
     const suiAddr = document.getElementById("wallet-widget-sui");
     const baseAddr = document.getElementById("wallet-widget-base");
+    const suinsName = document.getElementById("wallet-widget-suins");
     const balance = document.getElementById("wallet-widget-balance");
     const connectBtn = document.getElementById("wallet-widget-connect") as HTMLButtonElement | null;
     const disconnectBtn = document.getElementById("wallet-widget-disconnect") as HTMLButtonElement | null;
@@ -329,12 +332,19 @@ class App {
           }
         }
 
+        if (suinsName) {
+          suinsName.textContent = s.suiPrimaryName ?? "No primary";
+          suinsName.setAttribute("title", s.suiPrimaryName ?? "No primary");
+        }
+
         if (balance) {
           balance.textContent = wallet.formatBalance();
         }
 
         if (widgetToolbarText) {
-          widgetToolbarText.textContent = `Connected · ${wallet.formatBalance()}`;
+          widgetToolbarText.textContent = s.suiPrimaryName
+            ? `Connected · ${s.suiPrimaryName}`
+            : `Connected · ${wallet.formatBalance()}`;
         }
 
         if (linkBaseBtn) {
@@ -348,6 +358,7 @@ class App {
         connected?.classList.add("is-hidden");
         if (copySuiBtn) copySuiBtn.disabled = true;
         if (copyBaseBtn) copyBaseBtn.disabled = true;
+        if (suinsName) suinsName.textContent = "—";
         if (widgetToolbarText) widgetToolbarText.textContent = "Wallet";
       }
     });

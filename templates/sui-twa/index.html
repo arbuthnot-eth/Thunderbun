@@ -17,8 +17,8 @@
     <style>
       #splash{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#09090F;transition:opacity .3s ease}
       #splash.fade{opacity:0;pointer-events:none}
-      #splash img{width:64px;height:64px;border-radius:14px;animation:splash-glow 1.4s ease-in-out infinite;filter:drop-shadow(0 0 20px rgba(59,139,255,0.35)) drop-shadow(0 0 40px rgba(245,158,11,0.15))}
-      @keyframes splash-glow{0%,100%{opacity:.6;transform:scale(.95);filter:drop-shadow(0 0 20px rgba(59,139,255,0.35)) drop-shadow(0 0 40px rgba(245,158,11,0.15))}50%{opacity:1;transform:scale(1);filter:drop-shadow(0 0 30px rgba(59,139,255,0.5)) drop-shadow(0 0 60px rgba(245,158,11,0.25))}}
+      #splash img{width:64px;height:64px;border-radius:14px;animation:splash-glow 1.4s ease-in-out infinite;filter:drop-shadow(0 0 20px rgba(255,184,0,0.35)) drop-shadow(0 0 40px rgba(245,158,11,0.15))}
+      @keyframes splash-glow{0%,100%{opacity:.6;transform:scale(.95);filter:drop-shadow(0 0 20px rgba(255,184,0,0.35)) drop-shadow(0 0 40px rgba(245,158,11,0.15))}50%{opacity:1;transform:scale(1);filter:drop-shadow(0 0 30px rgba(255,184,0,0.5)) drop-shadow(0 0 60px rgba(245,158,11,0.25))}}
       #app{opacity:0;transition:opacity .2s ease}
       #app.ready{opacity:1}
     </style>
@@ -99,6 +99,12 @@
               <span class="wallet-widget-key">Base</span>
               <span class="wallet-widget-addr code-text" id="wallet-widget-base"></span>
               <button class="btn btn-secondary btn--compact" id="wallet-widget-copy-base">Copy</button>
+            </div>
+
+            <div class="wallet-widget-row">
+              <span class="wallet-widget-key">SuiNS</span>
+              <span class="wallet-widget-addr code-text" id="wallet-widget-suins">—</span>
+              <span class="wallet-widget-spacer" aria-hidden="true"></span>
             </div>
 
             <div class="wallet-widget-actions">

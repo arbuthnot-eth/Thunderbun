@@ -34,11 +34,17 @@ const MAX_UINT256 = (1n << 256n) - 1n;
 // ── Types ────────────────────────────────────────────────────────────────
 
 export type CctpPhase = "idle" | "approving" | "burning" | "attesting" | "minting" | "complete" | "error";
+export type CctpProgressStep = "approve" | "burn" | "attestation" | "mint";
+export type CctpProgressChain = "base" | "sui";
 
 export interface CctpProgress {
   phase: CctpPhase;
   message: string;
   attemptCount?: number;
+  step?: CctpProgressStep;
+  txHash?: string;
+  txChain?: CctpProgressChain;
+  messageHash?: string;
 }
 
 export interface CctpBurnResult {
@@ -162,7 +168,7 @@ export async function burnUsdcOnBase(
   await maybeAutoSwapDustForGas(config, amount, progress);
 
   // Check allowance
-  progress?.({ phase: "approving", message: "Checking USDC allowance…" });
+  progress?.({ phase: "approving", step: "approve", message: "Checking USDC allowance…" });
   const currentAllowance = await checkAllowance(
     config.base.usdc,
     baseAddress,
@@ -180,6 +186,7 @@ export async function burnUsdcOnBase(
     const approveAmount = approveMax ? MAX_UINT256 : amount;
     progress?.({
       phase: "approving",
+      step: "approve",
       message: approveMax ? "Requesting USDC max approval…" : "Requesting USDC approval…",
     });
     const approveData = encodeApprove(config.base.tokenMessenger, approveAmount);
@@ -187,18 +194,34 @@ export async function burnUsdcOnBase(
       to: config.base.usdc,
       data: approveData,
     });
-    progress?.({ phase: "approving", message: `Approval tx sent: ${approveTxHash.slice(0, 14)}…` });
+    progress?.({
+      phase: "approving",
+      step: "approve",
+      txHash: approveTxHash,
+      txChain: "base",
+      message: `Approval tx sent: ${approveTxHash.slice(0, 14)}…`,
+    });
     await wallet.waitForBaseReceipt(approveTxHash);
     saveApprovalHint(baseAddress, config.base.usdc, config.base.tokenMessenger);
-    progress?.({ phase: "approving", message: "USDC approved." });
+    progress?.({
+      phase: "approving",
+      step: "approve",
+      txHash: approveTxHash,
+      txChain: "base",
+      message: "USDC approved.",
+    });
   } else if (currentAllowance === null && allowanceHint) {
-    progress?.({ phase: "approving", message: "Allowance check unavailable, using prior approval hint." });
+    progress?.({
+      phase: "approving",
+      step: "approve",
+      message: "Allowance check unavailable, using prior approval hint.",
+    });
   } else {
-    progress?.({ phase: "approving", message: "Allowance sufficient, skipping approve." });
+    progress?.({ phase: "approving", step: "approve", message: "Allowance sufficient, skipping approve." });
   }
 
   // depositForBurn
-  progress?.({ phase: "burning", message: "Calling depositForBurn…" });
+  progress?.({ phase: "burning", step: "burn", message: "Calling depositForBurn…" });
   const depositData = encodeDepositForBurn(
     amount,
     config.suiDomain,
@@ -209,10 +232,22 @@ export async function burnUsdcOnBase(
     to: config.base.tokenMessenger,
     data: depositData,
   });
-  progress?.({ phase: "burning", message: `Burn tx sent: ${burnTxHash.slice(0, 14)}…` });
+  progress?.({
+    phase: "burning",
+    step: "burn",
+    txHash: burnTxHash,
+    txChain: "base",
+    message: `Burn tx sent: ${burnTxHash.slice(0, 14)}…`,
+  });
 
   const receipt = await wallet.waitForBaseReceipt(burnTxHash);
-  progress?.({ phase: "burning", message: "Burn confirmed on Base." });
+  progress?.({
+    phase: "burning",
+    step: "burn",
+    txHash: burnTxHash,
+    txChain: "base",
+    message: "Burn confirmed on Base.",
+  });
 
   // Extract MessageSent event
   const { messageBytes, messageHash } = await extractMessageSent(receipt);
@@ -252,6 +287,10 @@ export async function waitForAttestation(
     attempts++;
     progress?.({
       phase: "attesting",
+      step: "attestation",
+      txHash: burnTxHash,
+      txChain: burnTxHash ? "base" : undefined,
+      messageHash,
       message: "Checking Circle attestation…",
       attemptCount: attempts,
     });
@@ -270,7 +309,14 @@ export async function waitForAttestation(
         }
 
         if (status === "complete" && v2Message.attestation) {
-          progress?.({ phase: "attesting", message: "Attestation received." });
+          progress?.({
+            phase: "attesting",
+            step: "attestation",
+            txHash: burnTxHash,
+            txChain: burnTxHash ? "base" : undefined,
+            messageHash,
+            message: "Attestation received.",
+          });
           const canonicalMessageBytes = v2Message.message ? hexToBytes(v2Message.message) : messageBytes;
           return {
             attestation: v2Message.attestation,
@@ -282,6 +328,10 @@ export async function waitForAttestation(
         if (status === "pending_confirmations") {
           progress?.({
             phase: "attesting",
+            step: "attestation",
+            txHash: burnTxHash,
+            txChain: burnTxHash ? "base" : undefined,
+            messageHash,
             message: "Circle is waiting for Base confirmations. This usually takes a few minutes.",
             attemptCount: attempts,
           });
@@ -289,6 +339,10 @@ export async function waitForAttestation(
           const delaySuffix = v2Message.delayReason ? ` (${v2Message.delayReason.replace(/_/g, " ")})` : "";
           progress?.({
             phase: "attesting",
+            step: "attestation",
+            txHash: burnTxHash,
+            txChain: burnTxHash ? "base" : undefined,
+            messageHash,
             message: `Circle attestation status: ${status.replace(/_/g, " ")}${delaySuffix}.`,
             attemptCount: attempts,
           });
@@ -302,7 +356,14 @@ export async function waitForAttestation(
         const body = await res.json() as { status?: string; attestation?: string };
         const status = (body.status ?? "").toLowerCase();
         if (status === "complete" && body.attestation) {
-          progress?.({ phase: "attesting", message: "Attestation received." });
+          progress?.({
+            phase: "attesting",
+            step: "attestation",
+            txHash: burnTxHash,
+            txChain: burnTxHash ? "base" : undefined,
+            messageHash,
+            message: "Attestation received.",
+          });
           return {
             attestation: body.attestation,
             messageBytes,
@@ -313,12 +374,20 @@ export async function waitForAttestation(
         if (status === "pending_confirmations") {
           progress?.({
             phase: "attesting",
+            step: "attestation",
+            txHash: burnTxHash,
+            txChain: burnTxHash ? "base" : undefined,
+            messageHash,
             message: "Circle is waiting for Base confirmations. This usually takes a few minutes.",
             attemptCount: attempts,
           });
         } else if (status) {
           progress?.({
             phase: "attesting",
+            step: "attestation",
+            txHash: burnTxHash,
+            txChain: burnTxHash ? "base" : undefined,
+            messageHash,
             message: `Circle attestation status: ${status.replace(/_/g, " ")}.`,
             attemptCount: attempts,
           });
@@ -357,7 +426,7 @@ export async function mintUsdcOnSui(
     }
   }
 
-  progress?.({ phase: "minting", message: "Building Sui transaction…" });
+  progress?.({ phase: "minting", step: "mint", message: "Building Sui transaction…" });
 
   const { Transaction } = await import("@mysten/sui/transactions");
   const tx = new Transaction();
@@ -420,14 +489,21 @@ export async function mintUsdcOnSui(
   // Gas budget required for multi-call PTBs passing objects between calls
   tx.setGasBudget(50_000_000);
 
-  progress?.({ phase: "minting", message: "Signing and executing…" });
+  progress?.({ phase: "minting", step: "mint", message: "Signing and executing…" });
 
   const result = await wallet.signAndExecuteSuiTransaction(tx);
 
   const digest = extractDigest(result) ?? "unknown";
 
   clearPendingBridge();
-  progress?.({ phase: "complete", message: `Mint complete. Digest: ${digest}` });
+  progress?.({
+    phase: "complete",
+    step: "mint",
+    txHash: digest,
+    txChain: "sui",
+    messageHash: attestation.messageHash,
+    message: `Mint complete. Digest: ${digest}`,
+  });
 
   return { digest };
 }
@@ -538,7 +614,14 @@ export async function resumePendingBridge(
 
   const messageBytes = hexToBytes(pending.messageBytesHex);
 
-  progress?.({ phase: "attesting", message: "Resuming attestation polling…" });
+  progress?.({
+    phase: "attesting",
+    step: "attestation",
+    txHash: pending.burnTxHash,
+    txChain: "base",
+    messageHash: pending.messageHash,
+    message: "Resuming attestation polling…",
+  });
 
   const attestation = await waitForAttestation(
     pending.messageHash,

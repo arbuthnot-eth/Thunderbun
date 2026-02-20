@@ -10,7 +10,7 @@ export default defineConfig({
         name: "Thunderbun — Web4 dApp Portal",
         short_name: "Thunderbun",
         description: "The Sui-native framework for launching dApps. Built-in SDKs, Cloudflare Agents, PWA-ready.",
-        theme_color: "#3B8BFF",
+        theme_color: "#FFB800",
         background_color: "#09090F",
         display: "standalone",
         orientation: "portrait",

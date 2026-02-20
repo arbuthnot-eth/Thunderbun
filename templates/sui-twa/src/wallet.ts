@@ -10,18 +10,17 @@
 
 import type { SuiGrpcClient } from "@mysten/sui/grpc";
 import type { Transaction } from "@mysten/sui/transactions";
-import { toBase64 } from "@mysten/sui/utils";
 
 // Load web components (connect modal, etc.)
 import "@mysten/dapp-kit-core/web";
 import type { UiWalletAccount } from "@wallet-standard/ui";
 import {
   getWalletAccountForUiWalletAccount_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as getWalletAccountForUiWalletAccount,
-  getWalletForHandle_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as getWalletForHandle,
 } from "@wallet-standard/ui-registry";
 
 import { waapReady } from "./init-waap";
 import { dAppKit } from "./dapp-kit";
+import { signSuiTransactionViaReactDappKit } from "./react/dapp-kit-island";
 
 // ── Types ────────────────────────────────────────────────────────────────
 export type Network = "mainnet" | "testnet" | "devnet";
@@ -539,9 +538,19 @@ class WalletManager {
     tx.setSender(this.getState().address!);
     tx.setGasOwner(sponsorAddress);
     await build(tx);
-    const signable = await this.toSignableTransactionInput(tx);
-    const { signature, bytes } = await dAppKit.signTransaction({ transaction: signable });
-    return { bytes, userSignature: signature };
+    const sender = this.getState().address;
+    const chain = `sui:${this.getState().network}`;
+    const conn = dAppKit.stores.$connection.get();
+    const signed = await this.withWalletRequestTimeout(
+      () => signSuiTransactionViaReactDappKit({
+        transaction: tx,
+        accountAddress: sender,
+        walletName: conn.wallet?.name ?? null,
+        chain,
+      }),
+      "react-dapp-kit signTransaction(sponsored)",
+    );
+    return { bytes: signed.bytes, userSignature: signed.signature };
   }
 
   async executeSponsoredTx(
@@ -552,41 +561,99 @@ class WalletManager {
   }
 
   async signAndExecuteSuiTransaction(transaction: Transaction): Promise<unknown> {
-    await this.ensureWalletCanSignAndOrExecuteTransactions();
-    const signable = await this.toSignableTransactionInput(transaction, { forceSerialized: true });
-    if (typeof signable !== "string") {
-      throw new Error("Failed to serialize Sui transaction for signing.");
-    }
-    const serialized = signable;
-
-    // Avoid dAppKit.signAndExecuteTransaction route; some WaaP builds reject its wrapper payload.
-    const blockResult = await this.trySignAndExecuteViaBlockFeature(serialized);
-    if (blockResult) {
-      return blockResult;
-    }
-
-    await this.ensureWalletCanSignTransactions();
-    const { signature, bytes } = await dAppKit.signTransaction({ transaction: serialized });
-    return this.executeTransactionBytes(bytes, [signature]);
-  }
-
-  private async toSignableTransactionInput(
-    transaction: Transaction,
-    opts?: { forceSerialized?: boolean },
-  ): Promise<Transaction | string> {
-    const conn = dAppKit.stores.$connection.get();
-    const shouldSerialize = Boolean(opts?.forceSerialized) || hasWaaPName(conn.wallet?.name);
-    if (!shouldSerialize) {
-      return transaction;
-    }
-
+    await this.ensureWalletCanSignOrSignAndExecuteTransactions();
     const sender = this.getState().address;
     if (sender) {
       transaction.setSenderIfNotSet(sender);
     }
 
-    const txBytes = await transaction.build({ client: this.getClient() });
-    return toBase64(txBytes);
+    const failures: unknown[] = [];
+
+    // Primary path: React dApp Kit bridge with feature-level signing.
+    // This avoids the core wrapper path that can pass unsupported formats
+    // to some WaaP builds.
+    try {
+      const chain = `sui:${this.getState().network}`;
+      const conn = dAppKit.stores.$connection.get();
+      const signed = await this.withWalletRequestTimeout(
+        () => signSuiTransactionViaReactDappKit({
+          transaction,
+          accountAddress: sender,
+          walletName: conn.wallet?.name ?? null,
+          chain,
+        }),
+        "react-dapp-kit signTransaction",
+      );
+      return await this.executeTransactionBytes(signed.bytes, [signed.signature]);
+    } catch (err) {
+      console.warn("[wallet] react-dapp-kit signTransaction failed:", err);
+      failures.push(err);
+    }
+
+    // Fallback path: dApp Kit core explicit sign + execute.
+    try {
+      await this.ensureWalletCanSignTransactions();
+      const signed = await this.withWalletRequestTimeout(
+        () => dAppKit.signTransaction({ transaction }),
+        "signTransaction(transaction)",
+      );
+      return await this.executeTransactionBytes(signed.bytes, [signed.signature]);
+    } catch (err) {
+      console.warn("[wallet] signTransaction(transaction) failed:", err);
+      failures.push(err);
+    }
+
+    const attempts: Array<{ label: string; run: () => Promise<unknown> }> = [
+      {
+        label: "signAndExecute(transaction)",
+        run: () => this.withWalletRequestTimeout(
+          () => dAppKit.signAndExecuteTransaction({ transaction }),
+          "signAndExecute(transaction)",
+        ),
+      },
+    ];
+
+    for (const attempt of attempts) {
+      try {
+        return await attempt.run();
+      } catch (err) {
+        console.warn(`[wallet] ${attempt.label} failed:`, err);
+        failures.push(err);
+      }
+    }
+
+    throw new Error(this.formatSignFailures(failures));
+  }
+
+  private formatSignFailures(failures: unknown[]): string {
+    const messages = failures
+      .map((err) => (err instanceof Error ? err.message : String(err)))
+      .filter((msg) => msg.length > 0);
+    const uniqueMessages = Array.from(new Set(messages));
+    if (uniqueMessages.length === 0) {
+      return "Failed to sign Sui transaction.";
+    }
+    return `Failed to sign Sui transaction. ${uniqueMessages.join(" | ")}`;
+  }
+
+  private async withWalletRequestTimeout<T>(
+    run: () => Promise<T>,
+    label: string,
+  ): Promise<T> {
+    const timeoutMs = 45_000;
+    let timer = 0;
+    try {
+      return await Promise.race([
+        run(),
+        new Promise<T>((_, reject) => {
+          timer = window.setTimeout(() => {
+            reject(new Error(`${label} timeout after ${timeoutMs}ms`));
+          }, timeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timer) window.clearTimeout(timer);
+    }
   }
 
   private async executeTransactionBytes(
@@ -597,53 +664,6 @@ class WalletManager {
     return this.getClient().executeTransaction({
       transaction: txBytes,
       signatures,
-    });
-  }
-
-  private async trySignAndExecuteViaBlockFeature(serializedTx: string): Promise<unknown | null> {
-    const conn = dAppKit.stores.$connection.get();
-    const account = conn.account as UiWalletAccount | null;
-    if (!account) return null;
-    if (!this.isAccountOnCurrentSuiChain(account)) return null;
-
-    type WalletWithFeatures = {
-      features?: Record<string, unknown>;
-    };
-    type SignAndExecuteBlockFeature = {
-      signAndExecuteTransactionBlock(args: {
-        account: unknown;
-        chain: string;
-        transactionBlock: Transaction;
-        options?: {
-          showRawEffects?: boolean;
-          showRawInput?: boolean;
-        };
-      }): Promise<unknown>;
-    };
-
-    const wallet = getWalletForHandle(account) as WalletWithFeatures;
-    const feature = wallet.features?.["sui:signAndExecuteTransactionBlock"] as SignAndExecuteBlockFeature | undefined;
-    if (!feature || typeof feature.signAndExecuteTransactionBlock !== "function") {
-      return null;
-    }
-
-    const underlyingAccount = getWalletAccountForUiWalletAccount(account);
-    const txMod = await import("@mysten/sui/transactions");
-    const transactionBlock = txMod.Transaction.from(serializedTx);
-    const sender = this.getState().address;
-    if (sender) {
-      transactionBlock.setSenderIfNotSet(sender);
-    }
-
-    const chain = `sui:${dAppKit.stores.$currentNetwork.get()}`;
-    return await feature.signAndExecuteTransactionBlock({
-      account: underlyingAccount,
-      chain,
-      transactionBlock,
-      options: {
-        showRawEffects: true,
-        showRawInput: true,
-      },
     });
   }
 
@@ -780,8 +800,8 @@ class WalletManager {
     await this.ensureWalletSupportsAnyFeature(["sui:signTransaction"]);
   }
 
-  private async ensureWalletCanSignAndOrExecuteTransactions(): Promise<void> {
-    await this.ensureWalletSupportsAnyFeature(["sui:signAndExecuteTransaction", "sui:signTransaction"]);
+  private async ensureWalletCanSignOrSignAndExecuteTransactions(): Promise<void> {
+    await this.ensureWalletSupportsAnyFeature(["sui:signTransaction", "sui:signAndExecuteTransaction"]);
   }
 
   private emit() {
