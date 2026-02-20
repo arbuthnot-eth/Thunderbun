@@ -29,8 +29,12 @@ export function renderHome(container: HTMLElement) {
               <div class="home-minimal-value code-text">${wallet.formatBalance()}</div>
             </div>
             <div class="home-minimal-item">
-              <div class="home-minimal-label">Base Balance</div>
+              <div class="home-minimal-label">Base ETH</div>
               <div class="home-minimal-value code-text">${wallet.formatBaseBalance()}</div>
+            </div>
+            <div class="home-minimal-item">
+              <div class="home-minimal-label">Base USDC</div>
+              <div class="home-minimal-value code-text">${wallet.formatBaseUsdcBalance()}</div>
             </div>
             <div class="home-minimal-item">
               <div class="home-minimal-label">Primary SuiNS</div>

@@ -523,6 +523,28 @@ class WalletManager {
     }
 
     try {
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: BASE_CHAIN_ID }],
+      });
+    } catch {
+      try {
+        await provider.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: BASE_CHAIN_ID,
+            chainName: "Base",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: ["https://mainnet.base.org"],
+            blockExplorerUrls: ["https://basescan.org"],
+          }],
+        });
+      } catch {
+        /* chain switch failed — balance queries will likely fail too */
+      }
+    }
+
+    try {
       const weiHex = await provider.request({
         method: "eth_getBalance",
         params: [baseAddress, "latest"],
