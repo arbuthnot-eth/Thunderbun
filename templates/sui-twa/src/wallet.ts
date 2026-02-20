@@ -137,6 +137,15 @@ function hasWaaPName(name: string | undefined): boolean {
 
 async function ensureBaseChain(provider: WaaPEvmProvider): Promise<void> {
   try {
+    const currentChainId = await provider.request({ method: "eth_chainId" });
+    if (typeof currentChainId === "string" && currentChainId.toLowerCase() === BASE_CHAIN_ID) {
+      return;
+    }
+  } catch {
+    // If chain id probing fails, fall back to switching.
+  }
+
+  try {
     await provider.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: BASE_CHAIN_ID }],
