@@ -10,6 +10,7 @@
 
 import type { SuiGrpcClient } from "@mysten/sui/grpc";
 import type { Transaction } from "@mysten/sui/transactions";
+import { toBase64 } from "@mysten/sui/utils";
 
 // Load web components (connect modal, etc.)
 import "@mysten/dapp-kit-core/web";
@@ -510,7 +511,8 @@ class WalletManager {
     tx.setSender(this.getState().address!);
     tx.setGasOwner(sponsorAddress);
     await build(tx);
-    const { signature, bytes } = await dAppKit.signTransaction({ transaction: tx });
+    const signable = await this.toSignableTransactionInput(tx);
+    const { signature, bytes } = await dAppKit.signTransaction({ transaction: signable });
     return { bytes, userSignature: signature };
   }
 
@@ -522,16 +524,33 @@ class WalletManager {
   }
 
   async signAndExecuteSuiTransaction(transaction: Transaction): Promise<unknown> {
+    const signable = await this.toSignableTransactionInput(transaction);
+
     try {
-      return await dAppKit.signAndExecuteTransaction({ transaction });
+      return await dAppKit.signAndExecuteTransaction({ transaction: signable });
     } catch (err) {
       if (!isUnsupportedSignAndExecute(err)) {
         throw err;
       }
 
-      const { signature, bytes } = await dAppKit.signTransaction({ transaction });
+      const { signature, bytes } = await dAppKit.signTransaction({ transaction: signable });
       return this.executeTransactionBytes(bytes, [signature]);
     }
+  }
+
+  private async toSignableTransactionInput(transaction: Transaction): Promise<Transaction | string> {
+    const conn = dAppKit.stores.$connection.get();
+    if (!hasWaaPName(conn.wallet?.name)) {
+      return transaction;
+    }
+
+    const sender = this.getState().address;
+    if (sender) {
+      transaction.setSenderIfNotSet(sender);
+    }
+
+    const txBytes = await transaction.build({ client: this.getClient() });
+    return toBase64(txBytes);
   }
 
   private async executeTransactionBytes(
