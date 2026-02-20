@@ -91,7 +91,7 @@ The build system vendors Bun, Zig, and optionally CEF, then compiles native wrap
 ## Sui TWA Template
 
 The `sui-twa` template is a Sui-native PWA/TWA wired to the full Mysten ecosystem, ready for Play Store distribution via Bubblewrap.
-It now includes a one-click TradFi-to-Sui path: WaaP Base wallet + PeerAuth fiat onramp + Ika-aware Sui marker PTB flow, with SuiNS resolution for `zkp2p.sui` on the Sui leg.
+It now includes a one-click TradFi-to-Sui path: WaaP Base wallet + PeerAuth fiat onramp + Ika-aware sponsored Sui settlement PTB flow, with SuiNS resolution for `zkp2p.sui` on the Sui leg.
 
 **Transport**: `SuiGrpcClient` from `@mysten/sui/grpc` — fully migrated off JSON-RPC (shuts down April 2026).
 

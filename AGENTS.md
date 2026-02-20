@@ -236,8 +236,11 @@ bun dev           # builds framework + CLI, then builds + runs kitchen app
 
 ```bash
 cd templates/sui-twa
+bun run build     # required preflight before production deploys
 bun run deploy    # builds + deploys Worker + static assets
 ```
+
+For production-impacting `templates/sui-twa` changes (CCTP addresses, worker routes, wallet/bridge behavior), always run `bun run build` and `bun run deploy` before finalizing.
 
 ### Deploy the Move contract
 

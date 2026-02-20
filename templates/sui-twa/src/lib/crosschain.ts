@@ -23,9 +23,13 @@ export interface LaunchOnrampParams {
   referrer?: string;
 }
 
+export type OnrampLaunchMode = "sdk" | "providers-url";
+
 export interface LaunchOnrampResult {
   url: string;
   contractNetwork: Zkp2pContractNetwork;
+  mode: OnrampLaunchMode;
+  sdkState: Zkp2pSdkState;
 }
 
 export interface SettlementResult {
@@ -45,6 +49,19 @@ export interface Zkp2pContractSnapshot {
 }
 
 export type Zkp2pOnrampState = "ready" | "config_missing";
+export type Zkp2pSdkState = "ready" | "needs_connection" | "needs_install" | "error";
+
+export interface Zkp2pProofCompleteResult {
+  status: string;
+  intentHash?: string;
+  proofId?: string;
+  proof?: {
+    platform?: string;
+  };
+  error?: {
+    message?: string;
+  };
+}
 
 interface SponsorResponse {
   sponsorSignature?: string;
@@ -54,6 +71,20 @@ interface SponsorResponse {
 
 interface IkaBridgeAdapterResult {
   enabled: boolean;
+}
+
+interface Zkp2pSdkBridge {
+  getState: () => Promise<Zkp2pSdkState>;
+  requestConnection: () => Promise<void>;
+  openInstallPage: () => void;
+  onramp: (args: {
+    referrer: string;
+    referrerLogo?: string;
+    toToken: string;
+    recipientAddress: string;
+    callbackUrl?: string;
+  }) => void;
+  onProofComplete: (cb: (result: Zkp2pProofCompleteResult) => void) => () => void;
 }
 
 type IkaBridgeTxBuilder = (args: {
@@ -91,17 +122,54 @@ export async function getOnrampState(): Promise<Zkp2pOnrampState> {
   return "ready";
 }
 
+export async function getZkp2pSdkState(): Promise<Zkp2pSdkState> {
+  try {
+    const bridge = await getZkp2pSdkBridge();
+    if (!bridge) return "error";
+    return await bridge.getState();
+  } catch {
+    return "error";
+  }
+}
+
+export async function connectZkp2pSdk(): Promise<Zkp2pSdkState> {
+  const bridge = await getZkp2pSdkBridge();
+  if (!bridge) return "error";
+
+  const state = await bridge.getState();
+  if (state === "needs_connection") {
+    await bridge.requestConnection();
+  }
+  return await bridge.getState();
+}
+
+export async function openZkp2pSdkInstallPage(): Promise<void> {
+  const bridge = await getZkp2pSdkBridge();
+  bridge?.openInstallPage();
+}
+
+export async function onZkp2pProofComplete(
+  cb: (result: Zkp2pProofCompleteResult) => void,
+): Promise<(() => void) | null> {
+  try {
+    const bridge = await getZkp2pSdkBridge();
+    if (!bridge) return null;
+    return bridge.onProofComplete(cb);
+  } catch {
+    return null;
+  }
+}
+
 export function getZkp2pContractSnapshot(forNetwork?: Network): Zkp2pContractSnapshot {
   const suiNetwork = forNetwork ?? wallet.getState().network;
   const contractNetwork = resolveContractNetwork(suiNetwork);
 
-  const addressBook = normalizeAddressBook(
-    contractNetwork === "base" ? baseAddresses : baseSepoliaAddresses,
-  );
+  const rawNetwork = contractNetwork === "base" ? baseAddresses : baseSepoliaAddresses;
+  const addressBook = normalizeAddressBook(rawNetwork);
 
   const paymentMethods = resolvePaymentMethods();
 
-  const chainId = contractNetwork === "base" ? 8453 : 84532;
+  const chainId = readNumber((rawNetwork as Record<string, unknown>).chainId) ?? (contractNetwork === "base" ? 8453 : 84532);
 
   return {
     network: contractNetwork,
@@ -165,7 +233,7 @@ export async function connectWaaPBaseAddress(): Promise<string> {
   return await wallet.linkWaaPBaseAddress();
 }
 
-export function launchOnramp({ recipientAddress, referrer }: LaunchOnrampParams): LaunchOnrampResult {
+export async function launchOnramp({ recipientAddress, referrer }: LaunchOnrampParams): Promise<LaunchOnrampResult> {
   const cfg = getZkp2pRuntimeConfig();
   const snapshot = getZkp2pContractSnapshot();
   const toToken = (import.meta.env.VITE_ZKP2P_ONRAMP_TO_TOKEN as string | undefined)?.trim()
@@ -173,17 +241,33 @@ export function launchOnramp({ recipientAddress, referrer }: LaunchOnrampParams)
     || DEFAULT_TO_TOKEN;
 
   const chosenReferrer = referrer ?? cfg.referrer;
-  const url = new URL(cfg.providersBaseUrl);
-  url.searchParams.set("recipientAddress", recipientAddress);
-  url.searchParams.set("toToken", toToken);
-  url.searchParams.set("contractNetwork", snapshot.network);
-  url.searchParams.set("referrer", chosenReferrer);
-  if (snapshot.orchestrator) url.searchParams.set("orchestrator", snapshot.orchestrator);
-  if (snapshot.escrow) url.searchParams.set("escrow", snapshot.escrow);
-  if (cfg.referrerLogoUrl) url.searchParams.set("referrerLogo", cfg.referrerLogoUrl);
-  if (cfg.callbackUrl) url.searchParams.set("callbackUrl", cfg.callbackUrl);
+  const target = buildProvidersOnrampUrl({
+    recipientAddress,
+    toToken,
+    referrer: chosenReferrer,
+    snapshot,
+  });
 
-  const target = url.toString();
+  const sdkState = await getZkp2pSdkState();
+  if (sdkState === "ready") {
+    const bridge = await getZkp2pSdkBridge();
+    if (bridge) {
+      bridge.onramp({
+        referrer: chosenReferrer,
+        referrerLogo: cfg.referrerLogoUrl ?? undefined,
+        toToken,
+        recipientAddress,
+        callbackUrl: cfg.callbackUrl ?? undefined,
+      });
+      return {
+        url: target,
+        contractNetwork: snapshot.network,
+        mode: "sdk",
+        sdkState,
+      };
+    }
+  }
+
   const popup = window.open(target, "_blank", "noopener,noreferrer");
   if (!popup) {
     window.location.href = target;
@@ -192,20 +276,30 @@ export function launchOnramp({ recipientAddress, referrer }: LaunchOnrampParams)
   return {
     url: target,
     contractNetwork: snapshot.network,
+    mode: "providers-url",
+    sdkState,
   };
 }
 
-export async function executeSettlement({ baseAddress }: { baseAddress: string }): Promise<SettlementResult> {
+export async function executeSettlement({
+  baseAddress,
+  amountUsd = getDefaultSettlementUsd(),
+}: {
+  baseAddress: string;
+  amountUsd?: number;
+}): Promise<SettlementResult> {
   const route = await resolveZkp2pSuiRoute();
-  return executeSponsoredSettlement({ route, baseAddress });
+  return executeSponsoredSettlement({ route, baseAddress, amountUsd });
 }
 
 async function executeSponsoredSettlement({
   route,
   baseAddress,
+  amountUsd,
 }: {
   route: Zkp2pSuiRoute;
   baseAddress: string;
+  amountUsd: number;
 }): Promise<SettlementResult> {
   const sponsorStatus = await getSponsorStatus();
   if (!sponsorStatus.configured || !sponsorStatus.sponsorAddress) {
@@ -220,7 +314,7 @@ async function executeSponsoredSettlement({
 
   const rebuilt = await wallet.buildSponsoredTx(async (tx) => {
     const ika = await tryAttachIkaPrBridge(tx, {
-      amountUsd: 0,
+      amountUsd,
       paymentMethod: "zkp2p-contracts",
       baseAddress,
       recipientAddress: route.address,
@@ -230,7 +324,7 @@ async function executeSponsoredSettlement({
       buildOutcome.path = "ika-pr1646";
     } else {
       const contractAttached = tryAttachConfiguredSettlementMoveCall(tx, {
-        amountUsd: 0,
+        amountUsd,
         paymentMethod: "zkp2p-contracts",
         baseAddress,
         recipientAddress: route.address,
@@ -385,7 +479,11 @@ function normalizeAddressBook(input: unknown): AddressBook {
   if (!input || typeof input !== "object") {
     return {};
   }
-  return input as AddressBook;
+  const record = input as Record<string, unknown>;
+  if (record.contracts && typeof record.contracts === "object") {
+    return record.contracts as AddressBook;
+  }
+  return record as AddressBook;
 }
 
 function resolvePaymentMethods(): string[] {
@@ -407,4 +505,82 @@ function readString(value: unknown): string | null {
   return trimmed ? trimmed : null;
 }
 
+function readNumber(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return value;
+}
+
+function getDefaultSettlementUsd(): number {
+  const raw = (import.meta.env.VITE_ZKP2P_DEFAULT_SETTLEMENT_USD as string | undefined)?.trim();
+  const parsed = raw ? Number(raw) : Number.NaN;
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return 1;
+}
+
+async function getZkp2pSdkBridge(): Promise<Zkp2pSdkBridge | null> {
+  try {
+    const mod = await import("@zkp2p/sdk") as { peerExtensionSdk?: unknown };
+    if (!mod.peerExtensionSdk || typeof mod.peerExtensionSdk !== "object") {
+      return null;
+    }
+    const sdk = mod.peerExtensionSdk as Partial<Zkp2pSdkBridge>;
+    if (
+      typeof sdk.getState !== "function"
+      || typeof sdk.requestConnection !== "function"
+      || typeof sdk.openInstallPage !== "function"
+      || typeof sdk.onramp !== "function"
+      || typeof sdk.onProofComplete !== "function"
+    ) {
+      return null;
+    }
+    return sdk as Zkp2pSdkBridge;
+  } catch {
+    return null;
+  }
+}
+
+function buildProvidersOnrampUrl({
+  recipientAddress,
+  toToken,
+  referrer,
+  snapshot,
+}: {
+  recipientAddress: string;
+  toToken: string;
+  referrer: string;
+  snapshot: Zkp2pContractSnapshot;
+}): string {
+  const cfg = getZkp2pRuntimeConfig();
+  const url = new URL(cfg.providersBaseUrl);
+  url.searchParams.set("recipientAddress", recipientAddress);
+  url.searchParams.set("toToken", toToken);
+  url.searchParams.set("contractNetwork", snapshot.network);
+  url.searchParams.set("referrer", referrer);
+  if (snapshot.orchestrator) url.searchParams.set("orchestrator", snapshot.orchestrator);
+  if (snapshot.escrow) url.searchParams.set("escrow", snapshot.escrow);
+  if (cfg.referrerLogoUrl) url.searchParams.set("referrerLogo", cfg.referrerLogoUrl);
+  if (cfg.callbackUrl) url.searchParams.set("callbackUrl", cfg.callbackUrl);
+  return url.toString();
+}
+
 export type Zkp2pContractNetwork = "base" | "baseSepolia";
+
+// ── CCTP re-exports ──────────────────────────────────────────────────────
+export {
+  executeCctpBridge,
+  resumePendingBridge,
+  loadPendingBridge,
+  clearPendingBridge,
+  burnUsdcOnBase,
+  waitForAttestation,
+  mintUsdcOnSui,
+  type CctpPhase,
+  type CctpProgress,
+  type CctpBridgeParams,
+  type CctpBurnResult,
+  type CctpAttestationResult,
+  type CctpMintResult,
+  type PendingCctpBridge,
+} from "./cctp";
+
+export { getCctpConfig, type CctpConfig } from "./cctp-config";

@@ -215,7 +215,7 @@ bun run twa:build         # new .aab
 | **DeepBook** | `@mysten/deepbook-v3` | SDK queries: `midPrice`, `getLevel2TicksFromMid`, pool params |
 | **Seal** | `@mysten/seal` | Real `SealClient.encrypt()` on testnet + local AES-GCM demo |
 | **Ika MPC** | `@ika.xyz/sdk` | Network status, dWallet info, dynamic import for code splitting |
-| **Cross-chain Onramp** | WaaP + zkp2p-contracts + Ika | Base USDC onramp route + sponsored Sui settlement PTB |
+| **Cross-chain Onramp** | WaaP + zkp2p SDK + zkp2p-contracts + Ika | SDK-first Base USDC onramp + sponsored Sui settlement PTB |
 | **TradePort** | REST API | NFT browsing |
 | **Proof Verifier** | — | Link to on-chain Groth16 / Ligetron verification |
 | **x402 Scaffold** | `@x402/core` + `@x402/hono` | Paywalled endpoints ready for `@x402/sui` |
@@ -253,6 +253,18 @@ VITE_ZKP2P_CALLBACK_URL=
 # Optional override for providers onramp toToken
 VITE_ZKP2P_ONRAMP_TO_TOKEN=8453:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
 
+# Auto-trigger settlement when Base USDC balance increases
+VITE_ZKP2P_AUTO_SETTLE_ON_BASE_USDC=true
+# Threshold in USDC units (supports decimals)
+VITE_ZKP2P_AUTO_SETTLE_MIN_USDC=1
+
+# Default settlement amount used by Home one-tap action
+VITE_ZKP2P_DEFAULT_SETTLEMENT_USD=1
+
+# Optional explicit Sui USDC coin type for balance tracking
+# If omitted, Thunderbun sums all coins ending in ::usdc::USDC
+VITE_SUI_USDC_COIN_TYPE=
+
 # Optional Move entrypoint for Sui-side settlement logic
 # e.g. 0x...::zkp2p_bridge::settle_from_base_onramp
 VITE_ZKP2P_SUI_SETTLEMENT_TARGET=
@@ -263,6 +275,16 @@ VITE_ZKP2P_DEEPBOOK_HOOK_TARGET=
 
 # Optional: enable runtime adapter lookup for Ika PR1646 helper exports
 VITE_IKA_PR1646_ENABLED=false
+
+# CCTP gas smoothing (auto dust swap USDC -> ETH on Base before burn)
+VITE_CCTP_AUTO_SWAP_DUST=true
+VITE_CCTP_TRY_BASE_SPONSOR=true
+VITE_CCTP_DUST_SWAP_USDC=1000000
+VITE_CCTP_MIN_BASE_GAS_WEI=5000000000000
+VITE_CCTP_DUST_POOL_FEE=500
+VITE_CCTP_DUST_MIN_OUT_WEI=0
+VITE_CCTP_DUST_SWAP_ROUTER=0x2626664c2603336E57B271c5C0b26F421741e481
+VITE_CCTP_BASE_WETH=0x4200000000000000000000000000000000000006
 ```
 
 ---
@@ -320,6 +342,11 @@ wrangler secret put SPONSOR_PRIVATE_KEY
 
 # Optionally set max gas budget in MIST (default: 50_000_000 = 0.05 SUI)
 wrangler secret put MAX_GAS_BUDGET
+
+# Optional Base gas sponsor (EVM) for bootstrap gas on Base/Base Sepolia
+wrangler secret put BASE_SPONSOR_PRIVATE_KEY
+# Optional vars in wrangler.toml:
+# BASE_SPONSOR_RPC_URL, BASE_SPONSOR_AMOUNT_WEI, BASE_SPONSOR_COOLDOWN_MS
 ```
 
 When configured, clients can send base64-encoded transaction bytes to `/api/sponsor` and receive a sponsor signature back.

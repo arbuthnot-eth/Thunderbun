@@ -26,9 +26,22 @@ export interface Env {
 
   /** Max gas budget in MIST — defaults to 50_000_000 (0.05 SUI) */
   MAX_GAS_BUDGET?: string;
+
+  /** Optional EVM sponsor private key (0x...) for Base/Base Sepolia gas top-ups */
+  BASE_SPONSOR_PRIVATE_KEY?: string;
+
+  /** Optional override RPC URL for Base sponsor transactions */
+  BASE_SPONSOR_RPC_URL?: string;
+
+  /** Amount to sponsor in wei (default 0.0002 ETH) */
+  BASE_SPONSOR_AMOUNT_WEI?: string;
+
+  /** Per-recipient cooldown window for sponsor top-ups (default 1800000 ms) */
+  BASE_SPONSOR_COOLDOWN_MS?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
+const baseSponsorLastSent = new Map<string, number>();
 
 app.use("*", cors());
 
@@ -97,6 +110,95 @@ app.post("/api/sponsor", async (c) => {
   });
 });
 
+// ── Base gas sponsor (optional) ──────────────────────────────────────────────
+
+app.get("/api/base-sponsor/status", (c) => {
+  const configured = Boolean(c.env.BASE_SPONSOR_PRIVATE_KEY);
+  return c.json({
+    configured,
+    amountWei: configured ? (c.env.BASE_SPONSOR_AMOUNT_WEI ?? "200000000000000") : null,
+    cooldownMs: Number(c.env.BASE_SPONSOR_COOLDOWN_MS ?? "1800000"),
+    network: c.env.NETWORK === "mainnet" ? "base" : "baseSepolia",
+  });
+});
+
+app.post("/api/base-sponsor", async (c) => {
+  const privateKey = c.env.BASE_SPONSOR_PRIVATE_KEY;
+  if (!privateKey) {
+    return c.json({ error: "Base sponsor is not configured." }, 501);
+  }
+
+  const rawBody = await c.req.json<{ recipient?: string }>().catch(() => null);
+  const recipient = (rawBody?.recipient ?? "").trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
+    return c.json({ error: "Invalid recipient address." }, 400);
+  }
+
+  const now = Date.now();
+  const cooldownMs = Number(c.env.BASE_SPONSOR_COOLDOWN_MS ?? "1800000");
+  const lastSent = baseSponsorLastSent.get(recipient.toLowerCase()) ?? 0;
+  if (cooldownMs > 0 && now - lastSent < cooldownMs) {
+    const waitMs = cooldownMs - (now - lastSent);
+    return c.json({ error: `Sponsor cooldown active. Try again in ${Math.ceil(waitMs / 1000)}s.` }, 429);
+  }
+
+  let amountWei: bigint;
+  try {
+    amountWei = BigInt(c.env.BASE_SPONSOR_AMOUNT_WEI ?? "200000000000000");
+  } catch {
+    return c.json({ error: "Invalid BASE_SPONSOR_AMOUNT_WEI." }, 500);
+  }
+  if (amountWei <= 0n) {
+    return c.json({ error: "BASE_SPONSOR_AMOUNT_WEI must be > 0." }, 500);
+  }
+
+  try {
+    const [{ createWalletClient, createPublicClient, http }, { privateKeyToAccount }, { base, baseSepolia }] = await Promise.all([
+      import("viem"),
+      import("viem/accounts"),
+      import("viem/chains"),
+    ]);
+
+    const chain = c.env.NETWORK === "mainnet" ? base : baseSepolia;
+    const rpcUrl = c.env.BASE_SPONSOR_RPC_URL?.trim() || chain.rpcUrls.default.http[0];
+    const account = privateKeyToAccount(asHexPrivateKey(privateKey));
+
+    const walletClient = createWalletClient({
+      account,
+      chain,
+      transport: http(rpcUrl),
+    });
+    const publicClient = createPublicClient({
+      chain,
+      transport: http(rpcUrl),
+    });
+
+    const txHash = await walletClient.sendTransaction({
+      account,
+      to: recipient as `0x${string}`,
+      value: amountWei,
+      chain,
+    });
+
+    baseSponsorLastSent.set(recipient.toLowerCase(), now);
+
+    void publicClient.waitForTransactionReceipt({
+      hash: txHash,
+      timeout: 60_000,
+    }).catch(() => undefined);
+
+    return c.json({
+      txHash,
+      recipient,
+      amountWei: amountWei.toString(),
+      network: chain.name,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `Base sponsor failed: ${message}` }, 500);
+  }
+});
+
 // ── x402 paywalled routes (scaffold — ready for @x402/sui) ─────────────────
 
 app.use("/api/paid/*", async (c, next) => {
@@ -116,3 +218,11 @@ app.get("/api/paid/example", (c) => {
 app.all("*", async (c) => c.env.ASSETS.fetch(c.req.raw));
 
 export default app;
+
+function asHexPrivateKey(value: string): `0x${string}` {
+  const trimmed = value.trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(trimmed)) {
+    throw new Error("Invalid BASE_SPONSOR_PRIVATE_KEY format.");
+  }
+  return trimmed as `0x${string}`;
+}

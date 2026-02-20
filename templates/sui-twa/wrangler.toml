@@ -34,6 +34,10 @@ binding              = "ASSETS"
 # Plain vars go here; secrets use: wrangler secret put VAR_NAME
 [vars]
 NETWORK = "testnet"
+# Optional Base gas sponsor vars:
+# BASE_SPONSOR_RPC_URL = "https://sepolia.base.org"
+# BASE_SPONSOR_AMOUNT_WEI = "200000000000000"
+# BASE_SPONSOR_COOLDOWN_MS = "1800000"
 
 # Production overrides
 [env.production]
@@ -44,6 +48,10 @@ routes = [
 ]
 [env.production.vars]
 NETWORK = "mainnet"
+# Optional Base gas sponsor vars:
+# BASE_SPONSOR_RPC_URL = "https://mainnet.base.org"
+# BASE_SPONSOR_AMOUNT_WEI = "200000000000000"
+# BASE_SPONSOR_COOLDOWN_MS = "1800000"
 
 # Preview / staging
 [env.preview]

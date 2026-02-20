@@ -1,0 +1,4 @@
+Paste this single line into DevTools Console:
+
+(()=>{const p=JSON.parse(sessionStorage.getItem('cctp-pending-bridge')||'null');console.log('pending:',p);console.log('burn tx:',p&&p.burnTxHash?'https://basescan.org/tx/'+p.burnTxHash:null);console.log('attestation:',p&&p.messageHash?'https://iris-api.circle.com/v1/attestations/'+p.messageHash:null);return p;})()
+

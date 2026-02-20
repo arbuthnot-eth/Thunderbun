@@ -23,6 +23,7 @@ export type Network = "mainnet" | "testnet" | "devnet";
 export interface WalletState {
   connected: boolean;
   address: string | null;
+  suiUsdcBalance: bigint | null;
   waapBaseAddress: string | null;
   waapBaseBalance: bigint | null;
   waapBaseUsdcBalance: bigint | null;
@@ -129,10 +130,31 @@ function hasWaaPName(name: string | undefined): boolean {
   return WAAP_CONNECT_HINTS.some((hint) => lowered.includes(hint));
 }
 
+async function ensureBaseChain(provider: WaaPEvmProvider): Promise<void> {
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: BASE_CHAIN_ID }],
+    });
+  } catch {
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId: BASE_CHAIN_ID,
+        chainName: "Base",
+        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+        rpcUrls: ["https://mainnet.base.org"],
+        blockExplorerUrls: ["https://basescan.org"],
+      }],
+    });
+  }
+}
+
 // ── WalletManager ────────────────────────────────────────────────────────
 class WalletManager {
   private listeners: Listener[] = [];
   private balanceCache: bigint | null = null;
+  private suiUsdcBalanceCache: bigint | null = null;
   private waapBaseAddress: string | null = null;
   private waapBaseBalanceCache: bigint | null = null;
   private waapBaseUsdcBalanceCache: bigint | null = null;
@@ -155,6 +177,7 @@ class WalletManager {
     return {
       connected,
       address,
+      suiUsdcBalance: connected ? this.suiUsdcBalanceCache : null,
       waapBaseAddress: connected ? this.waapBaseAddress : null,
       waapBaseBalance: connected ? this.waapBaseBalanceCache : null,
       waapBaseUsdcBalance: connected ? this.waapBaseUsdcBalanceCache : null,
@@ -240,6 +263,7 @@ class WalletManager {
   async disconnect(): Promise<void> {
     await dAppKit.disconnectWallet();
     this.balanceCache = null;
+    this.suiUsdcBalanceCache = null;
     this.waapBaseAddress = null;
     this.waapBaseBalanceCache = null;
     this.waapBaseUsdcBalanceCache = null;
@@ -269,6 +293,7 @@ class WalletManager {
     }
 
     this.balanceCache = null;
+    this.suiUsdcBalanceCache = null;
     this.waapBaseAddress = null;
     this.waapBaseBalanceCache = null;
     this.waapBaseUsdcBalanceCache = null;
@@ -298,6 +323,7 @@ class WalletManager {
       }
     })());
 
+    tasks.push(this.refreshSuiUsdcBalance(address));
     tasks.push(this.refreshSuiPrimaryName(address));
     tasks.push(this.refreshBaseProfile());
 
@@ -325,6 +351,11 @@ class WalletManager {
     return `${formatEthFromWei(this.waapBaseBalanceCache)} ETH`;
   }
 
+  formatSuiUsdcBalance(): string {
+    if (this.suiUsdcBalanceCache === null) return "—";
+    return formatUsdc(this.suiUsdcBalanceCache);
+  }
+
   formatBaseUsdcBalance(): string {
     if (this.waapBaseUsdcBalanceCache === null) return "—";
     return formatUsdc(this.waapBaseUsdcBalanceCache);
@@ -335,6 +366,30 @@ class WalletManager {
     if (!addr) return "";
     if (full) return addr;
     return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  }
+
+  async getBaseEthBalance(): Promise<bigint> {
+    await waapReady;
+    const provider = window.waap as WaaPEvmProvider | undefined;
+    if (!provider) throw new Error("WaaP provider not available.");
+
+    const baseAddress = this.waapBaseAddress;
+    if (!baseAddress) throw new Error("WaaP Base address not linked.");
+
+    await ensureBaseChain(provider);
+    const weiHex = await provider.request({
+      method: "eth_getBalance",
+      params: [baseAddress, "latest"],
+    });
+
+    if (typeof weiHex !== "string") {
+      throw new Error("eth_getBalance returned non-string.");
+    }
+
+    const wei = BigInt(weiHex);
+    this.waapBaseBalanceCache = wei;
+    this.emit();
+    return wei;
   }
 
   async getWaaPBaseAddress({ request = false }: { request?: boolean } = {}): Promise<string | null> {
@@ -371,6 +426,79 @@ class WalletManager {
     return base;
   }
 
+  // ── Base EVM Transactions ──────────────────────────────────────────────────
+
+  async sendBaseTransaction({ to, data, value }: {
+    to: string;
+    data: string;
+    value?: string;
+  }): Promise<string> {
+    await waapReady;
+    const provider = window.waap as WaaPEvmProvider | undefined;
+    if (!provider) throw new Error("WaaP provider not available.");
+
+    const baseAddr = this.waapBaseAddress;
+    if (!baseAddr) throw new Error("WaaP Base address not linked.");
+
+    await ensureBaseChain(provider);
+
+    const txParams: Record<string, string> = { from: baseAddr, to, data };
+    if (value) txParams.value = value;
+
+    const txHash = await provider.request({
+      method: "eth_sendTransaction",
+      params: [txParams],
+    });
+
+    if (typeof txHash !== "string") {
+      throw new Error("eth_sendTransaction did not return a tx hash.");
+    }
+
+    return txHash;
+  }
+
+  async waitForBaseReceipt(txHash: string, timeoutMs = 120_000): Promise<Record<string, unknown>> {
+    await waapReady;
+    const provider = window.waap as WaaPEvmProvider | undefined;
+    if (!provider) throw new Error("WaaP provider not available.");
+    await ensureBaseChain(provider);
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const receipt = await provider.request({
+        method: "eth_getTransactionReceipt",
+        params: [txHash],
+      });
+
+      if (receipt && typeof receipt === "object") {
+        const r = receipt as Record<string, unknown>;
+        const status = typeof r.status === "string" ? r.status : "";
+        if (status === "0x0") {
+          throw new Error(`Base transaction reverted: ${txHash}`);
+        }
+        return r;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
+
+    throw new Error(`Timed out waiting for Base tx receipt: ${txHash}`);
+  }
+
+  async callBase({ to, data }: { to: string; data: string }): Promise<string> {
+    await waapReady;
+    const provider = window.waap as WaaPEvmProvider | undefined;
+    if (!provider) throw new Error("WaaP provider not available.");
+    await ensureBaseChain(provider);
+
+    const result = await provider.request({
+      method: "eth_call",
+      params: [{ to, data }, "latest"],
+    });
+    if (typeof result !== "string") throw new Error("eth_call returned non-string.");
+    return result;
+  }
+
   // ── Sponsored Transactions ────────────────────────────────────────────────
 
   async buildSponsoredTx(
@@ -387,6 +515,26 @@ class WalletManager {
   }
 
   async executeSponsoredTx(
+    bytes: string,
+    signatures: string[],
+  ): Promise<unknown> {
+    return this.executeTransactionBytes(bytes, signatures);
+  }
+
+  async signAndExecuteSuiTransaction(transaction: Transaction): Promise<unknown> {
+    try {
+      return await dAppKit.signAndExecuteTransaction({ transaction });
+    } catch (err) {
+      if (!isUnsupportedSignAndExecute(err)) {
+        throw err;
+      }
+
+      const { signature, bytes } = await dAppKit.signTransaction({ transaction });
+      return this.executeTransactionBytes(bytes, [signature]);
+    }
+  }
+
+  private async executeTransactionBytes(
     bytes: string,
     signatures: string[],
   ): Promise<unknown> {
@@ -419,6 +567,7 @@ class WalletManager {
       }
     } else {
       this.balanceCache = null;
+      this.suiUsdcBalanceCache = null;
       this.waapBaseAddress = null;
       this.waapBaseBalanceCache = null;
       this.waapBaseUsdcBalanceCache = null;
@@ -451,23 +600,7 @@ class WalletManager {
         }
       }
 
-      try {
-        await provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: BASE_CHAIN_ID }],
-        });
-      } catch {
-        await provider.request({
-          method: "wallet_addEthereumChain",
-          params: [{
-            chainId: BASE_CHAIN_ID,
-            chainName: "Base",
-            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-            rpcUrls: ["https://mainnet.base.org"],
-            blockExplorerUrls: ["https://basescan.org"],
-          }],
-        });
-      }
+      await ensureBaseChain(provider);
 
       const accounts = await provider.request({
         method: request ? "eth_requestAccounts" : "eth_accounts",
@@ -505,6 +638,40 @@ class WalletManager {
     }
   }
 
+  private async refreshSuiUsdcBalance(address: string): Promise<void> {
+    try {
+      const client = dAppKit.getClient();
+      const preferredCoinType = (import.meta.env.VITE_SUI_USDC_COIN_TYPE as string | undefined)?.trim() || null;
+
+      if (preferredCoinType) {
+        const { balance } = await client.getBalance({
+          owner: address,
+          coinType: preferredCoinType,
+        });
+        this.suiUsdcBalanceCache = BigInt(balance.balance);
+        return;
+      }
+
+      let total = 0n;
+      let cursor: string | null = null;
+
+      do {
+        const page = await client.listBalances({ owner: address, cursor, limit: 100 });
+        for (const item of page.balances) {
+          if (typeof item.coinType === "string" && item.coinType.endsWith("::usdc::USDC")) {
+            total += BigInt(item.balance);
+          }
+        }
+        cursor = page.cursor;
+        if (!page.hasNextPage) break;
+      } while (cursor);
+
+      this.suiUsdcBalanceCache = total;
+    } catch {
+      this.suiUsdcBalanceCache = null;
+    }
+  }
+
   private async refreshBaseProfile(): Promise<void> {
     const baseAddress = this.waapBaseAddress;
     if (!baseAddress) {
@@ -523,25 +690,9 @@ class WalletManager {
     }
 
     try {
-      await provider.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: BASE_CHAIN_ID }],
-      });
+      await ensureBaseChain(provider);
     } catch {
-      try {
-        await provider.request({
-          method: "wallet_addEthereumChain",
-          params: [{
-            chainId: BASE_CHAIN_ID,
-            chainName: "Base",
-            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-            rpcUrls: ["https://mainnet.base.org"],
-            blockExplorerUrls: ["https://basescan.org"],
-          }],
-        });
-      } catch {
-        /* chain switch failed — balance queries will likely fail too */
-      }
+      /* chain switch failed — balance queries will likely fail too */
     }
 
     try {
@@ -610,4 +761,10 @@ async function resolveBasePrimaryName(address: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function isUnsupportedSignAndExecute(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return message.includes("does not support signing and executing transactions")
+    || (message.includes("sign") && message.includes("execute") && message.includes("not support"));
 }
