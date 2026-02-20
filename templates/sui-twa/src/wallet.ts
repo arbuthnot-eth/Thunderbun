@@ -14,6 +14,11 @@ import { toBase64 } from "@mysten/sui/utils";
 
 // Load web components (connect modal, etc.)
 import "@mysten/dapp-kit-core/web";
+import type { UiWalletAccount } from "@wallet-standard/ui";
+import {
+  getWalletAccountForUiWalletAccount_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as getWalletAccountForUiWalletAccount,
+  getWalletForHandle_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as getWalletForHandle,
+} from "@wallet-standard/ui-registry";
 
 import { waapReady } from "./init-waap";
 import { dAppKit } from "./dapp-kit";
@@ -38,8 +43,8 @@ type Listener = (state: WalletState) => void;
 
 // ── Connect modal instance ───────────────────────────────────────────────
 let connectModal: HTMLElement | null = null;
-const WAAP_HINTS: string[] = ["waap", "silk", "human.tech", "walletconnect", "reown"];
-const WAAP_CONNECT_HINTS: string[] = ["waap", "silk", "human"];
+const WAAP_HINTS: string[] = ["waap", "silk", "human.tech", "walletconnect", "reown", "peer"];
+const WAAP_CONNECT_HINTS: string[] = ["waap", "silk", "human", "peer"];
 const BASE_CHAIN_ID = "0x2105";
 const BASE_USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const BALANCE_OF_SELECTOR = "0x70a08231";
@@ -427,6 +432,27 @@ class WalletManager {
     return base;
   }
 
+  async getWaaPSuiAddress(): Promise<string> {
+    await waapReady;
+
+    const current = dAppKit.stores.$connection.get();
+    if (!current.isConnected || !current.account || !hasWaaPName(current.wallet?.name)) {
+      const preferredWaaP = selectPreferredWaaPWallet();
+      if (!preferredWaaP) {
+        throw new Error("WaaP Sui wallet is not available. Open connect and choose WaaP first.");
+      }
+      await dAppKit.connectWallet({ wallet: preferredWaaP });
+    }
+
+    const resolved = dAppKit.stores.$connection.get();
+    const address = resolved.account?.address ?? null;
+    if (!address || !hasWaaPName(resolved.wallet?.name)) {
+      throw new Error("WaaP Sui address could not be resolved.");
+    }
+
+    return address;
+  }
+
   // ── Base EVM Transactions ──────────────────────────────────────────────────
 
   async sendBaseTransaction({ to, data, value }: {
@@ -506,6 +532,8 @@ class WalletManager {
     build: (tx: Transaction) => void | Promise<void>,
     sponsorAddress: string,
   ): Promise<{ bytes: string; userSignature: string }> {
+    await this.ensureWalletCanSignTransactions();
+
     const mod = await import("@mysten/sui/transactions");
     const tx = new mod.Transaction();
     tx.setSender(this.getState().address!);
@@ -524,23 +552,31 @@ class WalletManager {
   }
 
   async signAndExecuteSuiTransaction(transaction: Transaction): Promise<unknown> {
-    const signable = await this.toSignableTransactionInput(transaction);
-
-    try {
-      return await dAppKit.signAndExecuteTransaction({ transaction: signable });
-    } catch (err) {
-      if (!isUnsupportedSignAndExecute(err)) {
-        throw err;
-      }
-
-      const { signature, bytes } = await dAppKit.signTransaction({ transaction: signable });
-      return this.executeTransactionBytes(bytes, [signature]);
+    await this.ensureWalletCanSignAndOrExecuteTransactions();
+    const signable = await this.toSignableTransactionInput(transaction, { forceSerialized: true });
+    if (typeof signable !== "string") {
+      throw new Error("Failed to serialize Sui transaction for signing.");
     }
+    const serialized = signable;
+
+    // Avoid dAppKit.signAndExecuteTransaction route; some WaaP builds reject its wrapper payload.
+    const blockResult = await this.trySignAndExecuteViaBlockFeature(serialized);
+    if (blockResult) {
+      return blockResult;
+    }
+
+    await this.ensureWalletCanSignTransactions();
+    const { signature, bytes } = await dAppKit.signTransaction({ transaction: serialized });
+    return this.executeTransactionBytes(bytes, [signature]);
   }
 
-  private async toSignableTransactionInput(transaction: Transaction): Promise<Transaction | string> {
+  private async toSignableTransactionInput(
+    transaction: Transaction,
+    opts?: { forceSerialized?: boolean },
+  ): Promise<Transaction | string> {
     const conn = dAppKit.stores.$connection.get();
-    if (!hasWaaPName(conn.wallet?.name)) {
+    const shouldSerialize = Boolean(opts?.forceSerialized) || hasWaaPName(conn.wallet?.name);
+    if (!shouldSerialize) {
       return transaction;
     }
 
@@ -562,6 +598,190 @@ class WalletManager {
       transaction: txBytes,
       signatures,
     });
+  }
+
+  private async trySignAndExecuteViaBlockFeature(serializedTx: string): Promise<unknown | null> {
+    const conn = dAppKit.stores.$connection.get();
+    const account = conn.account as UiWalletAccount | null;
+    if (!account) return null;
+    if (!this.isAccountOnCurrentSuiChain(account)) return null;
+
+    type WalletWithFeatures = {
+      features?: Record<string, unknown>;
+    };
+    type SignAndExecuteBlockFeature = {
+      signAndExecuteTransactionBlock(args: {
+        account: unknown;
+        chain: string;
+        transactionBlock: Transaction;
+        options?: {
+          showRawEffects?: boolean;
+          showRawInput?: boolean;
+        };
+      }): Promise<unknown>;
+    };
+
+    const wallet = getWalletForHandle(account) as WalletWithFeatures;
+    const feature = wallet.features?.["sui:signAndExecuteTransactionBlock"] as SignAndExecuteBlockFeature | undefined;
+    if (!feature || typeof feature.signAndExecuteTransactionBlock !== "function") {
+      return null;
+    }
+
+    const underlyingAccount = getWalletAccountForUiWalletAccount(account);
+    const txMod = await import("@mysten/sui/transactions");
+    const transactionBlock = txMod.Transaction.from(serializedTx);
+    const sender = this.getState().address;
+    if (sender) {
+      transactionBlock.setSenderIfNotSet(sender);
+    }
+
+    const chain = `sui:${dAppKit.stores.$currentNetwork.get()}`;
+    return await feature.signAndExecuteTransactionBlock({
+      account: underlyingAccount,
+      chain,
+      transactionBlock,
+      options: {
+        showRawEffects: true,
+        showRawInput: true,
+      },
+    });
+  }
+
+  private getFeatureAliases(feature: string): string[] {
+    if (feature === "sui:signTransaction") {
+      return ["sui:signTransaction", "sui:signTransactionBlock"];
+    }
+    if (feature === "sui:signAndExecuteTransaction") {
+      return ["sui:signAndExecuteTransaction", "sui:signAndExecuteTransactionBlock"];
+    }
+    return [feature];
+  }
+
+  private extractFeatureNames(features: unknown): Set<string> {
+    const names = new Set<string>();
+    if (!features) return names;
+
+    if (Array.isArray(features)) {
+      for (const feature of features) {
+        if (typeof feature === "string" && feature.length > 0) {
+          names.add(feature);
+        }
+      }
+      return names;
+    }
+
+    if (typeof features === "object") {
+      for (const feature of Object.keys(features as Record<string, unknown>)) {
+        if (feature.length > 0) names.add(feature);
+      }
+    }
+
+    return names;
+  }
+
+  private getAccountFeatureNames(account: UiWalletAccount | null | undefined): Set<string> {
+    if (!account) return new Set<string>();
+    try {
+      const underlying = getWalletAccountForUiWalletAccount(account) as { features?: unknown };
+      return this.extractFeatureNames(underlying.features);
+    } catch {
+      return new Set<string>();
+    }
+  }
+
+  private isAccountOnCurrentSuiChain(account: UiWalletAccount | null | undefined): boolean {
+    if (!account) return false;
+    const currentNetwork = dAppKit.stores.$currentNetwork.get();
+    const expectedChain = `sui:${currentNetwork}` as `${string}:${string}`;
+    return account.chains.includes(expectedChain);
+  }
+
+  private accountSupportsAnyFeature(account: UiWalletAccount | null | undefined, features: string[]): boolean {
+    if (!account) return false;
+    if (!this.isAccountOnCurrentSuiChain(account)) return false;
+    const accountFeatures = this.getAccountFeatureNames(account);
+    return features.some((feature) => {
+      const aliases = this.getFeatureAliases(feature);
+      return aliases.some((alias) => accountFeatures.has(alias));
+    });
+  }
+
+  private findSigningAccount(
+    accounts: readonly UiWalletAccount[] | undefined,
+    features: string[],
+  ): UiWalletAccount | null {
+    if (!accounts || accounts.length === 0) return null;
+    for (const account of accounts) {
+      if (this.accountSupportsAnyFeature(account, features)) {
+        return account;
+      }
+    }
+    return null;
+  }
+
+  private connectionSupportsAnyFeature(
+    conn: { account?: UiWalletAccount | null; isConnected: boolean },
+    features: string[],
+  ): boolean {
+    if (!conn.isConnected) return false;
+    return this.accountSupportsAnyFeature(conn.account, features);
+  }
+
+  private async ensureWalletSupportsAnyFeature(features: string[]): Promise<void> {
+    const conn = dAppKit.stores.$connection.get();
+    if (this.connectionSupportsAnyFeature(conn, features)) {
+      return;
+    }
+
+    if (conn.isConnected && conn.wallet) {
+      const candidate = this.findSigningAccount(conn.wallet.accounts, features);
+      if (candidate && candidate.address !== conn.account?.address) {
+        try {
+          dAppKit.switchAccount({ account: candidate });
+        } catch (err) {
+          console.warn("[wallet] failed switching to signing-capable account:", err);
+        }
+      }
+      const switched = dAppKit.stores.$connection.get();
+      if (this.connectionSupportsAnyFeature(switched, features)) {
+        return;
+      }
+    }
+
+    const preferredWaaP = selectPreferredWaaPWallet();
+    if (preferredWaaP) {
+      try {
+        const preselected = this.findSigningAccount(preferredWaaP.accounts, features);
+        const connected = await dAppKit.connectWallet({
+          wallet: preferredWaaP,
+          ...(preselected ? { account: preselected } : {}),
+        });
+        const resolved = this.findSigningAccount(connected.accounts, features);
+        if (resolved) {
+          dAppKit.switchAccount({ account: resolved });
+        }
+      } catch (err) {
+        console.warn("[wallet] failed reconnecting preferred WaaP wallet:", err);
+      }
+    }
+
+    const refreshed = dAppKit.stores.$connection.get();
+    if (this.connectionSupportsAnyFeature(refreshed, features)) {
+      return;
+    }
+
+    const walletName = refreshed.wallet?.name ?? conn.wallet?.name ?? "current wallet";
+    throw new Error(
+      `Connected wallet (${walletName}) cannot sign Sui transactions. Reconnect with WaaP on the same login session.`,
+    );
+  }
+
+  private async ensureWalletCanSignTransactions(): Promise<void> {
+    await this.ensureWalletSupportsAnyFeature(["sui:signTransaction"]);
+  }
+
+  private async ensureWalletCanSignAndOrExecuteTransactions(): Promise<void> {
+    await this.ensureWalletSupportsAnyFeature(["sui:signAndExecuteTransaction", "sui:signTransaction"]);
   }
 
   private emit() {
@@ -780,10 +1000,4 @@ async function resolveBasePrimaryName(address: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-function isUnsupportedSignAndExecute(err: unknown): boolean {
-  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  return message.includes("does not support signing and executing transactions")
-    || (message.includes("sign") && message.includes("execute") && message.includes("not support"));
 }

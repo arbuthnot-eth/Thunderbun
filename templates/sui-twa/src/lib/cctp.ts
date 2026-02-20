@@ -45,6 +45,7 @@ export interface CctpBurnResult {
   burnTxHash: string;
   messageBytes: Uint8Array;
   messageHash: string;
+  recipientAddress: string;
 }
 
 export interface CctpAttestationResult {
@@ -87,6 +88,8 @@ export interface PendingCctpBridge {
 }
 
 const SESSION_KEY = "cctp-pending-bridge";
+const APPROVAL_HINT_PREFIX = "cctp-approval";
+const DEFAULT_PENDING_BRIDGE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
 // ── Session Persistence ──────────────────────────────────────────────────
 
@@ -101,7 +104,8 @@ export function loadPendingBridge(): PendingCctpBridge | null {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingCctpBridge;
-    if (Date.now() - parsed.timestamp > 20 * 60 * 1000) {
+    const ttlMs = readNumberEnv("VITE_CCTP_PENDING_TTL_MS", DEFAULT_PENDING_BRIDGE_TTL_MS);
+    if (Date.now() - parsed.timestamp > ttlMs) {
       clearPendingBridge();
       return null;
     }
@@ -117,6 +121,31 @@ export function clearPendingBridge(): void {
   } catch { /* ignore */ }
 }
 
+function approvalHintKey(owner: string, token: string, spender: string): string {
+  return [
+    APPROVAL_HINT_PREFIX,
+    owner.toLowerCase(),
+    token.toLowerCase(),
+    spender.toLowerCase(),
+  ].join(":");
+}
+
+function hasApprovalHint(owner: string, token: string, spender: string): boolean {
+  try {
+    return sessionStorage.getItem(approvalHintKey(owner, token, spender)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveApprovalHint(owner: string, token: string, spender: string): void {
+  try {
+    sessionStorage.setItem(approvalHintKey(owner, token, spender), "1");
+  } catch {
+    // ignore
+  }
+}
+
 // ── Phase 1: Burn on Base ────────────────────────────────────────────────
 
 export async function burnUsdcOnBase(
@@ -124,12 +153,11 @@ export async function burnUsdcOnBase(
   progress?: (p: CctpProgress) => void,
 ): Promise<CctpBurnResult> {
   const config = getCctpConfig(params.network ?? wallet.getState().network);
-  const baseAddress = wallet.getState().waapBaseAddress;
-  if (!baseAddress) throw new Error("WaaP Base address not linked.");
-
   const amount = params.amount;
-  const recipientAddress = params.recipientAddress ?? wallet.getState().address;
+  const recipientAddress = params.recipientAddress ?? await wallet.getWaaPSuiAddress();
   if (!recipientAddress) throw new Error("No Sui recipient address.");
+  const baseAddress = await wallet.getWaaPBaseAddress({ request: false });
+  if (!baseAddress) throw new Error("WaaP Base address not linked.");
 
   await maybeAutoSwapDustForGas(config, amount, progress);
 
@@ -140,18 +168,31 @@ export async function burnUsdcOnBase(
     baseAddress,
     config.base.tokenMessenger,
   );
+  const allowanceHint = hasApprovalHint(baseAddress, config.base.usdc, config.base.tokenMessenger);
 
   // Approve if needed
-  if (currentAllowance < amount) {
-    progress?.({ phase: "approving", message: "Requesting USDC approval…" });
-    const approveData = encodeApprove(config.base.tokenMessenger, amount);
+  const needsApproval = currentAllowance === null
+    ? !allowanceHint
+    : currentAllowance < amount;
+
+  if (needsApproval) {
+    const approveMax = readBooleanEnv("VITE_CCTP_APPROVE_MAX", true);
+    const approveAmount = approveMax ? MAX_UINT256 : amount;
+    progress?.({
+      phase: "approving",
+      message: approveMax ? "Requesting USDC max approval…" : "Requesting USDC approval…",
+    });
+    const approveData = encodeApprove(config.base.tokenMessenger, approveAmount);
     const approveTxHash = await wallet.sendBaseTransaction({
       to: config.base.usdc,
       data: approveData,
     });
     progress?.({ phase: "approving", message: `Approval tx sent: ${approveTxHash.slice(0, 14)}…` });
     await wallet.waitForBaseReceipt(approveTxHash);
+    saveApprovalHint(baseAddress, config.base.usdc, config.base.tokenMessenger);
     progress?.({ phase: "approving", message: "USDC approved." });
+  } else if (currentAllowance === null && allowanceHint) {
+    progress?.({ phase: "approving", message: "Allowance check unavailable, using prior approval hint." });
   } else {
     progress?.({ phase: "approving", message: "Allowance sufficient, skipping approve." });
   }
@@ -187,7 +228,7 @@ export async function burnUsdcOnBase(
     timestamp: Date.now(),
   });
 
-  return { burnTxHash, messageBytes, messageHash };
+  return { burnTxHash, messageBytes, messageHash, recipientAddress };
 }
 
 // ── Phase 2: Wait for Attestation ────────────────────────────────────────
@@ -197,20 +238,63 @@ export async function waitForAttestation(
   messageBytes: Uint8Array,
   progress?: (p: CctpProgress) => void,
   network?: Network,
+  burnTxHash?: string,
 ): Promise<CctpAttestationResult> {
   const config = getCctpConfig(network ?? wallet.getState().network);
   const url = `${config.irisApiUrl}/v1/attestations/${messageHash}`;
 
   const deadline = Date.now() + config.pollingTimeoutMs;
   let attempts = 0;
+  let lastStatus: string | null = null;
+  let lastDelayReason: string | null = null;
 
   while (Date.now() < deadline) {
     attempts++;
     progress?.({
       phase: "attesting",
-      message: `Polling attestation (attempt ${attempts})…`,
+      message: "Checking Circle attestation…",
       attemptCount: attempts,
     });
+
+    if (burnTxHash) {
+      const v2Message = await fetchIrisMessageByTxHash(config.irisApiUrl, config.baseDomain, burnTxHash);
+      if (v2Message) {
+        const status = v2Message.status.toLowerCase();
+        lastStatus = status || null;
+        lastDelayReason = v2Message.delayReason;
+
+        if (v2Message.cctpVersion !== 1) {
+          throw new Error(
+            `Unsupported CCTP message version ${v2Message.cctpVersion} for Base→Sui mint path. Expected v1 for Sui domain ${config.suiDomain}.`,
+          );
+        }
+
+        if (status === "complete" && v2Message.attestation) {
+          progress?.({ phase: "attesting", message: "Attestation received." });
+          const canonicalMessageBytes = v2Message.message ? hexToBytes(v2Message.message) : messageBytes;
+          return {
+            attestation: v2Message.attestation,
+            messageBytes: canonicalMessageBytes,
+            messageHash,
+          };
+        }
+
+        if (status === "pending_confirmations") {
+          progress?.({
+            phase: "attesting",
+            message: "Circle is waiting for Base confirmations. This usually takes a few minutes.",
+            attemptCount: attempts,
+          });
+        } else if (status) {
+          const delaySuffix = v2Message.delayReason ? ` (${v2Message.delayReason.replace(/_/g, " ")})` : "";
+          progress?.({
+            phase: "attesting",
+            message: `Circle attestation status: ${status.replace(/_/g, " ")}${delaySuffix}.`,
+            attemptCount: attempts,
+          });
+        }
+      }
+    }
 
     try {
       const res = await fetch(url);
@@ -225,6 +309,20 @@ export async function waitForAttestation(
             messageHash,
           };
         }
+        lastStatus = status || null;
+        if (status === "pending_confirmations") {
+          progress?.({
+            phase: "attesting",
+            message: "Circle is waiting for Base confirmations. This usually takes a few minutes.",
+            attemptCount: attempts,
+          });
+        } else if (status) {
+          progress?.({
+            phase: "attesting",
+            message: `Circle attestation status: ${status.replace(/_/g, " ")}.`,
+            attemptCount: attempts,
+          });
+        }
       }
     } catch {
       // network error — retry
@@ -233,7 +331,9 @@ export async function waitForAttestation(
     await new Promise((resolve) => setTimeout(resolve, config.pollingIntervalMs));
   }
 
-  throw new Error("Attestation timed out. The bridge is still pending — you can retry later.");
+  const statusSuffix = lastStatus ? ` Last Iris status: ${lastStatus.replace(/_/g, " ")}.` : "";
+  const delaySuffix = lastDelayReason ? ` Delay reason: ${lastDelayReason.replace(/_/g, " ")}.` : "";
+  throw new Error(`Attestation timed out. The bridge is still pending — you can retry later.${statusSuffix}${delaySuffix}`);
 }
 
 // ── Phase 3: Mint on Sui ─────────────────────────────────────────────────
@@ -243,15 +343,25 @@ export async function mintUsdcOnSui(
   attestation: CctpAttestationResult,
   progress?: (p: CctpProgress) => void,
   network?: Network,
+  expectedRecipientAddress?: string,
 ): Promise<CctpMintResult> {
   const config = getCctpConfig(network ?? wallet.getState().network);
-  const recipientAddress = wallet.getState().address;
-  if (!recipientAddress) throw new Error("Sui wallet not connected.");
+  const activeWaaPSuiAddress = await wallet.getWaaPSuiAddress();
+  if (expectedRecipientAddress) {
+    const active = normalizeSuiAddress(activeWaaPSuiAddress);
+    const expected = normalizeSuiAddress(expectedRecipientAddress);
+    if (active !== expected) {
+      throw new Error(
+        `Mint recipient mismatch. Burn targeted ${expectedRecipientAddress}, but current WaaP Sui login is ${activeWaaPSuiAddress}. Reconnect the same WaaP login used for burn and resume.`,
+      );
+    }
+  }
 
   progress?.({ phase: "minting", message: "Building Sui transaction…" });
 
   const { Transaction } = await import("@mysten/sui/transactions");
   const tx = new Transaction();
+  tx.setSenderIfNotSet(activeWaaPSuiAddress);
 
   const msgBytes = Array.from(attestation.messageBytes);
   const attBytes = Array.from(hexToBytes(attestation.attestation));
@@ -335,9 +445,10 @@ export async function executeCctpBridge(
     burnResult.messageBytes,
     progress,
     params.network,
+    burnResult.burnTxHash,
   );
 
-  return mintUsdcOnSui(attestation, progress, params.network);
+  return mintUsdcOnSui(attestation, progress, params.network, burnResult.recipientAddress);
 }
 
 export function getCctpMinBaseGasWei(): bigint {
@@ -434,9 +545,10 @@ export async function resumePendingBridge(
     messageBytes,
     progress,
     pending.network,
+    pending.burnTxHash,
   );
 
-  return mintUsdcOnSui(attestation, progress, pending.network);
+  return mintUsdcOnSui(attestation, progress, pending.network, pending.recipientAddress);
 }
 
 // ── ABI Encoding Helpers ─────────────────────────────────────────────────
@@ -473,7 +585,7 @@ async function checkAllowance(
   usdcAddress: string,
   owner: string,
   spender: string,
-): Promise<bigint> {
+): Promise<bigint | null> {
   const paddedOwner = owner.slice(2).toLowerCase().padStart(64, "0");
   const paddedSpender = spender.slice(2).toLowerCase().padStart(64, "0");
   const data = `${ALLOWANCE_SELECTOR}${paddedOwner}${paddedSpender}`;
@@ -482,7 +594,7 @@ async function checkAllowance(
     const result = await wallet.callBase({ to: usdcAddress, data });
     return BigInt(result);
   } catch {
-    return 0n;
+    return null;
   }
 }
 
@@ -491,7 +603,7 @@ async function maybeAutoSwapDustForGas(
   bridgeAmount: bigint,
   progress?: (p: CctpProgress) => void,
 ): Promise<void> {
-  const enabled = readBooleanEnv("VITE_CCTP_AUTO_SWAP_DUST", true);
+  const enabled = readBooleanEnv("VITE_CCTP_AUTO_SWAP_DUST", false);
   if (!enabled) return;
 
   const baseAddress = wallet.getState().waapBaseAddress;
@@ -499,7 +611,14 @@ async function maybeAutoSwapDustForGas(
 
   const minBaseGasWei = getCctpMinBaseGasWei();
   const currentGas = await wallet.getBaseEthBalance().catch(() => null);
-  if (currentGas !== null && currentGas >= minBaseGasWei) {
+  if (currentGas === null) {
+    progress?.({
+      phase: "approving",
+      message: "Skipping automatic gas top-up because Base balance check failed.",
+    });
+    return;
+  }
+  if (currentGas >= minBaseGasWei) {
     return;
   }
 
@@ -546,7 +665,7 @@ async function maybeAutoSwapDustForGas(
   });
 
   const allowance = await checkAllowance(config.base.usdc, baseAddress, router);
-  if (allowance < dustSwapAmount) {
+  if (allowance === null || allowance < dustSwapAmount) {
     progress?.({ phase: "approving", message: "Approving USDC for gas top-up swap…" });
     const approveTxHash = await wallet.sendBaseTransaction({
       to: config.base.usdc,
@@ -761,4 +880,53 @@ function asHexAddress(value: string): `0x${string}` {
     throw new Error(`Invalid address: ${value}`);
   }
   return value as `0x${string}`;
+}
+
+function normalizeSuiAddress(value: string): string {
+  const raw = value.trim();
+  const noPrefix = raw.startsWith("0x") ? raw.slice(2) : raw;
+  if (!/^[0-9a-fA-F]+$/.test(noPrefix) || noPrefix.length === 0 || noPrefix.length > 64) {
+    throw new Error(`Invalid Sui address: ${value}`);
+  }
+  return `0x${noPrefix.toLowerCase().padStart(64, "0")}`;
+}
+
+interface IrisV2Message {
+  status: string;
+  attestation: string | null;
+  message: string | null;
+  cctpVersion: number;
+  delayReason: string | null;
+}
+
+async function fetchIrisMessageByTxHash(
+  irisApiUrl: string,
+  sourceDomain: number,
+  txHash: string,
+): Promise<IrisV2Message | null> {
+  const url = `${irisApiUrl}/v2/messages/${sourceDomain}?transactionHash=${txHash}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const body = await res.json() as {
+      messages?: Array<{
+        status?: string;
+        attestation?: string;
+        message?: string;
+        cctpVersion?: number;
+        delayReason?: string | null;
+      }>;
+    };
+    const message = body.messages?.[0];
+    if (!message) return null;
+    return {
+      status: (message.status ?? "").toLowerCase(),
+      attestation: typeof message.attestation === "string" ? message.attestation : null,
+      message: typeof message.message === "string" ? message.message : null,
+      cctpVersion: typeof message.cctpVersion === "number" ? message.cctpVersion : 1,
+      delayReason: typeof message.delayReason === "string" ? message.delayReason : null,
+    };
+  } catch {
+    return null;
+  }
 }

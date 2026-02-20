@@ -35,6 +35,7 @@ const PHASE_BADGE: Record<Phase, string> = {
 };
 
 export function renderCrosschain(container: HTMLElement): void {
+  let isMounted = true;
   let phase: Phase = "idle";
   let resolvedBaseAddress: string | null = null;
   let launchedOnrampUrl: string | null = null;
@@ -213,6 +214,7 @@ export function renderCrosschain(container: HTMLElement): void {
   }
 
   const $ = <T extends HTMLElement>(sel: string): T => container.querySelector<T>(sel)!;
+  const q = <T extends HTMLElement>(sel: string): T | null => container.querySelector<T>(sel);
 
   const phaseBadge = $("#cc-phase");
   const sdkBadge = $("#cc-sdk-badge");
@@ -233,6 +235,7 @@ export function renderCrosschain(container: HTMLElement): void {
   let lastObservedBaseUsdc: bigint | null = wallet.getState().waapBaseUsdcBalance;
 
   function setPhase(next: Phase): void {
+    if (!isMounted) return;
     phase = next;
     phaseBadge.className = `badge ${PHASE_BADGE[next]}`;
     phaseBadge.textContent = PHASE_LABELS[next];
@@ -240,6 +243,7 @@ export function renderCrosschain(container: HTMLElement): void {
   }
 
   function renderSteps(): void {
+    if (!isMounted) return;
     const s1 = $("#cc-step-1");
     const s2 = $("#cc-step-2");
     const s3 = $("#cc-step-3");
@@ -268,6 +272,7 @@ export function renderCrosschain(container: HTMLElement): void {
   }
 
   function appendLog(message: string): void {
+    if (!isMounted) return;
     const stamp = new Date().toLocaleTimeString();
     flowLog.unshift(`${stamp}  ${message}`);
     if (flowLog.length > 12) flowLog.pop();
@@ -286,14 +291,21 @@ export function renderCrosschain(container: HTMLElement): void {
   }
 
   function setContractFields(): void {
+    if (!isMounted) return;
     const state = wallet.getState();
     const snapshot = getZkp2pContractSnapshot(state.network);
+    const networkEl = q<HTMLElement>("#cc-contract-network");
+    const orchestratorEl = q<HTMLElement>("#cc-contract-orchestrator");
+    const escrowEl = q<HTMLElement>("#cc-contract-escrow");
+    const usdcEl = q<HTMLElement>("#cc-contract-usdc");
+    const methodsEl = q<HTMLElement>("#cc-contract-methods");
+    if (!networkEl || !orchestratorEl || !escrowEl || !usdcEl || !methodsEl) return;
 
-    $("#cc-contract-network").textContent = `${snapshot.network} (${snapshot.chainId})`;
-    $("#cc-contract-orchestrator").textContent = snapshot.orchestrator ?? "Not set";
-    $("#cc-contract-escrow").textContent = snapshot.escrow ?? "Not set";
-    $("#cc-contract-usdc").textContent = snapshot.usdc ?? "Not set";
-    $("#cc-contract-methods").textContent = snapshot.paymentMethods.length > 0
+    networkEl.textContent = `${snapshot.network} (${snapshot.chainId})`;
+    orchestratorEl.textContent = snapshot.orchestrator ?? "Not set";
+    escrowEl.textContent = snapshot.escrow ?? "Not set";
+    usdcEl.textContent = snapshot.usdc ?? "Not set";
+    methodsEl.textContent = snapshot.paymentMethods.length > 0
       ? snapshot.paymentMethods.slice(0, 8).join(", ")
       : "Not available";
   }
@@ -319,13 +331,22 @@ export function renderCrosschain(container: HTMLElement): void {
   }
 
   async function refreshReadiness(): Promise<void> {
+    if (!isMounted) return;
     const state = wallet.getState();
     const onrampState = await getOnrampState();
     const sdkState = await getZkp2pSdkState();
+    if (!isMounted) return;
 
     setSdkBadge(sdkState);
 
-    const walletStat = $("#cc-stat-wallet .stat-value");
+    const walletStat = q<HTMLElement>("#cc-stat-wallet .stat-value");
+    const sdkStat = q<HTMLElement>("#cc-stat-sdk .stat-value");
+    const networkStat = q<HTMLElement>("#cc-stat-network .stat-value");
+    const contractsStat = q<HTMLElement>("#cc-stat-contracts .stat-value");
+    const waapStat = q<HTMLElement>("#cc-stat-waap .stat-value");
+    const usdcStat = q<HTMLElement>("#cc-stat-base-usdc .stat-value");
+    if (!walletStat || !sdkStat || !networkStat || !contractsStat || !waapStat || !usdcStat) return;
+
     if (state.connected && state.address) {
       walletStat.textContent = shortAddress(state.address);
       walletStat.style.color = "var(--green)";
@@ -334,7 +355,6 @@ export function renderCrosschain(container: HTMLElement): void {
       walletStat.style.color = "var(--yellow)";
     }
 
-    const sdkStat = $("#cc-stat-sdk .stat-value");
     if (sdkState === "ready") {
       sdkStat.textContent = "Connected";
       sdkStat.style.color = "var(--green)";
@@ -349,12 +369,10 @@ export function renderCrosschain(container: HTMLElement): void {
       sdkStat.style.color = "var(--red)";
     }
 
-    const networkStat = $("#cc-stat-network .stat-value");
     networkStat.textContent = state.network;
     const isValidNetwork = state.network === "mainnet" || state.network === "testnet";
     networkStat.style.color = isValidNetwork ? "var(--green)" : "var(--yellow)";
 
-    const contractsStat = $("#cc-stat-contracts .stat-value");
     if (onrampState === "ready") {
       const snapshot = getZkp2pContractSnapshot(state.network);
       contractsStat.textContent = `${snapshot.network} route active`;
@@ -364,7 +382,6 @@ export function renderCrosschain(container: HTMLElement): void {
       contractsStat.style.color = "var(--red)";
     }
 
-    const waapStat = $("#cc-stat-waap .stat-value");
     if (resolvedBaseAddress || state.waapBaseAddress) {
       const addr = resolvedBaseAddress ?? state.waapBaseAddress!;
       waapStat.textContent = shortAddress(addr);
@@ -377,7 +394,6 @@ export function renderCrosschain(container: HTMLElement): void {
       waapRecipientEl.classList.add("is-hidden");
     }
 
-    const usdcStat = $("#cc-stat-base-usdc .stat-value");
     const usdcDisplay = wallet.formatBaseUsdcBalance();
     usdcStat.textContent = usdcDisplay;
     if (state.waapBaseUsdcBalance !== null && state.waapBaseUsdcBalance > 0n) {
@@ -590,6 +606,7 @@ export function renderCrosschain(container: HTMLElement): void {
   }
 
   function handleProofResult(result: Zkp2pProofCompleteResult): void {
+    if (!isMounted) return;
     proofCard.classList.remove("is-hidden");
 
     $("#cc-proof-intent").textContent = result.intentHash ? shortAddress(result.intentHash) : "—";
@@ -612,6 +629,7 @@ export function renderCrosschain(container: HTMLElement): void {
   }
 
   async function triggerSettlement(fromAuto: boolean): Promise<void> {
+    if (!isMounted) return;
     if (!resolvedBaseAddress) {
       showError("WaaP Base address is not linked.");
       return;
@@ -654,6 +672,7 @@ export function renderCrosschain(container: HTMLElement): void {
   }
 
   function resetFlow(): void {
+    if (!isMounted) return;
     setPhase("idle");
     launchedOnrampUrl = null;
     launchMode = null;
@@ -699,6 +718,7 @@ export function renderCrosschain(container: HTMLElement): void {
 
   const obs = new MutationObserver(() => {
     if (!document.contains(container)) {
+      isMounted = false;
       walletUnsub();
       if (proofUnsub) {
         proofUnsub();

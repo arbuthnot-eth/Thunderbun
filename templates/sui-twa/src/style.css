@@ -5,18 +5,19 @@
   --panel:        #101D30;
   --panel-glass:  rgba(11,20,35,0.78);
   --border:       #1A2F4B;
-  --border-glow:  rgba(0,184,255,0.18);
+  --border-glow:  rgba(255,184,0,0.18);
   --text:         #DCE7F6;
   --text-heading: #F2F7FF;
   --muted:        #7B97B8;
   --blue:         #2F8CFF;
-  --accent:       #00B8FF;
+  --accent:       #FFB800;
   --blue-glow:    rgba(47,140,255,0.26);
+  --accent-glow:  rgba(255,184,0,0.26);
   --amber:        #F59E0B;
   --green:        #34D399;
   --yellow:       #FBBF24;
   --red:          #F87171;
-  --grad-blue:    linear-gradient(135deg, #00B8FF, #2F8CFF 55%, #F3B221);
+  --grad-gold:    linear-gradient(135deg, #FFB800, #F59E0B 55%, #2F8CFF);
 
   --r-sm:  8px;
   --r-md:  12px;
@@ -76,9 +77,9 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 640px 520px at 16% 22%, rgba(0,184,255,0.08), transparent),
-    radial-gradient(ellipse 560px 520px at 72% 58%, rgba(47,140,255,0.07), transparent),
-    radial-gradient(ellipse 420px 420px at 44% 82%, rgba(245,158,11,0.05), transparent);
+    radial-gradient(ellipse 640px 520px at 16% 22%, rgba(255,184,0,0.08), transparent),
+    radial-gradient(ellipse 560px 520px at 72% 58%, rgba(245,158,11,0.07), transparent),
+    radial-gradient(ellipse 420px 420px at 44% 82%, rgba(47,140,255,0.05), transparent);
   animation: mesh-drift 20s ease-in-out infinite;
 }
 
@@ -152,7 +153,7 @@ body.sidebar-open #sidebar-dock-toggle {
   -webkit-backdrop-filter: blur(12px);
   box-shadow:
     0 10px 36px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(0, 184, 255, 0.08);
+    0 0 0 1px rgba(255, 184, 0, 0.08);
   padding: 10px 12px;
 }
 
@@ -291,8 +292,8 @@ body.sidebar-open #sidebar {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   background:
-    linear-gradient(130deg, rgba(0,184,255,0.14), rgba(16,29,48,0.82)),
-    radial-gradient(circle at 80% 20%, rgba(245,158,11,0.15), transparent 60%);
+    linear-gradient(130deg, rgba(255,184,0,0.14), rgba(16,29,48,0.82)),
+    radial-gradient(circle at 80% 20%, rgba(59,139,255,0.12), transparent 60%);
 }
 
 .sidebar-logo-icon {
@@ -339,7 +340,7 @@ body.sidebar-open #sidebar {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .wallet-card:hover {
-  border-color: var(--blue);
+  border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--border-glow);
 }
 
@@ -418,7 +419,7 @@ body.sidebar-open #sidebar {
 }
 .nav-item:hover { background: var(--bg); color: var(--text); }
 .nav-item.active {
-  background: rgba(59,139,255,0.12);
+  background: rgba(255,184,0,0.12);
   color: var(--text-heading);
   font-weight: 500;
 }
@@ -430,7 +431,7 @@ body.sidebar-open #sidebar {
   bottom: 4px;
   width: 3px;
   border-radius: 2px;
-  background: var(--grad-blue);
+  background: var(--grad-gold);
 }
 .nav-item:hover { text-decoration: none; }
 
@@ -476,7 +477,7 @@ body.sidebar-open #sidebar {
 .section-title--hero {
   font-size: 24px;
   font-weight: 700;
-  background: linear-gradient(135deg, #00B8FF, #2F8CFF 58%, #F59E0B);
+  background: linear-gradient(135deg, #FFB800, #F59E0B 58%, #2F8CFF);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -507,7 +508,7 @@ body.sidebar-open #sidebar {
 }
 .card:hover {
   border-color: var(--border-glow);
-  box-shadow: 0 0 20px rgba(59,139,255,0.06);
+  box-shadow: 0 0 20px rgba(255,184,0,0.06);
 }
 
 .card + .card,

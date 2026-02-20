@@ -12,6 +12,7 @@ export interface WaapInitStatus {
 
 const WAAP_IFRAME_URL = "https://waap.xyz/iframe";
 const WAAP_BOOT_TIMEOUT_MS = 7000;
+const WAAP_IFRAME_IDS = ["waap-wallet-iframe", "silk-wallet-iframe"] as const;
 
 const waapInitStatus: WaapInitStatus = {
   ready: false,
@@ -36,6 +37,14 @@ function isIframeBlockedOrSameOrigin(iframe: HTMLIFrameElement): boolean {
     // Cross-origin access throws when iframe loaded correctly.
     return false;
   }
+}
+
+function getWaapIframe(): HTMLIFrameElement | null {
+  for (const id of WAAP_IFRAME_IDS) {
+    const node = document.getElementById(id);
+    if (node instanceof HTMLIFrameElement) return node;
+  }
+  return null;
 }
 
 async function waitForBody(): Promise<void> {
@@ -81,6 +90,18 @@ async function canBootWaapIframe(): Promise<boolean> {
   });
 }
 
+async function waitForWaapIframeReady(timeoutMs = WAAP_BOOT_TIMEOUT_MS): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const iframe = getWaapIframe();
+    if (iframe && !isIframeBlockedOrSameOrigin(iframe)) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+  return false;
+}
+
 export const waapReady = (async () => {
   try {
     const booted = await canBootWaapIframe();
@@ -95,26 +116,30 @@ export const waapReady = (async () => {
     const { initWaaP, initWaaPSui } = await import("@human.tech/waap-sdk");
     const { registerWallet } = await import("@mysten/wallet-standard");
 
-    // Boot EVM provider so window.waap is available for Base address linking.
-    initWaaP({
-      config: {
-        authenticationMethods: ["email", "phone", "social"],
-        allowedSocials: ["google", "twitter", "discord"],
-        styles: { darkMode: true },
-      },
+    // Initialize Sui wallet first. Avoid extra config here because the SDK
+    // currently pings the iframe immediately when config/project is present.
+    const w = initWaaPSui({
       useStaging: false,
     });
 
-    const w = initWaaPSui({
-      config: {
-        authenticationMethods: ["email", "phone", "social"],
-        allowedSocials: ["google", "twitter", "discord"],
-        styles: { darkMode: true },
-      },
-      useStaging: false,
-    });
+    // Ensure iframe is actually cross-origin-loaded before booting EVM provider.
+    // This avoids transient "target origin mismatch" failures during early boot.
+    const iframeReady = await waitForWaapIframeReady();
+    if (!iframeReady) {
+      waapInitStatus.ready = false;
+      waapInitStatus.blockedLikely = true;
+      waapInitStatus.reason = "WaaP iframe did not finish loading (likely blocked by browser privacy settings or an extension).";
+      console.warn("[init-waap]", waapInitStatus.reason);
+      return;
+    }
 
     registerWallet(w as unknown as Parameters<typeof registerWallet>[0]);
+
+    // Boot EVM provider so window.waap is available for Base address linking.
+    initWaaP({
+      useStaging: false,
+    });
+
     waapInitStatus.ready = true;
     waapInitStatus.reason = null;
     waapInitStatus.blockedLikely = false;

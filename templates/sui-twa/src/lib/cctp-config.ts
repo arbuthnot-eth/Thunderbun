@@ -73,7 +73,7 @@ const MAINNET_CONFIG: CctpConfig = {
   suiDomain: 8,
   irisApiUrl: "https://iris-api.circle.com",
   pollingIntervalMs: 10_000,
-  pollingTimeoutMs: 900_000,
+  pollingTimeoutMs: 1_800_000,
 };
 
 const TESTNET_CONFIG: CctpConfig = {
@@ -95,7 +95,7 @@ const TESTNET_CONFIG: CctpConfig = {
   suiDomain: 8,
   irisApiUrl: "https://iris-api-sandbox.circle.com",
   pollingIntervalMs: 10_000,
-  pollingTimeoutMs: 900_000,
+  pollingTimeoutMs: 1_800_000,
 };
 
 /**

@@ -2,6 +2,77 @@ import "./style.css";
 import "./init-waap";
 import { wallet } from "./wallet";
 
+const CRITICAL_CACHE_RESET_VERSION = "2026-02-20-waap-origin-fix-1";
+const CACHE_RESET_DONE_KEY = "tb_critical_cache_reset_done";
+const CACHE_RESET_RELOAD_PREFIX = "tb_critical_cache_reset_reloaded";
+
+void runCriticalCacheReset();
+
+async function runCriticalCacheReset(): Promise<void> {
+  let alreadyDone = false;
+  try {
+    alreadyDone =
+      window.localStorage.getItem(CACHE_RESET_DONE_KEY) ===
+      CRITICAL_CACHE_RESET_VERSION;
+  } catch {
+    alreadyDone = false;
+  }
+  if (alreadyDone) return;
+
+  let touched = false;
+
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      if (regs.length > 0) {
+        await Promise.all(regs.map((r) => r.unregister()));
+        touched = true;
+      }
+    }
+  } catch (err) {
+    console.warn("[cache-reset] failed to unregister service workers:", err);
+  }
+
+  try {
+    const cacheApi = window.caches;
+    if (cacheApi) {
+      const names = await cacheApi.keys();
+      if (names.length > 0) {
+        await Promise.all(names.map((name) => cacheApi.delete(name)));
+        touched = true;
+      }
+    }
+  } catch (err) {
+    console.warn("[cache-reset] failed to clear caches:", err);
+  }
+
+  try {
+    window.localStorage.setItem(
+      CACHE_RESET_DONE_KEY,
+      CRITICAL_CACHE_RESET_VERSION,
+    );
+  } catch {
+    /* ignore */
+  }
+
+  if (!touched) return;
+
+  const reloadKey = `${CACHE_RESET_RELOAD_PREFIX}:${CRITICAL_CACHE_RESET_VERSION}`;
+  let alreadyReloaded = false;
+  try {
+    alreadyReloaded = window.sessionStorage.getItem(reloadKey) === "1";
+    if (!alreadyReloaded) {
+      window.sessionStorage.setItem(reloadKey, "1");
+    }
+  } catch {
+    alreadyReloaded = false;
+  }
+
+  if (!alreadyReloaded) {
+    window.location.reload();
+  }
+}
+
 export type SectionId =
   | "home" | "suins" | "walrus" | "deepbook"
   | "seal" | "nft" | "zkproof" | "ika" | "crosschain" | "passkeys" | "settings";

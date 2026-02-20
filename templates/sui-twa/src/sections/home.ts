@@ -65,6 +65,7 @@ export function renderHome(container: HTMLElement) {
       const isBusy = bridgePhase !== "idle" && bridgePhase !== "complete" && bridgePhase !== "error";
       const maxUsdc = s.waapBaseUsdcBalance !== null ? formatUsdcDecimal(s.waapBaseUsdcBalance) : "";
       const hasPending = !!loadPendingBridge();
+      const mustResumePending = hasPending && bridgePhase === "idle";
       const parsedAmount = parseUsdcInput(bridgeAmount);
       const isDefaultDollar = parsedAmount === 1_000_000n;
       const minBaseGasWei = getCctpMinBaseGasWei();
@@ -142,8 +143,8 @@ export function renderHome(container: HTMLElement) {
                   <input type="text" id="home-amount" class="input-field code-text"
                     placeholder="1.00" inputmode="decimal"
                     value="${escapeAttr(bridgeAmount)}"
-                    ${isBusy ? "disabled" : ""} />
-                  <button class="btn btn-secondary btn--compact" id="home-max" ${isBusy || !maxUsdc ? "disabled" : ""}>Max</button>
+                    ${isBusy || mustResumePending ? "disabled" : ""} />
+                  <button class="btn btn-secondary btn--compact" id="home-max" ${isBusy || mustResumePending || !maxUsdc ? "disabled" : ""}>Max</button>
                 </div>
               </div>
             </div>
@@ -161,11 +162,14 @@ export function renderHome(container: HTMLElement) {
             <div class="home-minimal-actions">
               <button class="btn btn-primary" id="home-bridge" ${isBusy || !s.waapBaseAddress ? "disabled" : ""}>${
                 isBusy ? "Processing…"
+                : mustResumePending ? "Resume Pending Bridge"
                 : bridgePhase === "complete" ? "Bridge Again"
                 : bridgePhase === "error" ? "Retry Bridge"
                 : isDefaultDollar ? "Send $1 to Sui" : "Bridge to Sui"
               }</button>
+              <button class="btn btn-secondary" id="home-sdk-route"${!s.connected ? " disabled" : ""}>Use SDK Route (Ika/WaaP)</button>
             </div>
+            <div class="card-description">Fallback: SDK route in Cross-Chain section (Ika/WaaP path).</div>
           </div>
 
           <div class="home-minimal-actions">
@@ -237,12 +241,19 @@ export function renderHome(container: HTMLElement) {
 
       // Bridge button
       body.querySelector("#home-bridge")?.addEventListener("click", () => {
+        if (mustResumePending) {
+          void runResume();
+          return;
+        }
         if (bridgePhase === "complete" || bridgePhase === "error") {
           resetBridge();
           render();
           return;
         }
         void runCctpBridge();
+      });
+      body.querySelector("#home-sdk-route")?.addEventListener("click", () => {
+        gotoSection("crosschain");
       });
 
       // Resume button
