@@ -272,7 +272,7 @@ export function renderHome(container: HTMLElement) {
               }).join("")}
             </div>
 
-            ${bridgeMessage ? `<div class="cctp-status code-text">${escapeHtml(bridgeMessage)}${attestationAttempts > 0 ? ` (attempt ${attestationAttempts})` : ""}${bridgeDigest ? ` · <span class="cctp-digest">${shortDigest(bridgeDigest)}</span>` : ""}</div>` : ""}
+            ${bridgeMessage ? `<div class="cctp-status code-text">${escapeHtml(bridgeMessage)}${attestationAttempts > 0 ? ` (attempt ${attestationAttempts})` : ""}${bridgeDigest ? ` · <a class="cctp-digest code-text" href="${escapeAttr(getExplorerTxUrl("sui", bridgeDigest, s.network))}" target="_blank" rel="noopener">${shortDigest(bridgeDigest)}</a>` : ""}</div>` : ""}
             ${bridgeError ? `<div class="cctp-error">${escapeHtml(bridgeError)}</div>` : ""}
 
             <div class="cctp-activity-feed">
@@ -322,7 +322,9 @@ export function renderHome(container: HTMLElement) {
                       ${burn.attestationStatus === "complete"
                         ? `<button class="btn btn-primary btn--compact" data-recovery-idx="${i}" ${recoveryMintingIndex !== null ? "disabled" : ""}>${recoveryMintingIndex === i ? "Minting…" : "Mint on Sui"}</button>`
                         : burn.attestationStatus === "minted"
-                          ? `<span class="badge badge-green">Minted</span>`
+                          ? burn.mintDigest
+                            ? `<a class="badge badge-green" href="${escapeAttr(getExplorerTxUrl("sui", burn.mintDigest, s.network))}" target="_blank" rel="noopener">Minted ↗</a>`
+                            : `<span class="badge badge-green">Minted</span>`
                           : burn.attestationStatus === "pending"
                             ? `<span class="badge badge-yellow">Pending</span>`
                             : `<span class="badge badge-red">Unknown</span>`
@@ -711,7 +713,8 @@ export function renderHome(container: HTMLElement) {
         if (mounted) render();
       });
       burn.attestationStatus = "minted";
-      recoveryMintMessage = `Mint complete. Digest: ${shortDigest(result.digest)}`;
+      burn.mintDigest = result.digest;
+      recoveryMintMessage = `Mint complete.`;
       recoveryMintError = null;
       await wallet.refreshBalance();
     } catch (err) {
@@ -861,7 +864,9 @@ function renderActivityGroup(group: BridgeActivityGroup): string {
     <div class="cctp-activity-item">
       <div class="cctp-activity-head">
         <div class="cctp-activity-title">${escapeHtml(amount)} USDC</div>
-        <span class="badge ${statusClass}">${escapeHtml(group.status)}</span>
+        ${group.status === "complete" && group.digest
+          ? `<a class="badge ${statusClass}" href="${escapeAttr(getExplorerTxUrl("sui", group.digest, group.network))}" target="_blank" rel="noopener">${escapeHtml(group.status)} ↗</a>`
+          : `<span class="badge ${statusClass}">${escapeHtml(group.status)}</span>`}
       </div>
       <div class="cctp-activity-meta code-text">${escapeHtml(formatTimestamp(group.startedAt))} · ${escapeHtml(group.network)}</div>
       <div class="cctp-activity-step-row">

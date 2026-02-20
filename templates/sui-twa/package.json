@@ -18,6 +18,7 @@
     "worker:typecheck": "tsc -p tsconfig.worker.json --noEmit",
     "worker:dev": "npx wrangler dev --port 8787",
     "deploy": "bun run build && npx wrangler deploy",
+    "prod": "npx wrangler deploy --env production",
     "deploy:preview": "bun run build && npx wrangler deploy --env preview",
     "deploy:production": "bun run build && npx wrangler deploy --env production",
     "deploy:vercel": "npx vercel dist --prod",

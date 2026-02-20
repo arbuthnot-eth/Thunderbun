@@ -1048,6 +1048,7 @@ export interface RecoverableBurn {
   attestation: string | null;
   messageBytes: Uint8Array | null;
   messageHash: string | null;
+  mintDigest: string | null;
 }
 
 function getBaseRpcUrl(network: Network): string {
@@ -1187,6 +1188,7 @@ export async function scanPastBurns(
       attestation,
       messageBytes,
       messageHash,
+      mintDigest: null,
     });
   }
 
