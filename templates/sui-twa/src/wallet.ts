@@ -83,7 +83,37 @@ class WalletManager {
   async connect(): Promise<void> {
     await waapReady;
     const modal = ensureConnectModal();
-    await modal.show();
+
+    // dApp Kit opens <dialog> via .showModal() → top layer, above everything.
+    // When user picks WaaP, WaaP appends its own auth overlay to <body>.
+    // Close the dialog at that point so it doesn't stack above WaaP.
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (
+            node instanceof HTMLElement &&
+            node.tagName === "DIV" &&
+            node !== connectModal &&
+            node.id !== "app" &&
+            node.id !== "splash"
+          ) {
+            const dialog = connectModal?.shadowRoot?.querySelector("dialog");
+            if (dialog instanceof HTMLDialogElement && dialog.open) {
+              dialog.close();
+            }
+            observer.disconnect();
+            return;
+          }
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true });
+
+    try {
+      await modal.show();
+    } finally {
+      observer.disconnect();
+    }
   }
 
   async disconnect(): Promise<void> {

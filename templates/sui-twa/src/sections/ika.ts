@@ -109,10 +109,13 @@ export function renderIka(container: HTMLElement) {
       <div class="card">
         <div class="card-title">SDK usage</div>
         <pre style="font-size:11px;line-height:1.6">import { IkaClient, getNetworkConfig } from '@ika.xyz/sdk';
-import { SuiClient } from '@mysten/sui/client';
+import { SuiGrpcClient } from '@mysten/sui/grpc';
 
-// Create clients
-const suiClient = new SuiClient({ url: 'https://fullnode.testnet.sui.io' });
+// Create clients (PR #1646: gRPC via ClientWithCoreApi)
+const suiClient = new SuiGrpcClient({
+  baseUrl: 'https://fullnode.testnet.sui.io:443',
+  network: 'testnet',
+});
 const ikaClient = new IkaClient({
   suiClient,
   config: getNetworkConfig('testnet'),
@@ -159,17 +162,10 @@ console.log('Ika system:', system);
 
     try {
       const { IkaClient, getNetworkConfig } = await import("@ika.xyz/sdk");
-      // Ika SDK v0.2.7 requires @mysten/sui v1.x — isolated JSON-RPC client
-      const { SuiJsonRpcClient, getJsonRpcFullnodeUrl } = await import("@mysten/sui/jsonRpc");
-
-      const suiClient = new SuiJsonRpcClient({
-        url: getJsonRpcFullnodeUrl(net),
-        network: net,
-      });
 
       const config = getNetworkConfig(net);
-      // Verify config is valid by creating client (validates package IDs exist)
-      void new IkaClient({ suiClient: suiClient as never, config });
+      // PR #1646: Ika SDK now accepts ClientWithCoreApi — pass the main gRPC client directly
+      void new IkaClient({ suiClient: wallet.getClient(), config });
 
       return {
         connected: true,

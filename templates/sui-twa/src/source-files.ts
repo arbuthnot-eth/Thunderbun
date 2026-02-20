@@ -16,6 +16,7 @@ const infra = import.meta.glob([
   './dapp-kit.ts',
   './sui-client.ts',
   './worker.ts',
+  './lib/crosschain.ts',
 ], {
   query: '?raw',
   import: 'default',

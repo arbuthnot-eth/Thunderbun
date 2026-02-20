@@ -4,7 +4,7 @@ import { wallet } from "./wallet";
 
 export type SectionId =
   | "home" | "suins" | "walrus" | "deepbook"
-  | "seal" | "nft" | "zkproof" | "ika" | "passkeys" | "settings";
+  | "seal" | "nft" | "zkproof" | "ika" | "crosschain" | "passkeys" | "settings";
 
 interface NavItem {
   id: SectionId;
@@ -21,7 +21,8 @@ const NAV: NavItem[] = [
   { id: "deepbook", label: "DeepBook",       icon: "📖", group: "ecosystem" },
   { id: "seal",     label: "Seal Encrypt",   icon: "🔒", group: "ecosystem" },
   { id: "passkeys", label: "Passkeys",       icon: "🔑", group: "ecosystem" },
-  { id: "ika",      label: "Ika MPC",        icon: "🔐", group: "ecosystem" },
+  { id: "ika",        label: "Ika MPC",        icon: "🔐", group: "ecosystem" },
+  { id: "crosschain", label: "Cross-Chain",    icon: "🌉", group: "ecosystem" },
   { id: "nft",      label: "TradePort NFTs", icon: "🖼", group: "ecosystem" },
   { id: "zkproof",  label: "Proof Verifier",  icon: "🔬", group: "ecosystem" },
 ];
@@ -41,7 +42,8 @@ const RENDERERS: Record<SectionId, () => Promise<{ default: (el: HTMLElement) =>
   deepbook: () => import("./sections/deepbook").then(m => ({ default: m.renderDeepBook })),
   seal:     () => import("./sections/seal").then(m => ({ default: m.renderSeal })),
   passkeys: () => import("./sections/passkeys").then(m => ({ default: m.renderPasskeys })),
-  ika:      () => import("./sections/ika").then(m => ({ default: m.renderIka })),
+  ika:        () => import("./sections/ika").then(m => ({ default: m.renderIka })),
+  crosschain: () => import("./sections/crosschain").then(m => ({ default: m.renderCrosschain })),
   nft:      () => import("./sections/nft").then(m => ({ default: m.renderNFT })),
   zkproof:  () => import("./sections/zkproof").then(m => ({ default: m.renderZkProof })),
   settings: () => import("./sections/settings").then(m => ({ default: m.renderSettings })),
