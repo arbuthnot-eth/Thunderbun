@@ -671,6 +671,18 @@ body.sidebar-open #sidebar {
   margin-top: 14px;
 }
 
+.home-ski-connect {
+  cursor: pointer;
+  border-radius: 16px;
+  transition: background 0.2s ease;
+}
+.home-ski-connect:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.home-ski-connect:active {
+  background: rgba(255, 255, 255, 0.07);
+}
+
 .home-minimal-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
