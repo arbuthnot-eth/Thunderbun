@@ -61,7 +61,7 @@ export async function mountSkiWalletWidget(): Promise<boolean> {
       SKI_KIT_SCRIPT_ID,
       generateWalletKitJs({
         network: "mainnet",
-        autoConnect: true,
+        autoConnect: false,
       }),
     );
     injectScript(
@@ -81,9 +81,6 @@ export async function mountSkiWalletWidget(): Promise<boolean> {
     skiKit.renderWidget("ski-wallet-widget-host");
     if (typeof skiKit.detectWallets === "function") {
       await skiKit.detectWallets().catch(() => undefined);
-    }
-    if (typeof skiKit.autoReconnect === "function") {
-      await skiKit.autoReconnect().catch(() => undefined);
     }
 
     widgetShell.classList.add("ski-widget-native");
