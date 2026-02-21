@@ -103,10 +103,6 @@ export function renderHome(container: HTMLElement) {
   let recoveryMintError: string | null = null;
   let attestStartTime: number | null = null;
   let attestTimerId: ReturnType<typeof setInterval> | null = null;
-  let waapAutoConnectStarted = false;
-  let waapAutoConnectInFlight = false;
-  let waapAutoConnectError: string | null = null;
-
   const getActiveGroup = (): BridgeActivityGroup | null => {
     if (!activeGroupId) return null;
     return activityFeed.find((group) => group.id === activeGroupId) ?? null;
@@ -167,58 +163,29 @@ export function renderHome(container: HTMLElement) {
     });
   };
 
-  const runAutoWaaPConnect = async (): Promise<void> => {
-    if (!mounted || waapAutoConnectInFlight) return;
-    waapAutoConnectInFlight = true;
-    waapAutoConnectError = null;
-    render();
-
-    try {
-      const state = wallet.getState();
-      if (!state.connected) await wallet.connect();
-      if (!wallet.getState().waapBaseAddress) await wallet.linkWaaPBaseAddress();
-    } catch (err) {
-      waapAutoConnectError = err instanceof Error ? err.message : String(err);
-      console.error("[home] auto .SKI connect failed:", err);
-    } finally {
-      waapAutoConnectInFlight = false;
-      if (mounted) render();
-    }
-  };
-
   const render = () => {
     const s = wallet.getState();
     sectionEl?.classList.remove("home-loading-section");
 
     if (s.hydrating || !s.connected || !s.address) {
       sectionEl?.classList.add("home-loading-section");
-      const title = s.hydrating
-        ? "Restoring wallet"
-        : waapAutoConnectInFlight || !waapAutoConnectStarted
-          ? "Opening .SKI"
-          : "WaaP login required";
+      const title = s.hydrating ? "Restoring wallet" : "Connect Wallet";
       const subtitle = s.hydrating
-        ? "Checking for an existing WaaP session…"
-        : waapAutoConnectInFlight || !waapAutoConnectStarted
-          ? "Waiting for WaaP login to complete…"
-          : waapAutoConnectError ?? "Login was interrupted. Retry .SKI to continue.";
+        ? "Checking for an existing session…"
+        : "Connect a wallet to start using the bridge.";
       body.innerHTML = `
         <div class="home-waap-loading-screen">
           <img class="home-waap-loading-logo" src="/icons/thunderbun-logo.png" alt="" width="176" height="176" />
           <div class="home-waap-loading-title">${escapeHtml(title)}</div>
           <div class="home-waap-loading-subtitle">${escapeHtml(subtitle)}</div>
-          ${(!s.hydrating && !waapAutoConnectInFlight)
-            ? `<button class="btn btn-primary" id="home-connect-retry">Retry .SKI</button>`
+          ${!s.hydrating
+            ? `<button class="btn btn-primary" id="home-connect-wallet">Connect</button>`
             : ""}
         </div>
       `;
-      body.querySelector<HTMLButtonElement>("#home-connect-retry")?.addEventListener("click", () => {
-        void runAutoWaaPConnect();
+      body.querySelector<HTMLButtonElement>("#home-connect-wallet")?.addEventListener("click", () => {
+        wallet.openConnectModal();
       });
-      if (!s.hydrating && !waapAutoConnectStarted) {
-        waapAutoConnectStarted = true;
-        void runAutoWaaPConnect();
-      }
       return;
     }
 

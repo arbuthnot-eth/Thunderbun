@@ -833,7 +833,6 @@ class WalletManager {
 
   private async finishInitialHydration(): Promise<void> {
     try {
-      await waapReady;
       await this.syncFromDAppKit();
     } finally {
       if (!this.hydrating) return;
@@ -848,9 +847,7 @@ class WalletManager {
       await this.refreshBalance();
       if (hasWaaPName(conn.wallet?.name)) {
         const shouldAutoRequest = !this.waapBaseAddress && !this.waapBaseAutoRequested;
-        await this.getWaaPBaseAddress({ request: shouldAutoRequest });
-        if (shouldAutoRequest) this.waapBaseAutoRequested = true;
-        await this.refreshBaseProfile();
+        void this.resolveWaaPBaseInBackground(shouldAutoRequest);
       } else {
         this.waapBaseAddress = null;
         this.waapBaseBalanceCache = null;
@@ -870,6 +867,17 @@ class WalletManager {
       this.waapAddressLookup = null;
     }
     this.emit();
+  }
+
+  private async resolveWaaPBaseInBackground(shouldAutoRequest: boolean): Promise<void> {
+    try {
+      await this.getWaaPBaseAddress({ request: shouldAutoRequest });
+      if (shouldAutoRequest) this.waapBaseAutoRequested = true;
+      await this.refreshBaseProfile();
+      this.emit();
+    } catch {
+      // WaaP not available — Base data stays null, app continues with Sui-only
+    }
   }
 
   private async resolveWaaPBaseAddress(request: boolean): Promise<string | null> {
