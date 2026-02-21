@@ -1,10 +1,10 @@
-# Claude Development Guidelines for ThunderBun
+# Claude Development Guidelines for Thunderbun
 
 ## Project Structure
 
-- `/package` — ThunderBun framework + CLI source
+- `/package` — Thunderbun framework + CLI source
 - `/kitchen` — Kitchen Sink desktop test app
-- `/templates/` — App templates (hello-world, react-tailwind-vite, svelte, photo-booth, multitab-browser, sui-twa)
+- `/templates/` — App templates (hello-world, react-tailwind-vite, svelte, photo-booth, multitab-browser, ski-dapp)
 - `/move/ligetron-verifier` — Sui Move: Groth16 verifier + attestation contracts
 - `/contracts/proof-verifier` — Sui Move: general-purpose Groth16 framework
 - `/docs/` — Internal docs (BUILD.md, CEF.md, BETA_RELEASE.md)
@@ -27,10 +27,10 @@ bun run test:unit    # Unit tests (src/shared)
 
 The build process vendors Bun, Zig, and CEF, compiles native wrappers, builds the CLI, then switches to the kitchen folder to build and run the test app.
 
-### Sui TWA template (from `templates/sui-twa/`)
+### Ski dApp template (from `templates/ski-dapp/`)
 
 ```bash
-cd templates/sui-twa
+cd templates/ski-dapp
 bun install
 bun run dev          # Vite dev server → localhost:5173
 bun run build        # Production build
@@ -58,13 +58,13 @@ sui client publish --gas-budget 100000000
 | 2 | `SuiGraphQLClient` from `@mysten/sui/graphql` | Complex queries needing GraphQL+Indexer |
 | 3 | `SuiJsonRpcClient` from `@mysten/sui/jsonRpc` | DEPRECATED. Only when a third-party SDK requires it |
 
-### Current state (sui-twa template)
+### Current state (ski-dapp template)
 
 - `dapp-kit.ts` uses `SuiGrpcClient` with MVR (`mvr: {}`). All Mysten SDKs (dapp-kit-core, deepbook-v3, seal, walrus, suins) accept `ClientWithCoreApi` — fully gRPC compatible.
 - `@human.tech/waap-sdk` — client-agnostic (Wallet Standard only).
 - `@ika.xyz/sdk` — bundles its own `@mysten/sui@1.45.2`, creates isolated JSON-RPC client via dynamic import. Pass clients via `as never` for type compatibility. Does not affect main app client.
 
-## SDK Client Architecture (sui-twa)
+## SDK Client Architecture (ski-dapp)
 
 - `src/sui-client.ts` provides lazy, network-aware singletons for SealClient, DeepBookClient, WalrusClient
 - All clients auto-invalidate on network switch
@@ -72,7 +72,7 @@ sui client publish --gas-budget 100000000
 - Seal key servers only configured for testnet — `getSealClient()` returns null on other networks
 - Walrus SDK `writeBlob()` requires `Signer` keypair (not available in browser) — use HTTP publisher for writes, SDK for reads
 
-## Peer Onramp (sui-twa)
+## Peer Onramp (ski-dapp)
 
 The Peer (zkp2p) onramp is **extension-only** — no REST API, redirect URL, or headless flow. All interactions go through the PeerAuth Chrome extension via `@zkp2p/sdk`. See `docs/onramp-llm.md` for the full integration spec and `.claude/agents/peer-onramp.md` for agent context.
 
@@ -90,7 +90,7 @@ The Peer (zkp2p) onramp is **extension-only** — no REST API, redirect URL, or 
 
 ## Coding Conventions
 
-- **Vanilla TypeScript** in sui-twa sections — no React components, `innerHTML` + event handlers
+- **Vanilla TypeScript** in ski-dapp sections — no React components, `innerHTML` + event handlers
 - **Semantic CSS** — no utility classes, custom properties for tokens, semantic class names
 - **Move 2024.beta edition** — method syntax, named error constants
 - **No narration comments** — only explain non-obvious intent

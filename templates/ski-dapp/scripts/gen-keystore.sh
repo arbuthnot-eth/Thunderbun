@@ -23,7 +23,7 @@ if ! command -v keytool &>/dev/null; then
 fi
 
 echo ""
-echo "ThunderBun TWA — keystore generator"
+echo "Thunderbun TWA — keystore generator"
 echo "────────────────────────────────────"
 
 if [[ "$MODE" == "debug" ]]; then

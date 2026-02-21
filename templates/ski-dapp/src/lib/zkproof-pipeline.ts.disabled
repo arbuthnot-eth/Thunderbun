@@ -1,7 +1,7 @@
 /**
  * zkproof-pipeline.ts
  *
- * Composable, configuration-driven ZK proof pipeline for ThunderBun.
+ * Composable, configuration-driven ZK proof pipeline for Thunderbun.
  *
  * Each step is an independent async function — combine only what you need.
  *

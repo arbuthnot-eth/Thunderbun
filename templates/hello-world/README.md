@@ -1,6 +1,10 @@
-# ThunderBun Hello World
+<p align="center">
+  <img src="../../thunderbun-logo.png" alt="Thunderbun" width="100" />
+</p>
 
-A simple ThunderBun app to get you started with the framework.
+# Thunderbun Hello World
+
+A simple Thunderbun app to get you started with the framework.
 
 ## What You'll See
 
@@ -42,9 +46,8 @@ src/
 
 Ready to build something more complex? Check out:
 
-- **[Documentation](https://docs.thunderbun.dev)** - Learn about all ThunderBun features
-- **[Examples](https://github.com/arbuthnot-eth/thunderbun/tree/main/playground)** - See advanced features like RPC, menus, and system tray
-- **[GitHub](https://github.com/arbuthnot-eth/thunderbun)** - Star the repo and join the community
+- **[GitHub](https://github.com/arbuthnot-eth/thunderbun)** — Star the repo and join the community
+- **[Templates](https://github.com/arbuthnot-eth/thunderbun/tree/master/templates)** — See advanced features like ski-dapp, Svelte, and more
 
 ### Add More Features
 
@@ -53,5 +56,3 @@ Want to extend this app? Try adding:
 - Native menus and system tray
 - File dialogs and system integration
 - Multiple windows and views
-
-Happy building! 🚀

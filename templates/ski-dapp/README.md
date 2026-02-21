@@ -1,10 +1,20 @@
-# Thunderbun
+<p align="center">
+  <img src="public/icons/thunderbun-logo.png" alt="Thunderbun" width="140" />
+</p>
 
-Live SDK playground for the Sui ecosystem — run in browser, ship to the Play Store. gRPC-first · dApp Kit · Cloudflare Workers + Agents · PWA-ready.
+<h1 align="center">Thunderbun</h1>
+
+<p align="center">
+  Live SDK playground for the Sui ecosystem — run in browser, ship to the Play Store.<br/>
+  gRPC-first · dApp Kit · Cloudflare Workers + Agents · PWA-ready.
+</p>
+
+<p align="center">
+  <a href="https://thunderbun.ai"><img src="https://img.shields.io/badge/live-thunderbun.ai-FFB800" alt="Live" /></a>
+</p>
+
 Includes a one-click onramp flow: TradFi → Base USDC via zkp2p contracts, then a native sponsored Sui settlement PTB coordinated by WaaP + Ika-aware runtime checks.
 The Sui leg resolves `zkp2p.sui` through SuiNS and enforces sponsor-address match before execution.
-
-**Live:** [thunderbun.ai](https://thunderbun.ai)
 
 ---
 
@@ -21,11 +31,11 @@ Opens at `http://localhost:5173`.
 
 ## 🔌 JSON-RPC → gRPC Migration
 
-**JSON-RPC shuts down April 2026.** ThunderBun uses `SuiGrpcClient` from `@mysten/sui/grpc` everywhere — the migration is already done.
+**JSON-RPC shuts down April 2026.** Thunderbun uses `SuiGrpcClient` from `@mysten/sui/grpc` everywhere — the migration is already done.
 
 ### What changed
 
-| Before (JSON-RPC, deprecated) | After (gRPC, ThunderBun default) |
+| Before (JSON-RPC, deprecated) | After (gRPC, Thunderbun default) |
 |-------------------------------|----------------------------------|
 | `import { SuiClient } from "@mysten/sui/client"` | `import { SuiGrpcClient } from "@mysten/sui/grpc"` |
 | `new SuiClient({ url: getFullnodeUrl("testnet") })` | `new SuiGrpcClient({ baseUrl: "https://fullnode.testnet.sui.io:443", network: "testnet", mvr: {} })` |
@@ -52,7 +62,7 @@ Works with: `dapp-kit-core`, `deepbook-v3`, `seal`, `walrus`, `suins`.
 ### Third-party SDKs
 
 - **WaaP SDK** — Wallet Standard only, no client dependency. Works as-is.
-- **Ika SDK** — Bundles its own `@mysten/sui@1.x`. ThunderBun isolates it via dynamic import so it never touches the main gRPC client.
+- **Ika SDK** — Bundles its own `@mysten/sui@1.x`. Thunderbun isolates it via dynamic import so it never touches the main gRPC client.
 
 ---
 
@@ -158,7 +168,7 @@ Output: `android/app/build/outputs/bundle/release/app-release.aab`
 ### Step 6 — Upload to Play Console
 
 1. [play.google.com/console](https://play.google.com/console) → **Create app**
-   - App name: `ThunderBun` · Default language: English · App / Free
+   - App name: `Thunderbun` · Default language: English · App / Free
 2. Left sidebar → **Release** → **Testing** → **Internal testing**
 3. **Create new release** → Upload `app-release.aab`
 4. **Testers** tab → **Create email list** → add your Gmail address
@@ -247,7 +257,7 @@ VITE_ZKP2P_CONTRACT_NETWORK=baseSepolia
 VITE_ZKP2P_WAIT_FOR_PROOF=true
 VITE_ZKP2P_PROOF_TIMEOUT_MS=480000
 VITE_ZKP2P_CONSOLE_LOGGING=false
-VITE_ZKP2P_REFERRER=ThunderBun
+VITE_ZKP2P_REFERRER=Thunderbun
 VITE_ZKP2P_REFERRER_LOGO_URL=
 VITE_ZKP2P_CALLBACK_URL=
 # Optional override for providers onramp toToken

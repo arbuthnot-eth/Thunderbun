@@ -1,18 +1,32 @@
-# ThunderBun
+<p align="center">
+  <img src="thunderbun-logo.png" alt="Thunderbun" width="180" />
+</p>
 
-Cross-platform desktop app framework built on [Bun](https://bun.sh). Build fast, tiny native apps with TypeScript.
+<h1 align="center">Thunderbun</h1>
 
-ThunderBun packages your app with native webview wrappers (CEF or system WebKit/WebView2), a Bun runtime, and a self-extracting installer — all from a single `thunderbun.config.ts`.
+<p align="center">
+  Cross-platform desktop app framework built on <a href="https://bun.sh">Bun</a>. Build fast, tiny native apps with TypeScript.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/thunderbun"><img src="https://img.shields.io/npm/v/thunderbun" alt="npm" /></a>
+  <a href="https://thunderbun.ai"><img src="https://img.shields.io/badge/live-thunderbun.ai-FFB800" alt="Live" /></a>
+  <a href="https://github.com/arbuthnot-eth/thunderbun/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a>
+</p>
+
+---
+
+Thunderbun packages your app with native webview wrappers (CEF or system WebKit/WebView2), a Bun runtime, and a self-extracting installer — all from a single `thunderbun.config.ts`.
 
 ## Web3 & Web4 Native
 
-Unlike other lightweight Electron alternatives, **ThunderBun** is built from the ground up to be highly composable with modern decentralized tech. It is shipped with first-class support for:
+Unlike other lightweight Electron alternatives, **Thunderbun** is built from the ground up to be highly composable with modern decentralized tech. It is shipped with first-class support for:
 - **Agents SDK** (`npm i agents`) for AI-driven multi-agent systems
 - **WaaP** (`@human.tech/waap-sdk`) for seamless Wallet as a Service
 - **Ika** (`@ika.xyz/sdk`) for MPC and dWallets
 - **x402** (`@x402/core` & `@x402/hono`) for frictionless HTTP 402 AI micropayments
 
-The included `sui-twa` template provides a comprehensive starting point to leverage these packages immediately while remaining tiny and cross-platform.
+The included `ski-dapp` template provides a comprehensive starting point to leverage these packages immediately while remaining tiny and cross-platform.
 
 ---
 
@@ -34,7 +48,7 @@ bun run dev
 | `svelte` | Svelte app |
 | `photo-booth` | Camera / media capture demo |
 | `multitab-browser` | Tabbed browser shell |
-| `sui-twa` | Sui blockchain TWA — gRPC, dApp Kit, WaaP, ZK proofs, Cloudflare Workers |
+| `ski-dapp` | Sui blockchain TWA — gRPC, dApp Kit, WaaP, ZK proofs, Cloudflare Workers |
 
 ## Platform Support
 
@@ -64,7 +78,7 @@ thunderbun/
 │   ├── svelte/
 │   ├── photo-booth/
 │   ├── multitab-browser/
-│   └── sui-twa/          Sui blockchain TWA template
+│   └── ski-dapp/          Sui blockchain TWA template
 ├── move/                 Sui Move smart contracts
 │   └── ligetron-verifier/
 ├── contracts/            Additional on-chain contracts
@@ -88,9 +102,13 @@ bun run build:cli    # CLI binary only
 
 The build system vendors Bun, Zig, and optionally CEF, then compiles native wrappers for the target platform.
 
-## Sui TWA Template
+## Ski dApp Template
 
-The `sui-twa` template is a Sui-native PWA/TWA wired to the full Mysten ecosystem, ready for Play Store distribution via Bubblewrap.
+<p align="center">
+  <img src="thunderbun-logo.png" alt="Thunderbun" width="80" />
+</p>
+
+The `ski-dapp` template is a Sui-native PWA/TWA wired to the full Mysten ecosystem, ready for Play Store distribution via Bubblewrap.
 It now includes a one-click TradFi-to-Sui path: WaaP Base wallet + PeerAuth fiat onramp + Ika-aware sponsored Sui settlement PTB flow, with SuiNS resolution for `zkp2p.sui` on the Sui leg.
 
 **Transport**: `SuiGrpcClient` from `@mysten/sui/grpc` — fully migrated off JSON-RPC (shuts down April 2026).
@@ -110,7 +128,7 @@ Included SDKs:
 | Payments | x402 scaffold |
 
 ```bash
-cd templates/sui-twa
+cd templates/ski-dapp
 bun install
 bun run dev          # localhost:5173
 bun run deploy       # Cloudflare Workers
@@ -134,10 +152,11 @@ bun run npm:publish:beta    # beta release
 
 ## Links
 
-- [thunderbun.dev](https://thunderbun.dev)
+- [thunderbun.ai](https://thunderbun.ai)
+- [npm](https://www.npmjs.com/package/thunderbun)
 - [GitHub](https://github.com/arbuthnot-eth/thunderbun)
 - [Sui gRPC Docs](https://docs.sui.io) · [dApp Kit](https://sdk.mystenlabs.com/dapp-kit) · [WaaP](https://docs.waap.xyz)
 
 ---
 
-MIT
+MIT · [Thunderbun](https://github.com/arbuthnot-eth/thunderbun)

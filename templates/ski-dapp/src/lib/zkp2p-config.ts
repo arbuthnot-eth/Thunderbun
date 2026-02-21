@@ -16,7 +16,7 @@ const DEFAULTS = {
   curatorApiUrl: "https://api.zkp2p.xyz",
   attestationServiceUrl: "https://attestation-service.zkp2p.xyz",
   attestorWsUrl: "wss://attestor.zkp2p.xyz/ws",
-  referrer: "ThunderBun",
+  referrer: "Thunderbun",
   proofTimeoutMs: 8 * 60 * 1000,
 } as const;
 

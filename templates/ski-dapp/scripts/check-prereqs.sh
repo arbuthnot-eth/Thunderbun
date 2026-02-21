@@ -10,7 +10,7 @@ fail() { echo -e "${RED}✗${NC} $1"; FAILED=1; }
 FAILED=0
 
 echo ""
-echo "ThunderBun TWA — prerequisite check"
+echo "Thunderbun TWA — prerequisite check"
 echo "────────────────────────────────────"
 
 # ── Java 17+ ──────────────────────────────────────────────────────────────────

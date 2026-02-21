@@ -1,9 +1,9 @@
 ---
-description: ThunderBun project conventions for Sui, Move, vanilla TS, and the zkproof pipeline
+description: Thunderbun project conventions for Sui, Move, vanilla TS, and the zkproof pipeline
 alwaysApply: true
 ---
 
-# ThunderBun coding rules
+# Thunderbun coding rules
 
 ## Vanilla TypeScript — no frameworks
 - No React, Vue, Svelte, or dapp-kit
@@ -35,7 +35,7 @@ alwaysApply: true
 - Never commit `.env` files with real keys
 
 ## Adding a new template section
-1. `templates/sui-twa/src/sections/mysection.ts` → export `renderMySection`
+1. `templates/ski-dapp/src/sections/mysection.ts` → export `renderMySection`
 2. Register in `main.ts`: `SectionId`, `NAV`, and `RENDERERS`
 
 ## Adding a new pipeline step

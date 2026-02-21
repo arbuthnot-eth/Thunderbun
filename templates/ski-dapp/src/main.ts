@@ -1,6 +1,7 @@
 import "./style.css";
 import "./init-waap";
 import { initReactDappKitIsland } from "./react/dapp-kit-island";
+import { mountSkiWalletWidget } from "./ski-widget";
 import { wallet } from "./wallet";
 
 const CRITICAL_CACHE_RESET_VERSION = "2026-02-20-root-canonical-cache-fix";
@@ -18,6 +19,7 @@ async function bootstrapApp(): Promise<void> {
     stripHardResetParamFromUrl();
   }
   initReactDappKitIsland();
+  void mountSkiWalletWidget();
 }
 
 function hasHardResetParam(): boolean {

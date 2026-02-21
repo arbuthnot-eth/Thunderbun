@@ -86,7 +86,7 @@ document.body.appendChild(iframe);
 
 // 3. Request registration via postMessage
 iframe.contentWindow.postMessage(
-  { action: "register", rpName: "ThunderBun" },
+  { action: "register", rpName: "Thunderbun" },
   "https://${rpId}"
 );
 
@@ -108,7 +108,7 @@ window.addEventListener("message", (e) => {
 
 // Configure for cross-subdomain portability
 const provider = new BrowserPasskeyProvider(
-  "ThunderBun",  // RP name
+  "Thunderbun",  // RP name
   { rp: { id: "${rpId}" } }
 );
 
@@ -148,7 +148,7 @@ const signed = await keypair.signWithIntent(txBytes, "TransactionData");</pre>
       const { BrowserPasskeyProvider, PasskeyKeypair } = await import(
         "@mysten/sui/keypairs/passkey"
       );
-      const provider = new BrowserPasskeyProvider("ThunderBun", { rp: { id: rpId } });
+      const provider = new BrowserPasskeyProvider("Thunderbun", { rp: { id: rpId } });
       const keypair = await PasskeyKeypair.getPasskeyInstance(provider);
       resEl.style.display = "block";
       container.querySelector<HTMLElement>("#pk-address")!.textContent =
@@ -176,7 +176,7 @@ const signed = await keypair.signWithIntent(txBytes, "TransactionData");</pre>
       const { BrowserPasskeyProvider, PasskeyKeypair } = await import(
         "@mysten/sui/keypairs/passkey"
       );
-      const provider = new BrowserPasskeyProvider("ThunderBun", { rp: { id: rpId } });
+      const provider = new BrowserPasskeyProvider("Thunderbun", { rp: { id: rpId } });
       const publicKeys = await PasskeyKeypair.signAndRecover(
         provider,
         new Uint8Array([0]),

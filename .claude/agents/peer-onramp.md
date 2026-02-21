@@ -53,7 +53,7 @@ const unsub = peerSdk.onProofComplete((result) => {
 
 Subscribe BEFORE calling `onramp()` to avoid race conditions.
 
-## Architecture in sui-twa
+## Architecture in ski-dapp
 
 - `src/lib/crosschain.ts` — `launchOnramp()` (fire-and-forget), `executeSettlement()` (post-proof)
 - `src/sections/crosschain.ts` — phase state machine (idle → onramping → proved → settling → settled)

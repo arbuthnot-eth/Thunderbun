@@ -1,4 +1,4 @@
-# AGENTS.md — ThunderBun AI Agent Guide
+# AGENTS.md — Thunderbun AI Agent Guide
 
 Read this before making edits. Covers architecture, design decisions, extension patterns, and open TODOs.
 
@@ -6,9 +6,9 @@ Read this before making edits. Covers architecture, design decisions, extension 
 
 ## Project overview
 
-**ThunderBun** is a cross-platform desktop app framework built on Bun. It ships native webview wrappers (CEF or system WebKit/WebView2), a Bun runtime, embedded templates, and a CLI to scaffold and build apps.
+**Thunderbun** is a cross-platform desktop app framework built on Bun. It ships native webview wrappers (CEF or system WebKit/WebView2), a Bun runtime, embedded templates, and a CLI to scaffold and build apps.
 
-The `sui-twa` template is a Sui-native PWA/TWA wired to the Mysten ecosystem with gRPC transport, Cloudflare Workers backend, and an on-chain ZK proof pipeline.
+The `ski-dapp` template is a Sui-native PWA/TWA wired to the Mysten ecosystem with gRPC transport, Cloudflare Workers backend, and an on-chain ZK proof pipeline.
 
 ---
 
@@ -23,7 +23,7 @@ Thunderbun/
 │   ├── BUILD.md                       ← build system + cross-platform compilation
 │   ├── CEF.md                         ← CEF version management + caching
 │   └── BETA_RELEASE.md               ← beta release workflow
-├── package/                           ← ThunderBun framework + CLI
+├── package/                           ← Thunderbun framework + CLI
 │   ├── build.ts                       ← build orchestrator (vendors Bun, Zig, CEF)
 │   ├── src/
 │   │   ├── cli/index.ts               ← CLI: init, build, dev commands
@@ -43,7 +43,7 @@ Thunderbun/
 │   ├── svelte/
 │   ├── photo-booth/
 │   ├── multitab-browser/
-│   └── sui-twa/                       ← Sui TWA template (see below)
+│   └── ski-dapp/                       ← Sui ski-dapp template (see below)
 ├── move/
 │   └── ligetron-verifier/             ← Sui Move: Groth16 verifier + attestation
 └── contracts/
@@ -58,7 +58,7 @@ Thunderbun/
 
 ~4,100 lines. Commands: `init`, `build`, `dev`.
 
-- **init** — Scaffolds from embedded templates (interactive or `thunderbun init sui-twa`)
+- **init** — Scaffolds from embedded templates (interactive or `thunderbun init ski-dapp`)
 - **build** — Cross-platform compilation: config loading, platform detection, binary downloading (CEF, Bun, native wrappers), app bundling (ASAR), icon embedding, installers (DMG/EXE/AppImage), codesigning
 - **dev** — Builds locally and launches without packaging
 
@@ -91,7 +91,7 @@ Zig implementation — creates self-extracting Windows installer EXE with embedd
 
 ---
 
-## Sui TWA template (`templates/sui-twa/`)
+## Ski dApp template (`templates/ski-dapp/`)
 
 ### Source layout
 
@@ -193,7 +193,7 @@ General-purpose Groth16 verification framework supporting BN254 and BLS12-381 cu
 
 ## Environment variables
 
-### sui-twa template (`templates/sui-twa/.env`)
+### ski-dapp template (`templates/ski-dapp/.env`)
 
 ```env
 # Required — from `sui client publish` in move/ligetron-verifier/
@@ -217,10 +217,10 @@ wrangler secret put MAX_GAS_BUDGET        # optional, default 50_000_000 (0.05 S
 
 ## Common tasks
 
-### Run the sui-twa dev server
+### Run the ski-dapp dev server
 
 ```bash
-cd templates/sui-twa
+cd templates/ski-dapp
 bun install
 bun run dev       # Vite dev server → http://localhost:5173
 ```
@@ -232,15 +232,15 @@ cd package
 bun dev           # builds framework + CLI, then builds + runs kitchen app
 ```
 
-### Deploy sui-twa to Cloudflare Workers
+### Deploy ski-dapp to Cloudflare Workers
 
 ```bash
-cd templates/sui-twa
+cd templates/ski-dapp
 bun run build     # required preflight before production deploys
 npx wrangler deploy --env production
 ```
 
-For production-impacting `templates/sui-twa` changes (CCTP addresses, worker routes, wallet/bridge behavior), always run `bun run build` and `npx wrangler deploy --env production` before finalizing.
+For production-impacting `templates/ski-dapp` changes (CCTP addresses, worker routes, wallet/bridge behavior), always run `bun run build` and `npx wrangler deploy --env production` before finalizing.
 
 ### Deploy the Move contract
 
@@ -254,11 +254,11 @@ sui client publish --gas-budget 100000000
 
 ### Add a new template section
 
-1. Create `templates/sui-twa/src/sections/mysection.ts`
+1. Create `templates/ski-dapp/src/sections/mysection.ts`
    - Export `renderMySection(container: HTMLElement): void`
    - Follow the `innerHTML` + `attachHandlers` pattern
 
-2. Register in `templates/sui-twa/src/main.ts`:
+2. Register in `templates/ski-dapp/src/main.ts`:
    - Add to `SectionId` union type
    - Add to `NAV` array (with id, label, icon, group)
    - Add to `RENDERERS` record
@@ -321,7 +321,7 @@ cd move/ligetron-verifier
 sui move test
 
 # TypeScript (Vite build check)
-cd templates/sui-twa
+cd templates/ski-dapp
 bun run build && bun run preview
 
 # Desktop framework

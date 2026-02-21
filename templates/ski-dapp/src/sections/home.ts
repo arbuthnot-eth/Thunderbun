@@ -103,6 +103,9 @@ export function renderHome(container: HTMLElement) {
   let recoveryMintError: string | null = null;
   let attestStartTime: number | null = null;
   let attestTimerId: ReturnType<typeof setInterval> | null = null;
+  let waapAutoConnectStarted = false;
+  let waapAutoConnectInFlight = false;
+  let waapAutoConnectError: string | null = null;
 
   const getActiveGroup = (): BridgeActivityGroup | null => {
     if (!activeGroupId) return null;
@@ -164,19 +167,58 @@ export function renderHome(container: HTMLElement) {
     });
   };
 
+  const runAutoWaaPConnect = async (): Promise<void> => {
+    if (!mounted || waapAutoConnectInFlight) return;
+    waapAutoConnectInFlight = true;
+    waapAutoConnectError = null;
+    render();
+
+    try {
+      const state = wallet.getState();
+      if (!state.connected) await wallet.connect();
+      if (!wallet.getState().waapBaseAddress) await wallet.linkWaaPBaseAddress();
+    } catch (err) {
+      waapAutoConnectError = err instanceof Error ? err.message : String(err);
+      console.error("[home] auto .SKI connect failed:", err);
+    } finally {
+      waapAutoConnectInFlight = false;
+      if (mounted) render();
+    }
+  };
+
   const render = () => {
     const s = wallet.getState();
     sectionEl?.classList.remove("home-loading-section");
 
-    if (s.hydrating) {
+    if (s.hydrating || !s.connected || !s.address) {
       sectionEl?.classList.add("home-loading-section");
+      const title = s.hydrating
+        ? "Restoring wallet"
+        : waapAutoConnectInFlight || !waapAutoConnectStarted
+          ? "Opening .SKI"
+          : "WaaP login required";
+      const subtitle = s.hydrating
+        ? "Checking for an existing WaaP session…"
+        : waapAutoConnectInFlight || !waapAutoConnectStarted
+          ? "Waiting for WaaP login to complete…"
+          : waapAutoConnectError ?? "Login was interrupted. Retry .SKI to continue.";
       body.innerHTML = `
         <div class="home-waap-loading-screen">
           <img class="home-waap-loading-logo" src="/icons/thunderbun-logo.png" alt="" width="176" height="176" />
-          <div class="home-waap-loading-title">Restoring wallet</div>
-          <div class="home-waap-loading-subtitle">Checking for an existing WaaP session…</div>
+          <div class="home-waap-loading-title">${escapeHtml(title)}</div>
+          <div class="home-waap-loading-subtitle">${escapeHtml(subtitle)}</div>
+          ${(!s.hydrating && !waapAutoConnectInFlight)
+            ? `<button class="btn btn-primary" id="home-connect-retry">Retry .SKI</button>`
+            : ""}
         </div>
       `;
+      body.querySelector<HTMLButtonElement>("#home-connect-retry")?.addEventListener("click", () => {
+        void runAutoWaaPConnect();
+      });
+      if (!s.hydrating && !waapAutoConnectStarted) {
+        waapAutoConnectStarted = true;
+        void runAutoWaaPConnect();
+      }
       return;
     }
 
@@ -291,36 +333,44 @@ export function renderHome(container: HTMLElement) {
                     ${baseAddrFull ? `<button class="home-id-copy" data-copy-value="${escapeAttr(baseAddrFull)}" aria-label="Copy Base address" title="Copy">${copyIconSvg}</button>` : ""}
                   </div>
                 </div>
-                <div class="home-abam-core home-abam-core--cctp">
-                  <div class="home-abam-head">
-                    <span>BAM Events</span>
-                    <div class="home-abam-head-right">
-                      ${bamAmountLabel ? `<div class="home-abam-amount code-text">${usdcIconSvg}<span>${escapeHtml(bamAmountLabel)}</span></div>` : ""}
-                      ${abamGroup ? `<span class="badge ${abamStatusClass}">${escapeHtml(abamGroup.status)}</span>` : `<span class="badge ${abamStatusClass}">idle</span>`}
+                <div class="home-cctp-center-stack">
+                  <img
+                    class="home-cctp-logo"
+                    src="/icons/thunderbun-logo.png"
+                    alt="Thunderbun logo"
+                    loading="lazy"
+                  />
+                  <div class="home-abam-core home-abam-core--cctp">
+                    <div class="home-abam-head">
+                      <span>BAM Events</span>
+                      <div class="home-abam-head-right">
+                        ${bamAmountLabel ? `<div class="home-abam-amount code-text">${usdcIconSvg}<span>${escapeHtml(bamAmountLabel)}</span></div>` : ""}
+                        ${abamGroup ? `<span class="badge ${abamStatusClass}">${escapeHtml(abamGroup.status)}</span>` : `<span class="badge ${abamStatusClass}">idle</span>`}
+                      </div>
                     </div>
-                  </div>
-                  <div class="home-abam-steps">
-                    ${[
-                      { id: "burn" as const, label: "Burn" },
-                      { id: "attestation" as const, label: "Attest" },
-                      { id: "mint" as const, label: "Mint" },
-                    ].map((step, i) => {
-                      const stepClass = getStepClass(abamPhase, STEP_IDS.indexOf(step.id));
-                      const stepId = step.id;
-                      const tx = abamStepTxMap[stepId];
-                      const marker = stepClass === "is-complete"
-                        ? `<span class="home-abam-marker home-abam-marker--check">${checkIconSvg}</span>`
-                        : `<span class="home-abam-marker ${stepClass === "is-active" ? "is-active" : ""}">${i + 1}</span>`;
-                      const label = tx
-                        ? `<a class="home-abam-step-link" href="${escapeAttr(getExplorerTxUrl(tx.chain, tx.hash, s.network))}" target="_blank" rel="noopener">${step.label} ↗</a>`
-                        : `<span>${step.label}</span>`;
-                      return `<div class="home-abam-step ${stepClass}">${marker}${label}</div>`;
-                    }).join("")}
-                  </div>
-                  <div class="home-abam-meta code-text">
-                    ${abamGroup
-                      ? `${escapeHtml(safeFormatAmount(abamGroup.amountRaw))} USDC · ${escapeHtml(formatTimestamp(abamGroup.startedAt))}`
-                      : "No bridge activity yet."}
+                    <div class="home-abam-steps">
+                      ${[
+                        { id: "burn" as const, label: "Burn" },
+                        { id: "attestation" as const, label: "Attest" },
+                        { id: "mint" as const, label: "Mint" },
+                      ].map((step, i) => {
+                        const stepClass = getStepClass(abamPhase, STEP_IDS.indexOf(step.id));
+                        const stepId = step.id;
+                        const tx = abamStepTxMap[stepId];
+                        const marker = stepClass === "is-complete"
+                          ? `<span class="home-abam-marker home-abam-marker--check">${checkIconSvg}</span>`
+                          : `<span class="home-abam-marker ${stepClass === "is-active" ? "is-active" : ""}">${i + 1}</span>`;
+                        const label = tx
+                          ? `<a class="home-abam-step-link" href="${escapeAttr(getExplorerTxUrl(tx.chain, tx.hash, s.network))}" target="_blank" rel="noopener">${step.label} ↗</a>`
+                          : `<span>${step.label}</span>`;
+                        return `<div class="home-abam-step ${stepClass}">${marker}${label}</div>`;
+                      }).join("")}
+                    </div>
+                    <div class="home-abam-meta code-text">
+                      ${abamGroup
+                        ? `${escapeHtml(safeFormatAmount(abamGroup.amountRaw))} USDC · ${escapeHtml(formatTimestamp(abamGroup.startedAt))}`
+                        : "No bridge activity yet."}
+                    </div>
                   </div>
                 </div>
                 <div class="cctp-share-node cctp-share-node--sui">
@@ -532,27 +582,6 @@ export function renderHome(container: HTMLElement) {
       // Ensure prior timer gets cleared as view re-renders.
       if (attestTimerId !== null) { clearInterval(attestTimerId); attestTimerId = null; }
 
-    } else {
-      body.innerHTML = `
-        <div class="home-panel home-panel--connect">
-          <div class="home-connect-hero">
-            <img class="home-connect-logo" src="/icons/thunderbun-logo.png" alt="" width="56" height="56" />
-            <div class="home-panel-title">.Sui Key-In</div>
-            <div class="home-panel-sub">Link your Sui + Base accounts to view balances and bridge USDC via CCTP.</div>
-          </div>
-          <div class="home-connect-actions">
-            <button class="btn btn-primary btn-keyin" id="home-connect">.SKI</button>
-            <button class="btn btn-secondary" id="home-connect-traditional">Traditional Wallets</button>
-          </div>
-        </div>
-      `;
-
-      body.querySelector<HTMLButtonElement>("#home-connect")?.addEventListener("click", () => {
-        wallet.openConnectModal();
-      });
-      body.querySelector<HTMLButtonElement>("#home-connect-traditional")?.addEventListener("click", () => {
-        wallet.openConnectModal();
-      });
     }
   };
 

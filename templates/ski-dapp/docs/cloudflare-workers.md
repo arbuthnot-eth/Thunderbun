@@ -1,6 +1,6 @@
-# Cloudflare Workers + Agents — ThunderBun Guide
+# Cloudflare Workers + Agents — Thunderbun Guide
 
-This document covers everything you need to deploy, extend, and operate the ThunderBun
+This document covers everything you need to deploy, extend, and operate the Thunderbun
 `sui-twa` template on **Cloudflare Workers** with the **`agents` SDK**.
 
 ---

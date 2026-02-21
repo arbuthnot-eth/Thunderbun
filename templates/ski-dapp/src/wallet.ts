@@ -139,12 +139,6 @@ class WalletManager {
   private waapBasePrimaryName: string | null = null;
   private waapBaseAutoRequested = false;
   private waapAddressLookup: Promise<string | null> | null = null;
-  private connectHubEl: HTMLElement | null = null;
-  private connectHubWalletUnsub: (() => void) | null = null;
-  private connectHubEscHandler: ((event: KeyboardEvent) => void) | null = null;
-  private connectHubBusy = false;
-  private connectHubBusyTarget: "waap" | number | null = null;
-  private connectHubWalletFilter = "";
 
   constructor() {
     dAppKit.stores.$connection.subscribe(() => {
@@ -185,21 +179,10 @@ class WalletManager {
   }
 
   openConnectModal(): void {
-    this.ensureConnectHub();
-    this.connectHubWalletFilter = "";
-    const walletSearch = this.connectHubEl?.querySelector<HTMLInputElement>("#tb-connect-hub-wallet-search");
-    if (walletSearch) walletSearch.value = "";
-    this.renderConnectHubWalletList();
-    this.setConnectHubStatus(null, false);
-    this.connectHubEl?.classList.add("is-open");
-    document.body.classList.add("tb-connect-modal-open");
-    this.teardownConnectHubEscapeListener();
-    this.connectHubEscHandler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        this.closeConnectHub();
-      }
-    };
-    window.addEventListener("keydown", this.connectHubEscHandler);
+    const kit = window.SuiWalletKit;
+    if (kit?.openModal) {
+      kit.openModal();
+    }
   }
 
   async connect(): Promise<void> {
@@ -273,7 +256,6 @@ class WalletManager {
   }
 
   async disconnect(): Promise<void> {
-    this.closeConnectHub();
     await dAppKit.disconnectWallet();
     this.balanceCache = null;
     this.suiUsdcBalanceCache = null;
@@ -289,7 +271,6 @@ class WalletManager {
 
   async disconnectWaaP({ hardReset = false }: { hardReset?: boolean } = {}): Promise<void> {
     await waapReady;
-    this.closeConnectHub();
     const provider = window.waap as WaaPEvmProvider | undefined;
 
     if (provider?.logout) {
@@ -324,236 +305,6 @@ class WalletManager {
 
   async disconnectAndHardReset(): Promise<void> {
     await this.disconnectWaaP({ hardReset: true });
-  }
-
-  private ensureConnectHub(): void {
-    if (this.connectHubEl) return;
-
-    const root = document.createElement("div");
-    root.id = "tb-connect-hub";
-    root.className = "tb-connect-hub";
-    root.innerHTML = `
-      <div class="tb-connect-hub-backdrop" data-connect-hub-action="close"></div>
-      <div class="tb-connect-hub-panel" role="dialog" aria-modal="true" aria-labelledby="tb-connect-hub-title">
-        <button class="tb-connect-hub-close" type="button" aria-label="Close wallet connect" data-connect-hub-action="close">×</button>
-        <div class="tb-connect-hub-head">
-          <div class="tb-connect-hub-title" id="tb-connect-hub-title">Connect Wallet</div>
-          <div class="tb-connect-hub-sub">Use .SKI (WaaP) or a traditional Sui wallet from dApp Kit.</div>
-          <div class="tb-connect-hub-pillrow">
-            <span class="tb-connect-hub-pill">Sui + Base</span>
-            <span class="tb-connect-hub-pill">Sponsored PTBs</span>
-            <span class="tb-connect-hub-pill">dApp Kit Ready</span>
-          </div>
-        </div>
-        <div class="tb-connect-hub-grid">
-          <section class="tb-connect-hub-col">
-            <div class="tb-connect-hub-col-title">.SKI (WaaP)</div>
-            <div class="tb-connect-hub-col-sub">Embedded social login, Base linking, and instant ready state.</div>
-            <ul class="tb-connect-hub-col-list">
-              <li>Works in app and mobile web</li>
-              <li>Auto-resolves Base + Sui identity</li>
-              <li>Best path for cross-chain rails</li>
-            </ul>
-            <button class="btn btn-primary btn--block tb-connect-hub-waap-btn" type="button" data-connect-hub-action="connect-waap">.SKI</button>
-          </section>
-          <section class="tb-connect-hub-col">
-            <div class="tb-connect-hub-col-title">Traditional Wallets</div>
-            <div class="tb-connect-hub-col-sub">Phantom, Backpack, Slush, Suiet, and other injected wallets.</div>
-            <input
-              id="tb-connect-hub-wallet-search"
-              class="tb-connect-hub-search"
-              type="text"
-              inputmode="text"
-              placeholder="Filter wallets..."
-              aria-label="Filter traditional wallets"
-            />
-            <div class="tb-connect-hub-wallet-list" id="tb-connect-hub-wallet-list"></div>
-          </section>
-        </div>
-        <div class="tb-connect-hub-status" id="tb-connect-hub-status"></div>
-      </div>
-    `;
-
-    root.addEventListener("click", (event) => {
-      const target = event.target as HTMLElement;
-      const actionEl = target.closest<HTMLElement>("[data-connect-hub-action]");
-      if (!actionEl) return;
-
-      const action = actionEl.dataset.connectHubAction;
-      if (action === "close") {
-        this.closeConnectHub();
-        return;
-      }
-
-      if (action === "connect-waap") {
-        void this.runConnectHubWaaP();
-        return;
-      }
-
-      if (action === "connect-traditional") {
-        const idxRaw = actionEl.getAttribute("data-wallet-index");
-        const idx = idxRaw ? Number(idxRaw) : NaN;
-        if (Number.isNaN(idx)) return;
-        void this.runConnectHubTraditional(idx);
-      }
-    });
-
-    root.addEventListener("input", (event) => {
-      const target = event.target as HTMLElement | null;
-      if (!(target instanceof HTMLInputElement)) return;
-      if (target.id !== "tb-connect-hub-wallet-search") return;
-      this.connectHubWalletFilter = target.value.trim().toLowerCase();
-      this.renderConnectHubWalletList();
-    });
-
-    document.body.appendChild(root);
-    this.connectHubEl = root;
-
-    if (!this.connectHubWalletUnsub) {
-      this.connectHubWalletUnsub = dAppKit.stores.$wallets.subscribe(() => {
-        if (this.connectHubEl?.classList.contains("is-open")) {
-          this.renderConnectHubWalletList();
-        }
-      });
-    }
-  }
-
-  private closeConnectHub(): void {
-    if (!this.connectHubEl) return;
-    this.connectHubEl.classList.remove("is-open");
-    document.body.classList.remove("tb-connect-modal-open");
-    this.connectHubBusy = false;
-    this.connectHubBusyTarget = null;
-    this.teardownConnectHubEscapeListener();
-  }
-
-  private teardownConnectHubEscapeListener(): void {
-    if (!this.connectHubEscHandler) return;
-    window.removeEventListener("keydown", this.connectHubEscHandler);
-    this.connectHubEscHandler = null;
-  }
-
-  private renderConnectHubWalletList(): void {
-    const walletList = this.connectHubEl?.querySelector<HTMLElement>("#tb-connect-hub-wallet-list");
-    if (!walletList) return;
-
-    const wallets = getTraditionalWallets();
-    const filteredWallets = this.connectHubWalletFilter.length > 0
-      ? wallets.filter((wallet) => wallet.name.toLowerCase().includes(this.connectHubWalletFilter))
-      : wallets;
-
-    if (wallets.length === 0) {
-      walletList.innerHTML = `
-        <div class="tb-connect-hub-empty">No traditional Sui wallet detected.</div>
-      `;
-      return;
-    }
-
-    if (filteredWallets.length === 0) {
-      walletList.innerHTML = `
-        <div class="tb-connect-hub-empty">No wallets match that filter.</div>
-      `;
-      return;
-    }
-
-    walletList.innerHTML = filteredWallets
-      .map((wallet) => {
-        const originalIndex = wallets.findIndex((candidate) => candidate === wallet);
-        if (originalIndex < 0) return "";
-        const icon = escapeAttribute(wallet.icon);
-        const name = escapeHtml(wallet.name);
-        const disabled = this.connectHubBusy ? "disabled" : "";
-        const isPending = this.connectHubBusy && this.connectHubBusyTarget === originalIndex;
-        const pending = isPending ? "Connecting…" : name;
-        return `
-          <button
-            class="tb-connect-hub-wallet-btn"
-            type="button"
-            data-connect-hub-action="connect-traditional"
-            data-wallet-index="${originalIndex}"
-            ${disabled}
-          >
-            <div class="tb-connect-hub-wallet-btn-main">
-              <img src="${icon}" alt="" width="22" height="22" />
-              <span class="tb-connect-hub-wallet-name">${escapeHtml(pending)}</span>
-            </div>
-            <span class="tb-connect-hub-wallet-badge">${isPending ? "..." : "Installed"}</span>
-          </button>
-        `;
-      })
-      .join("");
-
-    const waapBtn = this.connectHubEl?.querySelector<HTMLButtonElement>(".tb-connect-hub-waap-btn");
-    if (waapBtn) {
-      waapBtn.disabled = this.connectHubBusy;
-      waapBtn.textContent =
-        this.connectHubBusy && this.connectHubBusyTarget === "waap"
-          ? "Connecting…"
-          : ".SKI";
-    }
-  }
-
-  private setConnectHubStatus(message: string | null, isError: boolean): void {
-    const statusEl = this.connectHubEl?.querySelector<HTMLElement>("#tb-connect-hub-status");
-    if (!statusEl) return;
-
-    if (!message) {
-      statusEl.textContent = "";
-      statusEl.classList.remove("is-visible", "is-error");
-      return;
-    }
-
-    statusEl.textContent = message;
-    statusEl.classList.add("is-visible");
-    statusEl.classList.toggle("is-error", isError);
-  }
-
-  private async runConnectHubWaaP(): Promise<void> {
-    if (this.connectHubBusy) return;
-    this.connectHubBusy = true;
-    this.connectHubBusyTarget = "waap";
-    this.setConnectHubStatus(null, false);
-    this.renderConnectHubWalletList();
-
-    try {
-      await this.connect();
-      this.closeConnectHub();
-    } catch (err) {
-      console.error("[wallet] .SKI connect failed:", err);
-      this.setConnectHubStatus(resolveErrorMessage(err), true);
-    } finally {
-      this.connectHubBusy = false;
-      this.connectHubBusyTarget = null;
-      if (this.connectHubEl?.classList.contains("is-open")) {
-        this.renderConnectHubWalletList();
-      }
-    }
-  }
-
-  private async runConnectHubTraditional(index: number): Promise<void> {
-    if (this.connectHubBusy) return;
-    this.connectHubBusy = true;
-    this.connectHubBusyTarget = index;
-    this.setConnectHubStatus(null, false);
-    this.renderConnectHubWalletList();
-
-    try {
-      const wallet = getTraditionalWallets()[index] ?? null;
-      if (!wallet) {
-        throw new Error("Selected wallet is no longer available.");
-      }
-      await this.connectTraditional(wallet);
-      this.closeConnectHub();
-    } catch (err) {
-      console.error("[wallet] traditional wallet connect failed:", err);
-      this.setConnectHubStatus(resolveErrorMessage(err), true);
-    } finally {
-      this.connectHubBusy = false;
-      this.connectHubBusyTarget = null;
-      if (this.connectHubEl?.classList.contains("is-open")) {
-        this.renderConnectHubWalletList();
-      }
-    }
   }
 
   async refreshBalance(): Promise<void> {
@@ -1305,23 +1056,3 @@ async function resolveBasePrimaryName(address: string): Promise<string | null> {
   }
 }
 
-function resolveErrorMessage(err: unknown): string {
-  if (err instanceof Error && err.message.trim()) {
-    return err.message.trim();
-  }
-  const message = String(err ?? "Wallet connection failed.").trim();
-  return message || "Wallet connection failed.";
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function escapeAttribute(value: string): string {
-  return escapeHtml(value);
-}

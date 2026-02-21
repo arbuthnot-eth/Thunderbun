@@ -9,7 +9,7 @@
 ///
 /// NOTE: End-to-end Groth16 verification requires a real circuit VK + proof
 /// (from an actual trusted setup).  Those integration tests live in
-/// templates/sui-twa/src/zkproof.ts and run against a deployed local node.
+/// templates/ski-dapp/src/zkproof.ts and run against a deployed local node.
 ///
 #[test_only]
 module ligetron_verifier::ligetron_verifier_tests {

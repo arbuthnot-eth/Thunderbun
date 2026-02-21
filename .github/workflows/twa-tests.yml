@@ -3,14 +3,14 @@ name: TWA Play Store Tests
 on:
   push:
     paths:
-      - 'templates/sui-twa/**'
+      - 'templates/ski-dapp/**'
   pull_request:
     paths:
-      - 'templates/sui-twa/**'
+      - 'templates/ski-dapp/**'
 
 defaults:
   run:
-    working-directory: templates/sui-twa
+    working-directory: templates/ski-dapp
 
 jobs:
   test:

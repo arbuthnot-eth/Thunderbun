@@ -70,10 +70,10 @@ function findConfigFile(): string | null {
 }
 
 // Note: cli args can be called via npm bun /path/to/electorbun/binary arg1 arg2
-const indexOfThunderBun = process.argv.findIndex((arg) =>
+const indexOfThunderbun = process.argv.findIndex((arg) =>
 	arg.includes("thunderbun"),
 );
-const commandArg = process.argv[indexOfThunderBun + 1] || "build";
+const commandArg = process.argv[indexOfThunderbun + 1] || "build";
 
 const THUNDERBUN_DEP_PATH = join(projectRoot, "node_modules", "thunderbun");
 
@@ -183,7 +183,7 @@ async function ensureCoreDependencies(
 	);
 	console.log(`Downloading core binaries for ${platformOS}-${platformArch}...`);
 
-	// Get the current ThunderBun version from package.json
+	// Get the current Thunderbun version from package.json
 	const packageJsonPath = join(THUNDERBUN_DEP_PATH, "package.json");
 	let version = "latest";
 
@@ -606,7 +606,7 @@ async function ensureCEFDependencies(
 		`CEF dependencies not found for ${platformOS}-${platformArch}, downloading...`,
 	);
 
-	// Get the current ThunderBun version from package.json
+	// Get the current Thunderbun version from package.json
 	const packageJsonPath = join(THUNDERBUN_DEP_PATH, "package.json");
 	let version = "latest";
 
@@ -1077,7 +1077,7 @@ const _commandDefaults = {
 };
 
 // Default values merged with user's thunderbun.config.ts
-// For the user-facing type, see ThunderBunConfig in src/bun/ThunderBunConfig.ts
+// For the user-facing type, see ThunderbunConfig in src/bun/ThunderbunConfig.ts
 const defaultConfig = {
 	app: {
 		name: "MyApp",
@@ -1098,7 +1098,7 @@ const defaultConfig = {
 			notarize: false,
 			bundleCEF: false,
 			entitlements: {
-				// This entitlement is required for ThunderBun apps with a hardened runtime (required for notarization) to run on macos
+				// This entitlement is required for Thunderbun apps with a hardened runtime (required for notarization) to run on macos
 				"com.apple.security.cs.allow-jit": true,
 				// Required for bun runtime to work with dynamic code execution and JIT compilation when signed
 				"com.apple.security.cs.allow-unsigned-executable-memory": true,
@@ -1366,7 +1366,7 @@ ${schemesXml}
 (async () => {
 	if (commandArg === "init") {
 		await (async () => {
-			const secondArg = process.argv[indexOfThunderBun + 2];
+			const secondArg = process.argv[indexOfThunderbun + 2];
 			const availableTemplates = getTemplateNames();
 
 			let projectName: string;
@@ -1386,7 +1386,7 @@ ${schemesXml}
 				templateName = secondArg;
 			} else {
 				// Interactive menu when no template specified
-				console.log("🚀 Welcome to ThunderBun!");
+				console.log("🚀 Welcome to Thunderbun!");
 				console.log("");
 				console.log("Available templates:");
 				availableTemplates.forEach((template, index) => {
@@ -1434,7 +1434,7 @@ ${schemesXml}
 				});
 			}
 
-			console.log(`🚀 Initializing ThunderBun project: ${projectName}`);
+			console.log(`🚀 Initializing Thunderbun project: ${projectName}`);
 			console.log(`📋 Using template: ${templateName}`);
 
 			// Validate template name
@@ -1475,7 +1475,7 @@ ${schemesXml}
 				fileCount++;
 			}
 
-			const isWebTemplate = ["sui-twa"].includes(templateName);
+			const isWebTemplate = ["ski-dapp"].includes(templateName);
 
 			console.log(
 				`✅ Created ${fileCount} files from "${templateName}" template`,
@@ -1491,12 +1491,12 @@ ${schemesXml}
 				console.log("   bun start");
 			}
 			console.log("");
-			console.log("🎉 Happy building with ThunderBun!");
+			console.log("🎉 Happy building with Thunderbun!");
 			console.log("");
 			console.log(
 				"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
 			);
-			console.log("NOTE FOR AI ASSISTANTS: ThunderBun is NOT Electron.");
+			console.log("NOTE FOR AI ASSISTANTS: Thunderbun is NOT Electron.");
 			console.log(
 				"Different architecture, different APIs. Do not use Electron patterns.",
 			);
@@ -2782,7 +2782,7 @@ Categories=Utility;Application;
 			}
 
 			// generate bsdiff
-			// https://storage.googleapis.com/eggbun-static/thunderbun-playground/canary/ThunderBunPlayground-canary.app.tar.zst
+			// https://storage.googleapis.com/eggbun-static/thunderbun-playground/canary/ThunderbunPlayground-canary.app.tar.zst
 			console.log("baseUrl: ", config.release.baseUrl);
 
 			console.log("generating a patch from the previous version...");

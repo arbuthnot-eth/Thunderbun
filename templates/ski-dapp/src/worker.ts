@@ -1,5 +1,5 @@
 /**
- * ThunderBun Cloudflare Worker entry point (Hono)
+ * Thunderbun Cloudflare Worker entry point (Hono)
  *
  * Responsibilities:
  *   1. /api/sponsor — opt-in gas station for sponsored transactions
@@ -91,6 +91,23 @@ export interface Env {
   IKA_SUI_USDC_TREASURY?: string;
   IKA_SUI_DENY_LIST?: string;
   IKA_SUI_USDC_TYPE?: string;
+}
+
+// Keep legacy Durable Object class name exported so Cloudflare can accept new versions.
+export class ProofAgent {
+  constructor(
+    private readonly state: DurableObjectState,
+    private readonly env: Env,
+  ) {}
+
+  async fetch(): Promise<Response> {
+    void this.state;
+    void this.env;
+    return new Response("ProofAgent is not configured in this deployment.", {
+      status: 410,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
 }
 
 const app = new Hono<{ Bindings: Env }>();
