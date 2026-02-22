@@ -343,7 +343,7 @@ function RootApp(): React.ReactElement {
         children: React.createElement(
           WalletProvider,
           {
-            autoConnect: true,
+            autoConnect: false,
             storageKey: "tb-react-dapp-kit",
             theme: thunderbunDappKitTheme,
             children: React.createElement(RuntimeBridge),
