@@ -3,6 +3,7 @@ interface SkiWalletKit {
   renderWidget(containerId: string): void;
   openModal(): void;
   closeModal(): void;
+  setPrimaryName?(name: string): void;
   detectWallets?: () => Promise<unknown>;
   autoReconnect?: () => Promise<unknown>;
 }
@@ -57,11 +58,12 @@ export async function mountSkiWalletWidget(): Promise<boolean> {
       window.dispatchEvent(new CustomEvent("tb:ski-wallet-disconnected"));
     };
 
+    const hasPreference = !!localStorage.getItem("tb_wallet_preference");
     injectScript(
       SKI_KIT_SCRIPT_ID,
       generateWalletKitJs({
         network: "mainnet",
-        autoConnect: false,
+        autoConnect: !hasPreference,
       }),
     );
     injectScript(

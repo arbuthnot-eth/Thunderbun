@@ -43,6 +43,40 @@ const WAAP_CONNECT_HINTS: string[] = ["waap", "silk", "human", "peer"];
 const BASE_CHAIN_ID = "0x2105";
 const BASE_USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const BALANCE_OF_SELECTOR = "0x70a08231";
+const WALLET_PREF_KEY = "tb_wallet_preference";
+
+interface WalletPreference {
+  type: "waap" | "traditional";
+  suiAddress: string;
+  walletName: string | null;
+  baseAddress: string | null;
+  timestamp: number;
+}
+
+function saveWalletPreference(pref: WalletPreference): void {
+  try {
+    localStorage.setItem(WALLET_PREF_KEY, JSON.stringify(pref));
+  } catch { /* storage full or blocked */ }
+}
+
+function loadWalletPreference(): WalletPreference | null {
+  try {
+    const raw = localStorage.getItem(WALLET_PREF_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as WalletPreference;
+    if (!parsed.type || !parsed.suiAddress || typeof parsed.timestamp !== "number") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearWalletPreference(): void {
+  try {
+    localStorage.removeItem(WALLET_PREF_KEY);
+    localStorage.removeItem("tb-react-dapp-kit");
+  } catch { /* ignore */ }
+}
 
 interface WaaPEvmProvider {
   request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
@@ -145,6 +179,14 @@ class WalletManager {
       void this.syncFromDAppKit();
     });
     dAppKit.stores.$currentNetwork.subscribe(() => this.emit());
+
+    window.addEventListener("tb:ski-wallet-connected", () => {
+      void this.bridgeSkiWidgetConnection();
+    });
+    window.addEventListener("tb:ski-wallet-disconnected", () => {
+      void this.disconnect();
+    });
+
     void this.finishInitialHydration();
   }
 
@@ -171,10 +213,8 @@ class WalletManager {
   subscribe(listener: Listener): () => void {
     this.listeners.push(listener);
     listener(this.getState());
-    const unsub = dAppKit.stores.$connection.subscribe(() => listener(this.getState()));
     return () => {
       this.listeners = this.listeners.filter((l) => l !== listener);
-      unsub();
     };
   }
 
@@ -227,6 +267,14 @@ class WalletManager {
     }
 
     await dAppKit.connectWallet({ wallet: preferredWaaP });
+    const connAfter = dAppKit.stores.$connection.get();
+    saveWalletPreference({
+      type: "waap",
+      suiAddress: connAfter.account?.address ?? baseAddress,
+      walletName: connAfter.wallet?.name ?? null,
+      baseAddress,
+      timestamp: Date.now(),
+    });
     await this.refreshBalance();
   }
 
@@ -237,8 +285,8 @@ class WalletManager {
     }
 
     const preferredAccount =
-      this.findSigningAccount(selectedWallet.accounts, ["sui:signTransaction", "sui:signAndExecuteTransaction"]) ??
-      selectedWallet.accounts[0] ??
+      this.findSigningAccount(selectedWallet?.accounts, ["sui:signTransaction", "sui:signAndExecuteTransaction"]) ??
+      selectedWallet?.accounts?.[0] ??
       null;
 
     await dAppKit.connectWallet({
@@ -247,15 +295,25 @@ class WalletManager {
     });
 
     const conn = dAppKit.stores.$connection.get();
-    if (conn.wallet?.name && hasWaaPName(conn.wallet.name)) {
+    const isWaaP = !!(conn.wallet?.name && hasWaaPName(conn.wallet.name));
+    if (isWaaP) {
       await this.getWaaPBaseAddress({ request: true });
       this.waapBaseAutoRequested = true;
     }
+
+    saveWalletPreference({
+      type: isWaaP ? "waap" : "traditional",
+      suiAddress: conn.account?.address ?? "",
+      walletName: conn.wallet?.name ?? null,
+      baseAddress: isWaaP ? this.waapBaseAddress : null,
+      timestamp: Date.now(),
+    });
 
     await this.refreshBalance();
   }
 
   async disconnect(): Promise<void> {
+    clearWalletPreference();
     await dAppKit.disconnectWallet();
     this.balanceCache = null;
     this.suiUsdcBalanceCache = null;
@@ -270,6 +328,7 @@ class WalletManager {
   }
 
   async disconnectWaaP({ hardReset = false }: { hardReset?: boolean } = {}): Promise<void> {
+    clearWalletPreference();
     await waapReady;
     const provider = window.waap as WaaPEvmProvider | undefined;
 
@@ -777,7 +836,7 @@ class WalletManager {
     }
 
     if (conn.isConnected && conn.wallet) {
-      const candidate = this.findSigningAccount(conn.wallet.accounts, features);
+      const candidate = this.findSigningAccount(conn.wallet?.accounts, features);
       if (candidate && candidate.address !== conn.account?.address) {
         try {
           dAppKit.switchAccount({ account: candidate });
@@ -794,12 +853,12 @@ class WalletManager {
     const preferredWaaP = await waitForPreferredWaaPWallet();
     if (preferredWaaP) {
       try {
-        const preselected = this.findSigningAccount(preferredWaaP.accounts, features);
+        const preselected = this.findSigningAccount(preferredWaaP?.accounts, features);
         const connected = await dAppKit.connectWallet({
           wallet: preferredWaaP,
           ...(preselected ? { account: preselected } : {}),
         });
-        const resolved = this.findSigningAccount(connected.accounts, features);
+        const resolved = this.findSigningAccount(connected?.accounts, features);
         if (resolved) {
           dAppKit.switchAccount({ account: resolved });
         }
@@ -831,8 +890,89 @@ class WalletManager {
     this.listeners.forEach((l) => l(this.getState()));
   }
 
+  private async bridgeSkiWidgetConnection(): Promise<void> {
+    const pref = loadWalletPreference();
+
+    let target: UiWallet | undefined;
+    for (let attempt = 0; attempt < 25; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const wallets = dAppKit.stores.$wallets.get();
+
+      if (pref) {
+        // Only connect to the wallet type that matches the stored preference.
+        if (pref.type === "waap") {
+          target = wallets.find((w) => (w.accounts?.length ?? 0) > 0 && hasWaaPName(w.name));
+        } else {
+          target = pref.walletName
+            ? wallets.find((w) => (w.accounts?.length ?? 0) > 0 && w.name === pref.walletName)
+            : wallets.find((w) => (w.accounts?.length ?? 0) > 0 && !hasWaaPName(w.name));
+        }
+      } else {
+        // No preference — existing behavior: prefer WaaP, then any wallet.
+        target =
+          wallets.find((w) => (w.accounts?.length ?? 0) > 0 && hasWaaPName(w.name)) ??
+          wallets.find((w) => (w.accounts?.length ?? 0) > 0);
+      }
+
+      if (target?.accounts?.[0]) break;
+    }
+
+    if (!target?.accounts?.[0]) return;
+
+    const conn = dAppKit.stores.$connection.get();
+    if (conn.isConnected && conn.account?.address === target.accounts[0].address) return;
+
+    try {
+      await dAppKit.connectWallet({ wallet: target, account: target.accounts[0] });
+    } catch (err) {
+      console.warn("[wallet] failed to bridge ski widget connection to dApp Kit:", err);
+    }
+  }
+
+  private async reconnectFromPreference(pref: WalletPreference): Promise<boolean> {
+    const deadline = Date.now() + 4_000;
+
+    while (Date.now() < deadline) {
+      const wallets = dAppKit.stores.$wallets.get();
+
+      let candidate: UiWallet | undefined;
+      if (pref.type === "waap") {
+        candidate = wallets.find((w) => (w.accounts?.length ?? 0) > 0 && hasWaaPName(w.name));
+      } else {
+        candidate = pref.walletName
+          ? wallets.find((w) => (w.accounts?.length ?? 0) > 0 && w.name === pref.walletName)
+          : wallets.find((w) => (w.accounts?.length ?? 0) > 0 && !hasWaaPName(w.name));
+      }
+
+      if (candidate?.accounts?.[0]) {
+        try {
+          await dAppKit.connectWallet({ wallet: candidate, account: candidate.accounts[0] });
+          return true;
+        } catch (err) {
+          console.warn("[wallet] reconnectFromPreference failed:", err);
+          return false;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+
+    return false;
+  }
+
   private async finishInitialHydration(): Promise<void> {
     try {
+      const pref = loadWalletPreference();
+      if (pref) {
+        const reconnected = await this.reconnectFromPreference(pref);
+        if (reconnected) {
+          await this.syncFromDAppKit();
+          return;
+        }
+        // Preferred wallet unavailable — clear stale preference, fall through.
+        clearWalletPreference();
+      }
+
       await this.syncFromDAppKit();
     } finally {
       if (!this.hydrating) return;
@@ -936,6 +1076,9 @@ class WalletManager {
       this.suiPrimaryName = reverse.data.name ?? null;
     } catch {
       this.suiPrimaryName = null;
+    }
+    if (this.suiPrimaryName) {
+      window.SuiWalletKit?.setPrimaryName?.(this.suiPrimaryName);
     }
   }
 
