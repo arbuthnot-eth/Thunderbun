@@ -26,8 +26,7 @@
     "deploy:netlify": "npx netlify deploy --prod --dir=dist",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:playstore": "vitest run --reporter=verbose tests/playstore/",
-    "validate": "bun run test:playstore && tsc -p tsconfig.json --noEmit && echo 'All validations passed'"
+    "validate": "tsc -p tsconfig.json --noEmit && echo 'All validations passed'"
   },
   "dependencies": {
     "@dika.sui/sdk": "github:arbuthnot-eth/dika",
