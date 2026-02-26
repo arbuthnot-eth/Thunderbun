@@ -50,6 +50,18 @@ NETWORK = "testnet"
 # Secret required (set via `wrangler secret put IKA_DWALLET_MASTER_SEED`)
 # Optional secret: `wrangler secret put SPONSOR_PRIVATE_KEY` for auto-mint signing
 
+# ─── .SKI Session Agent (Durable Object) ────────────────────────────────────
+# Uncomment to enable server-side .SKI session persistence and SuiNS lookups.
+# First deploy with: npx wrangler deploy
+#
+# [[durable_objects.bindings]]
+# name = "SESSION_AGENT"
+# class_name = "SessionAgent"
+#
+# [[migrations]]
+# tag = "v1"
+# new_sqlite_classes = ["SessionAgent"]
+
 # Production overrides
 [env.production]
 name = "thunderbun"

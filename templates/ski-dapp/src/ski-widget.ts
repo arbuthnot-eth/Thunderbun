@@ -1,94 +1,40 @@
-interface SkiWalletKit {
-  renderModal(containerId: string): void;
-  renderWidget(containerId: string): void;
-  openModal(): void;
-  closeModal(): void;
-  setPrimaryName?(name: string): void;
-  detectWallets?: () => Promise<unknown>;
-  autoReconnect?: () => Promise<unknown>;
-}
-
-declare global {
-  interface Window {
-    SuiWalletKit?: SkiWalletKit;
-    tbSkiWidgetConnected?: () => void;
-    tbSkiWidgetDisconnected?: () => void;
-  }
-}
-
-const SKI_STYLE_ID = "tb-ski-wallet-ui-style";
-const SKI_KIT_SCRIPT_ID = "tb-ski-wallet-kit-script";
-const SKI_UI_SCRIPT_ID = "tb-ski-wallet-ui-script";
-
-function injectStyle(id: string, css: string): void {
-  if (document.getElementById(id)) return;
-  const style = document.createElement("style");
-  style.id = id;
-  style.textContent = css;
-  document.head.appendChild(style);
-}
-
-function injectScript(id: string, source: string): void {
-  if (document.getElementById(id)) return;
-  const script = document.createElement("script");
-  script.id = id;
-  script.type = "text/javascript";
-  script.textContent = source;
-  document.head.appendChild(script);
-}
+/**
+ * ski-widget.ts — mounts the sui.ski v2 wallet widget.
+ *
+ * sui.ski auto-initializes on import: discovers Wallet Standard wallets,
+ * renders the .SKI button + modal, and establishes a signed .SKI session
+ * (device fingerprint + personal message) stored in localStorage.
+ *
+ * Bridge: ski:wallet-connected → tb:ski-wallet-connected so the existing
+ * wallet.ts (dApp Kit + WaaP) syncs its state for transaction signing.
+ */
 
 export async function mountSkiWalletWidget(): Promise<boolean> {
-  const widgetShell = document.getElementById("wallet-widget");
-  const widgetHost = document.getElementById("ski-wallet-widget-host");
-  const modalHost = document.getElementById("ski-wallet-modal-host");
-  if (!widgetShell || !widgetHost || !modalHost) return false;
+  if (!document.getElementById("wallet-widget")) return false;
 
   try {
-    const [{ generateWalletKitJs }, { generateWalletUiCss, generateWalletUiJs }] = await Promise.all([
-      import("../node_modules/sui.ski/src/utils/wallet-kit-js.ts"),
-      import("../node_modules/sui.ski/src/utils/wallet-ui-js.ts"),
-    ]);
+    // sui.ski auto-inits: reads DOM elements, renders widget, starts auto-reconnect
+    await import("sui.ski");
 
-    injectStyle(SKI_STYLE_ID, generateWalletUiCss());
-
-    window.tbSkiWidgetConnected = () => {
+    // Bridge to tb: event system so wallet.ts bridges the Wallet Standard
+    // connection into dApp Kit (bridgeSkiWidgetConnection polls until it appears)
+    window.addEventListener("ski:wallet-connected", () => {
       window.dispatchEvent(new CustomEvent("tb:ski-wallet-connected"));
-    };
-    window.tbSkiWidgetDisconnected = () => {
+    });
+    window.addEventListener("ski:wallet-disconnected", () => {
       window.dispatchEvent(new CustomEvent("tb:ski-wallet-disconnected"));
-    };
+    });
 
-    injectScript(
-      SKI_KIT_SCRIPT_ID,
-      generateWalletKitJs({
-        network: "mainnet",
-        autoConnect: false,
-      }),
-    );
-    injectScript(
-      SKI_UI_SCRIPT_ID,
-      generateWalletUiJs({
-        showPrimaryName: true,
-        onConnect: "tbSkiWidgetConnected",
-        onDisconnect: "tbSkiWidgetDisconnected",
-        primaryProfileHost: "sui.ski",
-      }),
-    );
+    // Wire the fallback ".SKI" button (shown before ski.ski hydrates) to
+    // open the ski.ski modal directly
+    document.getElementById("wallet-widget-connect")?.addEventListener("click", () => {
+      window.dispatchEvent(new CustomEvent("ski:open-modal"));
+    });
 
-    const skiKit = window.SuiWalletKit;
-    if (!skiKit) return false;
-
-    skiKit.renderModal("ski-wallet-modal-host");
-    skiKit.renderWidget("ski-wallet-widget-host");
-    if (typeof skiKit.detectWallets === "function") {
-      await skiKit.detectWallets().catch(() => undefined);
-    }
-
-    widgetShell.classList.add("ski-widget-native");
     document.body.classList.add("ski-widget-native");
     return true;
   } catch (error) {
-    console.warn("[ski-widget] failed to mount sui.ski wallet UI:", error);
+    console.warn("[ski-widget] failed to mount sui.ski:", error);
     return false;
   }
 }

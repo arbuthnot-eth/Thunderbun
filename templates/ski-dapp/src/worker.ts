@@ -5,15 +5,31 @@
  *   1. /api/sponsor — opt-in gas station for sponsored transactions
  *   2. /api/ika-deposit/* — managed dWallet-style Base->Sui USDC flow
  *   3. /api/paid/* — x402 scaffold (ready for @x402/sui when it ships)
- *   4. Serve all other requests from ASSETS binding (Vite-built PWA)
+ *   4. /agents/* — sui.ski SessionAgent Durable Object WebSocket proxy
+ *   5. Serve all other requests from ASSETS binding (Vite-built PWA)
  */
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { agentsMiddleware } from "hono-agents";
+
+// Re-export the .SKI session Durable Object so wrangler can bind it.
+// Add to wrangler.toml:
+//   [[durable_objects.bindings]]
+//   name = "SESSION_AGENT"
+//   class_name = "SessionAgent"
+//   [[migrations]]
+//   tag = "v1"
+//   new_sqlite_classes = ["SessionAgent"]
+// @ts-expect-error — sui.ski doesn't export src/ paths in package.json but wrangler/esbuild resolve them fine
+export { SessionAgent } from "sui.ski/src/server/agents/session";
 
 export interface Env {
   /** Bound to the Vite dist/ folder — serves static assets with SPA fallback */
   ASSETS: Fetcher;
+
+  /** .SKI session Durable Object — optional, enables server-side session persistence */
+  SESSION_AGENT?: DurableObjectNamespace;
 
   /** Plain var from wrangler.toml [vars] — "testnet" | "mainnet" */
   NETWORK: string;
@@ -250,6 +266,11 @@ interface IrisV2Message {
 }
 
 app.use("*", cors());
+
+// ── .SKI session agent (Durable Object WebSocket proxy) ─────────────────────
+// Handles WS upgrades for ski.ski's AgentClient session persistence.
+// Requires SESSION_AGENT binding in wrangler.toml to be active.
+app.use("/agents/*", agentsMiddleware());
 
 // ── Gas Station — opt-in sponsored transactions ─────────────────────────────
 
@@ -595,6 +616,37 @@ app.post("/api/cache-relay/mint", async (c) => {
       signatureCount: Array.isArray(body.signatures) ? body.signatures.length : 0,
     },
   }, 501);
+});
+
+// ── Wallet session endpoints ─────────────────────────────────────────────────
+// Stateless cookie-based sessions — no KV/DO required.
+// wallet-session-js (from sui.ski) calls these automatically on connect/disconnect.
+
+app.post("/api/wallet/challenge", (c) => {
+  return c.json({ challenge: `thunderbun-signin:${crypto.randomUUID()}` });
+});
+
+app.post("/api/wallet/connect", async (c) => {
+  type ConnectBody = { address?: string; walletName?: string };
+  const body: ConnectBody = await c.req.json<ConnectBody>().catch(() => ({}));
+  if (!body.address?.startsWith("0x")) {
+    return c.json({ error: "invalid address" }, 400);
+  }
+  const sessionId = crypto.randomUUID();
+  const maxAge = 86400; // 24 h
+  const cookieOpts = `Path=/; SameSite=Lax; Secure; Max-Age=${maxAge}`;
+  c.header("Set-Cookie", `session_id=${sessionId}; ${cookieOpts}`, { append: true });
+  c.header("Set-Cookie", `wallet_address=${encodeURIComponent(body.address)}; ${cookieOpts}`, { append: true });
+  c.header("Set-Cookie", `wallet_name=${encodeURIComponent(body.walletName ?? "")}; ${cookieOpts}`, { append: true });
+  return c.json({ sessionId, address: body.address });
+});
+
+app.post("/api/wallet/disconnect", async (c) => {
+  const expired = "Path=/; SameSite=Lax; Secure; Max-Age=0";
+  c.header("Set-Cookie", `session_id=; ${expired}`, { append: true });
+  c.header("Set-Cookie", `wallet_address=; ${expired}`, { append: true });
+  c.header("Set-Cookie", `wallet_name=; ${expired}`, { append: true });
+  return c.json({ ok: true });
 });
 
 // ── Static assets fallback ──────────────────────────────────────────────────

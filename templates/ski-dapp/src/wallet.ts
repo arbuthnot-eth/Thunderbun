@@ -219,10 +219,7 @@ class WalletManager {
   }
 
   openConnectModal(): void {
-    const kit = window.SuiWalletKit;
-    if (kit?.openModal) {
-      kit.openModal();
-    }
+    window.dispatchEvent(new CustomEvent("ski:open-modal"));
   }
 
   async connect(): Promise<void> {
@@ -1078,7 +1075,8 @@ class WalletManager {
       this.suiPrimaryName = null;
     }
     if (this.suiPrimaryName) {
-      window.SuiWalletKit?.setPrimaryName?.(this.suiPrimaryName);
+      // Dispatch event so ski.ski (or other listeners) can react to the resolved name
+      window.dispatchEvent(new CustomEvent("tb:suins-resolved", { detail: { name: this.suiPrimaryName } }));
     }
   }
 
