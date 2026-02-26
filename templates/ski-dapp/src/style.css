@@ -356,7 +356,7 @@ body.wallet-widget-collapsed #wallet-widget-content {
   border-radius: 10px;
   margin-bottom: 6px;
   animation: splash-glow 1.4s ease-in-out infinite;
-  filter: drop-shadow(0 0 20px rgba(255,184,0,0.35)) drop-shadow(0 0 40px rgba(245,158,11,0.15));
+  filter: drop-shadow(0 0 14px rgba(255,255,255,0.5));
 }
 
 /* ─── Sidebar (glass) ─────────────────────────────────────────────────── */
@@ -401,6 +401,7 @@ body.sidebar-open #sidebar {
   border-radius: 8px;
   flex-shrink: 0;
   object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.45));
 }
 
 .sidebar-logo-name {
@@ -651,7 +652,7 @@ body.sidebar-open #sidebar {
   border-radius: 28px;
   margin-bottom: 10px;
   animation: splash-glow 1.4s ease-in-out infinite;
-  filter: drop-shadow(0 0 20px rgba(255,184,0,0.35)) drop-shadow(0 0 40px rgba(245,158,11,0.15));
+  filter: drop-shadow(0 0 20px rgba(255,255,255,0.5));
 }
 
 .home-waap-loading-title {
@@ -2386,7 +2387,7 @@ body.tb-connect-modal-open {
 .home-connect-logo {
   border-radius: 14px;
   animation: splash-glow 1.4s ease-in-out infinite;
-  filter: drop-shadow(0 0 20px rgba(255,184,0,0.35)) drop-shadow(0 0 40px rgba(245,158,11,0.15));
+  filter: drop-shadow(0 0 20px rgba(255,255,255,0.5));
 }
 
 .home-connect-actions {
@@ -2721,6 +2722,7 @@ body.tb-connect-modal-open {
   max-width: 100%;
   height: auto;
   object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.4));
 }
 
 .home-abam-core--cctp .home-abam-steps {

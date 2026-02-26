@@ -172,7 +172,7 @@ export function renderHome(container: HTMLElement) {
       if (s.hydrating) {
         body.innerHTML = `
           <div class="home-waap-loading-screen">
-            <img class="home-waap-loading-logo" src="/icons/thunderbun-logo.png" alt="" width="176" height="176" />
+            <img class="home-waap-loading-logo" src="/icons/tbai.svg" alt="" width="176" height="176" />
             <div class="home-waap-loading-title">Restoring wallet</div>
             <div class="home-waap-loading-subtitle">Checking for an existing session…</div>
           </div>
@@ -180,7 +180,7 @@ export function renderHome(container: HTMLElement) {
       } else {
         body.innerHTML = `
           <div class="home-waap-loading-screen home-ski-connect" id="home-ski-connect">
-            <img class="home-waap-loading-logo" src="/icons/thunderbun-logo.png" alt="" width="176" height="176" />
+            <img class="home-waap-loading-logo" src="/icons/tbai.svg" alt="" width="176" height="176" />
             <div class="home-waap-loading-title">.Sui Key-In</div>
             <div class="home-waap-loading-subtitle">once, everywhere</div>
           </div>
@@ -306,8 +306,10 @@ export function renderHome(container: HTMLElement) {
                 <div class="home-cctp-center-stack">
                   <img
                     class="home-cctp-logo"
-                    src="/icons/thunderbun-logo.png"
-                    alt="Thunderbun logo"
+                    src="/icons/tbai.svg"
+                    alt=""
+                    width="50"
+                    height="50"
                     loading="lazy"
                   />
                   <div class="home-abam-core home-abam-core--cctp">

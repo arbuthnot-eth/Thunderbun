@@ -30,8 +30,8 @@
     "validate": "bun run test:playstore && tsc -p tsconfig.json --noEmit && echo 'All validations passed'"
   },
   "dependencies": {
+    "@dika.sui/sdk": "github:arbuthnot-eth/dika",
     "@human.tech/waap-sdk": "file:vendor/waap-sdk",
-    "@ika.xyz/sdk": "github:arbuthnot-eth/ika#feat/upgrade-mysten-sui-v2",
     "@mysten/dapp-kit": "latest",
     "@mysten/dapp-kit-core": "^1.0.4",
     "@mysten/deepbook-v3": "^1.0.12",
@@ -50,7 +50,7 @@
     "hono-agents": "^3.0.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "sui.ski": "0.1.11"
+    "sui.ski": "^0.1.14"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260228.0",

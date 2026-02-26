@@ -431,7 +431,7 @@ async function tryAttachIkaPrBridge(
     return { enabled: false };
   }
 
-  const ikaModule = await import("@ika.xyz/sdk") as Record<string, unknown>;
+  const ikaModule = await import("@dika.sui/sdk") as Record<string, unknown>;
   for (const exportName of IKA_PR_CANDIDATE_EXPORTS) {
     const fn = ikaModule[exportName];
     if (typeof fn === "function") {
