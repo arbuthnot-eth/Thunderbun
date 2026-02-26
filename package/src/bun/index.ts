@@ -80,6 +80,9 @@ export {
 	BuildConfig,
 };
 
+// @ts-expect-error — sui.ski doesn't list src/ paths in exports map but Bun/esbuild resolve them
+export { SessionAgent } from "sui.ski/src/server/agents/session";
+
 // Default Export
 const ThunderBun = {
 	BrowserWindow,

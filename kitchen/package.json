@@ -1,5 +1,5 @@
 {
-    "scripts": {        
+    "scripts": {
         "start": "thunderbun dev",
         "build:dev": "thunderbun build",
         "build:canary": "thunderbun build --env=canary",

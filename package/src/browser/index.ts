@@ -177,6 +177,9 @@ export {
 	type WebviewEventTypes,
 };
 
+// sui.ski — wallet widget + session primitives
+export * from "sui.ski";
+
 const ThunderBun = {
 	Thunderview,
 };

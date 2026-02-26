@@ -116,10 +116,11 @@ export default {
 				"views/playgrounds/webviewtag/index.html",
 			"src/playgrounds/webviewtag/host-message-test.html":
 				"views/playgrounds/webviewtag/host-message-test.html",
-			"src/playgrounds/webviewtag/thunderbun.png":
-				"views/playgrounds/webviewtag/thunderbun.png",
+			"src/playgrounds/webviewtag/thunderbun.svg":
+				"views/playgrounds/webviewtag/thunderbun.svg",
 			"assets/thunderbun-logo-32-template.png":
 				"views/assets/thunderbun-logo-32-template.png",
+			"assets/tbai.svg": "views/assets/tbai.svg",
 			"src/playgrounds/window-events/index.html":
 				"views/playgrounds/window-events/index.html",
 			"src/playgrounds/custom-titlebar/index.html":

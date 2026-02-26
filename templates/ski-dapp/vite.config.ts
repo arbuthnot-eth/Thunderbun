@@ -76,7 +76,7 @@ export default defineConfig({
     target: "es2020",
     outDir: "dist",
     rollupOptions: {
-      external: ["@ika.xyz/sdk"],
+      external: ["@dika.sui/sdk"],
       output: {
         manualChunks(id) {
           // All @mysten/sui internal modules must land in the same chunk
