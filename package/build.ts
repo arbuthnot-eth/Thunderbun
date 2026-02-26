@@ -578,6 +578,9 @@ async function copyToDist() {
 	// ThunderBun cli and npm launcher
 	await $`cp src/npmbin/index.js dist/npmbin.js`;
 	await $`cp src/cli/build/thunderbun${binExt} dist/thunderbun${binExt}`;
+	// Also copy to bin/ so the npm bin shim (bin/thunderbun.cjs) can find it
+	// during local dev (kitchen uses "thunderbun": "file:../package")
+	await $`mkdir -p bin && cp src/cli/build/thunderbun${binExt} bin/thunderbun${binExt}`;
 	// ThunderBun's Typescript bun and browser apis
 	await copyApiFiles();
 	// Native code and frameworks
@@ -2018,8 +2021,20 @@ async function generateTemplateEmbeddings() {
 					readDirectory(fullPath, relativePath);
 				} else {
 					try {
-						const content = readFileSync(fullPath, "utf-8");
-						files[relativePath] = content;
+						const ext = entry.name.split(".").pop()?.toLowerCase();
+						const binaryExtensions = new Set([
+							"png", "jpg", "jpeg", "gif", "bmp", "ico", "webp",
+							"woff", "woff2", "ttf", "eot", "otf",
+							"zip", "tar", "gz", "br", "zst",
+							"wasm", "pdf",
+						]);
+						if (ext && binaryExtensions.has(ext)) {
+							const content = readFileSync(fullPath);
+							files[relativePath] = "base64:" + content.toString("base64");
+						} else {
+							const content = readFileSync(fullPath, "utf-8");
+							files[relativePath] = content;
+						}
 					} catch (error) {
 						console.warn(`Warning: Could not read ${fullPath}:`, error);
 					}
