@@ -21,8 +21,6 @@ import { agentsMiddleware } from "hono-agents";
 //   [[migrations]]
 //   tag = "v1"
 //   new_sqlite_classes = ["SessionAgent"]
-// @ts-expect-error — sui.ski doesn't export src/ paths in package.json but wrangler/esbuild resolve them fine
-export { SessionAgent } from "sui.ski/src/server/agents/session";
 
 export interface Env {
   /** Bound to the Vite dist/ folder — serves static assets with SPA fallback */
