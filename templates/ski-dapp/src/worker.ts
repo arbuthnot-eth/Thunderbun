@@ -21,6 +21,7 @@ import { agentsMiddleware } from "hono-agents";
 //   [[migrations]]
 //   tag = "v1"
 //   new_sqlite_classes = ["SessionAgent"]
+export { SessionAgent } from "./agents/session";
 
 export interface Env {
   /** Bound to the Vite dist/ folder — serves static assets with SPA fallback */
