@@ -17,7 +17,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 
 name            = "thunderbun"
-account_id      = "78d00354fe2d2f18838c04823c9d58f5"
+account_id      = "6a10ee79fe9d21b5e2c3155ce8690742"
 main            = "src/worker.ts"
 compatibility_date  = "2026-02-19"
 compatibility_flags = ["nodejs_compat"]
