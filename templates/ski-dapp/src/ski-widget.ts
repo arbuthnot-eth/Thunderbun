@@ -1,29 +1,23 @@
 /**
  * ski-widget.ts — mounts the sui.ski wallet widget.
  *
- * sui.ski auto-initializes on import: discovers Wallet Standard wallets,
- * renders the .SKI pill + Key-In modal, and establishes a signed session.
+ * Static import ensures ski.ski initializes synchronously with the module,
+ * so ski:open-modal listeners are ready before any user interaction.
  *
  * Bridge: ski:wallet-connected → tb:ski-wallet-connected so wallet.ts
  * syncs Sui connection state for transaction signing.
  */
+import "sui.ski";
 
-export async function mountSkiWalletWidget(): Promise<boolean> {
+export function mountSkiWalletWidget(): boolean {
   if (!document.getElementById("wallet-widget")) return false;
 
-  try {
-    await import("sui.ski");
+  window.addEventListener("ski:wallet-connected", () => {
+    window.dispatchEvent(new CustomEvent("tb:ski-wallet-connected"));
+  });
+  window.addEventListener("ski:wallet-disconnected", () => {
+    window.dispatchEvent(new CustomEvent("tb:ski-wallet-disconnected"));
+  });
 
-    window.addEventListener("ski:wallet-connected", () => {
-      window.dispatchEvent(new CustomEvent("tb:ski-wallet-connected"));
-    });
-    window.addEventListener("ski:wallet-disconnected", () => {
-      window.dispatchEvent(new CustomEvent("tb:ski-wallet-disconnected"));
-    });
-
-    return true;
-  } catch (error) {
-    console.warn("[ski-widget] failed to mount sui.ski:", error);
-    return false;
-  }
+  return true;
 }

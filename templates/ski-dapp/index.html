@@ -14,19 +14,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Thunderbun — Web4 dApp Portal</title>
-    <style>
-      #splash{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#09090F;transition:opacity .3s ease}
-      #splash.fade{opacity:0;pointer-events:none}
-      #splash img{width:60px;height:60px;border-radius:14px;animation:splash-glow 1.4s ease-in-out infinite;filter:drop-shadow(0 0 16px rgba(255,255,255,0.5))}
-      @keyframes splash-glow{0%,100%{opacity:.65;transform:scale(.95);filter:drop-shadow(0 0 14px rgba(255,255,255,0.4))}50%{opacity:1;transform:scale(1);filter:drop-shadow(0 0 24px rgba(255,255,255,0.7))}}
-      #app{opacity:0;transition:opacity .2s ease}
-      #app.ready{opacity:1}
-    </style>
   </head>
   <body>
-    <div id="splash">
-      <img src="/icons/tbai.svg" alt="" width="60" height="60" />
-    </div>
     <div id="app">
       <button id="sidebar-dock-toggle" aria-label="Open navigation">
         <img src="/icons/tbai.svg" alt="" width="20" height="20" />

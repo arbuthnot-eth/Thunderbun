@@ -169,26 +169,7 @@ export function renderHome(container: HTMLElement) {
 
     if (s.hydrating || !s.connected || !s.address) {
       sectionEl?.classList.add("home-loading-section");
-      if (s.hydrating) {
-        body.innerHTML = `
-          <div class="home-waap-loading-screen">
-            <img class="home-waap-loading-logo" src="/icons/tbai.svg" alt="" width="176" height="176" />
-            <div class="home-waap-loading-title">Restoring wallet</div>
-            <div class="home-waap-loading-subtitle">Checking for an existing session…</div>
-          </div>
-        `;
-      } else {
-        body.innerHTML = `
-          <div class="home-waap-loading-screen home-ski-connect" id="home-ski-connect">
-            <img class="home-waap-loading-logo" src="/icons/tbai.svg" alt="" width="176" height="176" />
-            <div class="home-waap-loading-title">.Sui Key-In</div>
-            <div class="home-waap-loading-subtitle">once, everywhere</div>
-          </div>
-        `;
-        body.querySelector<HTMLElement>("#home-ski-connect")?.addEventListener("click", () => {
-          wallet.openConnectModal();
-        });
-      }
+      body.innerHTML = "";
       return;
     }
 
