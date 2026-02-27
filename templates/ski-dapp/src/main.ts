@@ -1,8 +1,8 @@
 import "./style.css";
+import "sui.ski/styles";
 import "./init-waap";
 import { initReactDappKitIsland } from "./react/dapp-kit-island";
 import { mountSkiWalletWidget } from "./ski-widget";
-import { wallet } from "./wallet";
 
 const CRITICAL_CACHE_RESET_VERSION = "2026-02-20-root-canonical-cache-fix";
 const CACHE_RESET_DONE_KEY = "tb_critical_cache_reset_done";
@@ -166,7 +166,6 @@ class App {
     this.main = document.getElementById("main-content")!;
     this.setupSidebarDrawer();
     this.buildNav();
-    this.watchWallet();
     this.showSection("base");
     (window as unknown as Record<string, unknown>).__app = this;
   }
@@ -248,159 +247,6 @@ class App {
     document.body.classList.remove("sidebar-open");
   }
 
-  private watchWallet() {
-    const widgetToggleBtn = document.getElementById("wallet-widget-toggle") as HTMLButtonElement | null;
-    const widgetToolbarText = document.getElementById("wallet-widget-toolbar-text");
-    const loading = document.getElementById("wallet-widget-loading");
-    const disconnected = document.getElementById("wallet-widget-disconnected");
-    const connected = document.getElementById("wallet-widget-connected");
-    const suiAddr = document.getElementById("wallet-widget-sui");
-    const baseAddr = document.getElementById("wallet-widget-base");
-    const suinsName = document.getElementById("wallet-widget-suins");
-    const baseName = document.getElementById("wallet-widget-basename");
-    const balance = document.getElementById("wallet-widget-balance");
-    const connectBtn = document.getElementById("wallet-widget-connect") as HTMLButtonElement | null;
-    const disconnectBtn = document.getElementById("wallet-widget-disconnect-top") as HTMLButtonElement | null;
-    const copySuiBtn = document.getElementById("wallet-widget-copy-sui") as HTMLButtonElement | null;
-    const copyBaseBtn = document.getElementById("wallet-widget-copy-base") as HTMLButtonElement | null;
-    const collapseStorageKey = "tb_wallet_widget_collapsed";
-
-    const setWidgetCollapsed = (collapsed: boolean): void => {
-      document.body.classList.toggle("wallet-widget-collapsed", collapsed);
-      if (widgetToggleBtn) {
-        widgetToggleBtn.textContent = collapsed ? "+" : "−";
-        widgetToggleBtn.setAttribute("aria-label", collapsed ? "Expand wallet widget" : "Collapse wallet widget");
-      }
-      try {
-        window.localStorage.setItem(collapseStorageKey, collapsed ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-    };
-
-    let initialCollapsed = false;
-    try {
-      initialCollapsed = window.localStorage.getItem(collapseStorageKey) === "1";
-    } catch {
-      /* ignore */
-    }
-    setWidgetCollapsed(initialCollapsed);
-
-    widgetToggleBtn?.addEventListener("click", () => {
-      const next = !document.body.classList.contains("wallet-widget-collapsed");
-      setWidgetCollapsed(next);
-    });
-
-    const flashButton = (btn: HTMLButtonElement | null, text: string): void => {
-      if (!btn) return;
-      const original = btn.textContent;
-      btn.textContent = text;
-      window.setTimeout(() => {
-        btn.textContent = original;
-      }, 900);
-    };
-
-    const copyValue = async (value: string | null, btn: HTMLButtonElement | null): Promise<void> => {
-      if (!value || !btn) return;
-      try {
-        await navigator.clipboard.writeText(value);
-        flashButton(btn, "Copied");
-      } catch {
-        flashButton(btn, "Failed");
-      }
-    };
-
-    connectBtn?.addEventListener("click", () => {
-      wallet.openConnectModal();
-    });
-
-    disconnectBtn?.addEventListener("click", () => {
-      wallet.disconnectAndHardReset().catch((err) => console.error("[main] waap disconnect failed:", err));
-    });
-
-    copySuiBtn?.addEventListener("click", () => {
-      void copyValue(suiAddr?.getAttribute("data-full") ?? null, copySuiBtn);
-    });
-    copyBaseBtn?.addEventListener("click", () => {
-      void copyValue(baseAddr?.getAttribute("data-full") ?? null, copyBaseBtn);
-    });
-
-    wallet.subscribe((s) => {
-      if (s.hydrating) {
-        loading?.classList.remove("is-hidden");
-        disconnected?.classList.add("is-hidden");
-        connected?.classList.add("is-hidden");
-        disconnectBtn?.classList.add("is-hidden");
-        if (disconnectBtn) disconnectBtn.disabled = true;
-        if (copySuiBtn) copySuiBtn.disabled = true;
-        if (copyBaseBtn) copyBaseBtn.disabled = true;
-        if (widgetToolbarText) widgetToolbarText.textContent = "Restoring wallet…";
-        return;
-      }
-
-      loading?.classList.add("is-hidden");
-
-      if (s.connected && s.address) {
-        disconnected?.classList.add("is-hidden");
-        connected?.classList.remove("is-hidden");
-        disconnectBtn?.classList.remove("is-hidden");
-        if (disconnectBtn) disconnectBtn.disabled = false;
-
-        if (suiAddr) {
-          suiAddr.textContent = shortAddress(s.address);
-          suiAddr.setAttribute("data-full", s.address);
-        }
-
-        if (baseAddr) {
-          if (s.waapBaseAddress) {
-            baseAddr.textContent = shortAddress(s.waapBaseAddress);
-            baseAddr.setAttribute("data-full", s.waapBaseAddress);
-          } else {
-            baseAddr.textContent = "Not linked";
-            baseAddr.removeAttribute("data-full");
-          }
-        }
-
-        if (suinsName) {
-          suinsName.textContent = s.suiPrimaryName ?? "—";
-          suinsName.setAttribute("title", s.suiPrimaryName ?? "No SuiNS name");
-        }
-
-        if (baseName) {
-          baseName.textContent = s.waapBasePrimaryName ?? "—";
-          baseName.setAttribute("title", s.waapBasePrimaryName ?? "No Base name");
-        }
-
-        if (balance) {
-          balance.textContent = wallet.formatBalance();
-        }
-
-        if (widgetToolbarText) {
-          widgetToolbarText.textContent = s.suiPrimaryName
-            ? `Connected · ${s.suiPrimaryName}`
-            : `Connected · ${wallet.formatBalance()}`;
-        }
-
-        if (copySuiBtn) copySuiBtn.disabled = false;
-        if (copyBaseBtn) copyBaseBtn.disabled = !s.waapBaseAddress;
-      } else {
-        disconnected?.classList.remove("is-hidden");
-        connected?.classList.add("is-hidden");
-        disconnectBtn?.classList.add("is-hidden");
-        if (disconnectBtn) disconnectBtn.disabled = true;
-        if (copySuiBtn) copySuiBtn.disabled = true;
-        if (copyBaseBtn) copyBaseBtn.disabled = true;
-        if (suinsName) suinsName.textContent = "—";
-        if (baseName) baseName.textContent = "—";
-        if (widgetToolbarText) widgetToolbarText.textContent = "Wallet";
-      }
-    });
-  }
-}
-
-function shortAddress(address: string): string {
-  if (address.length <= 18) return address;
-  return `${address.slice(0, 9)}…${address.slice(-7)}`;
 }
 
 export const app = new App();

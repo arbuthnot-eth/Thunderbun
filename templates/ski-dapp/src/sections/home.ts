@@ -308,8 +308,8 @@ export function renderHome(container: HTMLElement) {
                     class="home-cctp-logo"
                     src="/icons/tbai.svg"
                     alt=""
-                    width="50"
-                    height="50"
+                    width="60"
+                    height="60"
                     loading="lazy"
                   />
                   <div class="home-abam-core home-abam-core--cctp">

@@ -17,7 +17,7 @@
     <style>
       #splash{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#09090F;transition:opacity .3s ease}
       #splash.fade{opacity:0;pointer-events:none}
-      #splash img{width:64px;height:64px;border-radius:14px;animation:splash-glow 1.4s ease-in-out infinite;filter:drop-shadow(0 0 16px rgba(255,255,255,0.5))}
+      #splash img{width:60px;height:60px;border-radius:14px;animation:splash-glow 1.4s ease-in-out infinite;filter:drop-shadow(0 0 16px rgba(255,255,255,0.5))}
       @keyframes splash-glow{0%,100%{opacity:.65;transform:scale(.95);filter:drop-shadow(0 0 14px rgba(255,255,255,0.4))}50%{opacity:1;transform:scale(1);filter:drop-shadow(0 0 24px rgba(255,255,255,0.7))}}
       #app{opacity:0;transition:opacity .2s ease}
       #app.ready{opacity:1}
@@ -25,7 +25,7 @@
   </head>
   <body>
     <div id="splash">
-      <img src="/icons/tbai.svg" alt="" width="50" height="50" />
+      <img src="/icons/tbai.svg" alt="" width="60" height="60" />
     </div>
     <div id="app">
       <button id="sidebar-dock-toggle" aria-label="Open navigation">
@@ -37,7 +37,7 @@
       <!-- Sidebar -->
       <aside id="sidebar">
         <div class="sidebar-logo">
-          <img class="sidebar-logo-icon" src="/icons/tbai.svg" alt="Thunderbun" width="50" height="50" />
+          <img class="sidebar-logo-icon" src="/icons/tbai.svg" alt="Thunderbun" width="60" height="60" />
           <span class="sidebar-logo-name" id="app-title">Thunderbun</span>
           <button id="sidebar-close" class="sidebar-close" aria-label="Close navigation">✕</button>
         </div>
@@ -66,67 +66,12 @@
       <!-- Main -->
       <main id="main-content"></main>
 
-      <!-- Top-right wallet widget -->
-      <aside id="wallet-widget" aria-live="polite">
-        <div class="wallet-widget-toolbar">
-          <span class="wallet-widget-toolbar-text" id="wallet-widget-toolbar-text">Wallet</span>
-          <div class="wallet-widget-toolbar-actions">
-            <button class="btn btn-danger btn--compact is-hidden" id="wallet-widget-disconnect-top">Disconnect</button>
-            <button class="wallet-widget-toggle" id="wallet-widget-toggle" aria-label="Collapse wallet widget">−</button>
-          </div>
-        </div>
-
-        <div id="wallet-widget-content">
-          <div id="wallet-widget-loading">
-            <img class="wallet-widget-loading-logo" src="/icons/tbai.svg" alt="" width="50" height="50" />
-            <div class="wallet-widget-sub">Checking WaaP session…</div>
-          </div>
-
-          <div id="wallet-widget-disconnected" class="is-hidden">
-            <div class="wallet-widget-title">Wallet</div>
-            <div class="wallet-widget-sub">Not connected</div>
-            <div class="wallet-widget-actions">
-              <button class="btn btn-primary btn--compact" id="wallet-widget-connect">.SKI</button>
-            </div>
-          </div>
-
-          <div id="wallet-widget-connected" class="is-hidden">
-            <div class="wallet-widget-head">
-              <span class="wallet-label connected">
-                <span class="wallet-status-dot connected"></span>
-                Connected
-              </span>
-              <span class="wallet-widget-balance" id="wallet-widget-balance"></span>
-            </div>
-
-            <div class="wallet-widget-row">
-              <span class="wallet-widget-key">Sui</span>
-              <div class="wallet-widget-identity">
-                <span class="wallet-widget-name" id="wallet-widget-suins">—</span>
-                <span class="wallet-widget-addr code-text" id="wallet-widget-sui"></span>
-              </div>
-              <button class="wallet-widget-copy-icon" id="wallet-widget-copy-sui" aria-label="Copy Sui address" title="Copy Sui address">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              </button>
-            </div>
-
-            <div class="wallet-widget-row">
-              <span class="wallet-widget-key">Base</span>
-              <div class="wallet-widget-identity">
-                <span class="wallet-widget-name" id="wallet-widget-basename">—</span>
-                <span class="wallet-widget-addr code-text" id="wallet-widget-base"></span>
-              </div>
-              <button class="wallet-widget-copy-icon" id="wallet-widget-copy-base" aria-label="Copy Base address" title="Copy Base address">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        <!-- sui.ski v2 — wallet pill, .SKI button, menu, modal -->
+      <!-- .SKI wallet widget — one-button overlay -->
+      <div class="wallet-widget" id="wallet-widget">
         <div id="wk-widget"></div>
         <button class="wallet-ski-btn" id="wallet-ski-btn" style="display:none" aria-label=".SKI wallet"></button>
         <div id="wallet-menu-root"></div>
-      </aside>
+      </div>
       <div id="ski-modal"></div>
     </div>
 
