@@ -4,12 +4,11 @@
 	"description": "A multi-tab browser demo for ThunderBun",
 	"type": "module",
 	"scripts": {
-		"build": "thunderbun build",
-		"dev": "thunderbun dev",
-		"start": "bun run build && bun run dev"
+		"start": "thunderbun dev",
+		"dev": "thunderbun dev --watch"
 	},
 	"dependencies": {
-		"thunderbun": "latest"
+		"thunderbun": "file:../../package"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

@@ -3,13 +3,12 @@
 	"version": "1.0.0",
 	"description": "A photo booth app demonstrating getUserMedia with ThunderBun",
 	"scripts": {
-		"build": "thunderbun build",
-		"dev": "thunderbun dev",
-		"start": "bun run build && bun run dev",
+		"start": "thunderbun dev",
+		"dev": "thunderbun dev --watch",
 		"build:canary": "thunderbun build --env=canary"
 	},
 	"dependencies": {
-		"thunderbun": "latest"
+		"thunderbun": "file:../../package"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

@@ -3,8 +3,8 @@ import type { ThunderBunConfig } from "thunderbun";
 export default {
 	app: {
 		name: "ThunderBun Kitchen Sink",
-		identifier: "dev.thunderbun.kitchen",
-		version: "1.14.5-beta.0",
+		identifier: "sh.blackboard.thunderbun-kitchen",
+		version: "1.15.1",
 		urlSchemes: ["thunderbun-playground"],
 	},
 	runtime: {
@@ -55,8 +55,11 @@ export default {
 			"playgrounds/webviewtag": {
 				entrypoint: "src/playgrounds/webviewtag/index.ts",
 			},
-			"playgrounds/window-events": {
-				entrypoint: "src/playgrounds/window-events/index.ts",
+			"playgrounds/window-events-move-resize": {
+				entrypoint: "src/playgrounds/window-events-move-resize/index.ts",
+			},
+			"playgrounds/window-events-blur-focus": {
+				entrypoint: "src/playgrounds/window-events-blur-focus/index.ts",
 			},
 			"playgrounds/custom-titlebar": {
 				entrypoint: "src/playgrounds/custom-titlebar/index.ts",
@@ -75,6 +78,9 @@ export default {
 			},
 			"playgrounds/webview-cleanup": {
 				entrypoint: "src/playgrounds/webview-cleanup/index.ts",
+			},
+			"playgrounds/wgpu-tag": {
+				entrypoint: "src/playgrounds/wgpu-tag/index.ts",
 			},
 		},
 		copy: {
@@ -116,13 +122,14 @@ export default {
 				"views/playgrounds/webviewtag/index.html",
 			"src/playgrounds/webviewtag/host-message-test.html":
 				"views/playgrounds/webviewtag/host-message-test.html",
-			"src/playgrounds/webviewtag/thunderbun.svg":
-				"views/playgrounds/webviewtag/thunderbun.svg",
+			"src/playgrounds/webviewtag/thunderbun.png":
+				"views/playgrounds/webviewtag/thunderbun.png",
 			"assets/thunderbun-logo-32-template.png":
 				"views/assets/thunderbun-logo-32-template.png",
-			"assets/tbai.svg": "views/assets/tbai.svg",
-			"src/playgrounds/window-events/index.html":
-				"views/playgrounds/window-events/index.html",
+			"src/playgrounds/window-events-move-resize/index.html":
+				"views/playgrounds/window-events-move-resize/index.html",
+			"src/playgrounds/window-events-blur-focus/index.html":
+				"views/playgrounds/window-events-blur-focus/index.html",
 			"src/playgrounds/custom-titlebar/index.html":
 				"views/playgrounds/custom-titlebar/index.html",
 			"src/playgrounds/transparent-window/index.html":
@@ -143,11 +150,14 @@ export default {
 				"views/playgrounds/webview-cleanup/index.css",
 			"src/playgrounds/webview-cleanup/assets/bunny.png":
 				"views/playgrounds/webview-cleanup/assets/bunny.png",
+			"src/playgrounds/wgpu-tag/index.html":
+				"views/playgrounds/wgpu-tag/index.html",
 		},
 		mac: {
 			codesign: true,
 			notarize: true,
 			bundleCEF: true,
+			bundleWGPU: true,
 			entitlements: {},
 			chromiumFlags: {
 				// "show-paint-rects": true,
@@ -157,6 +167,7 @@ export default {
 		},
 		linux: {
 			bundleCEF: true,
+			bundleWGPU: true,
 			icon: "icon.iconset/icon_256x256.png",
 			chromiumFlags: {
 				// "show-paint-rects": true,
@@ -166,6 +177,7 @@ export default {
 		},
 		win: {
 			bundleCEF: true,
+			bundleWGPU: true,
 			icon: "icon.iconset/icon_256x256.png",
 			chromiumFlags: {
 				// "show-paint-rects": true,
@@ -178,7 +190,7 @@ export default {
 		postBuild: "./buildScript.ts",
 	},
 	release: {
-		baseUrl: "https://thunderbun-kitchen.thunderbun.dev/",
+		baseUrl: "https://thunderbun-kitchen.blackboard.sh/",
 		generatePatch: true,
 	},
 } satisfies ThunderBunConfig;

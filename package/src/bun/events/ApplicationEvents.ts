@@ -16,6 +16,7 @@ export default {
 		),
 	openUrl: (data: OpenUrlData) =>
 		new ThunderBunEvent<OpenUrlData, void>("open-url", data),
+	reopen: (data: {}) => new ThunderBunEvent<{}, void>("reopen", data),
 	beforeQuit: (data: {}) =>
 		new ThunderBunEvent<{}, { allow: boolean }>("before-quit", data),
 };

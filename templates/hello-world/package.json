@@ -3,12 +3,11 @@
 	"version": "1.0.0",
 	"description": "A simple ThunderBun app showcasing core features",
 	"scripts": {
-		"dev": "thunderbun dev",
-		"build": "thunderbun build",
-		"start": "bun run build && bun run dev"
+		"start": "thunderbun dev",
+		"dev": "thunderbun dev --watch"
 	},
 	"dependencies": {
-		"thunderbun": "latest"
+		"thunderbun": "file:../../package"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

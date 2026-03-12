@@ -1,9 +1,9 @@
 {
 	"name": "thunderbun",
-	"version": "0.1.22-beta.0",
+	"version": "1.15.1",
 	"description": "Build ultra fast, tiny, and cross-platform desktop apps with Typescript.",
 	"license": "MIT",
-	"author": "ThunderBun Team",
+	"author": "Blackboard Technologies Inc.",
 	"keywords": [
 		"bun",
 		"desktop",
@@ -23,20 +23,17 @@
 	"homepage": "https://thunderbun.dev",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/arbuthnot-eth/thunderbun.git"
+		"url": "git+https://github.com/blackboardsh/thunderbun.git"
 	},
 	"scripts": {
-		"build:cli": "mkdir -p bin && vendors/bun/bun build src/cli/index.ts --compile --outfile bin/thunderbun",
 		"start": "bun src/bun/index.ts",
 		"check-zig-version": "vendors/zig/zig version",
 		"build:dev": "bun build.ts",
 		"build:release": "bun build.ts --release",
-		"dev": "bun install && bun build:dev && bun build:cli && cd ../kitchen && bun install && bun build:dev && bun start",
+		"dev": "bun install && bun build:dev && cd ../kitchen && bun install && bun dev",
 		"dev:clean": "cd ../kitchen && rm -rf node_modules && rm -rf vendors/cef && cd ../package && bun dev",
-		"dev:rerun": "cd ../kitchen && bun start",
-		"dev:canary": "bun install && bun build:release && bun build:cli && cd ../kitchen && bun install && bun build:canary",
-		"dev:stable": "bun install && bun build:release && bun build:cli && cd ../kitchen && bun install && bun build:stable",
-		"dev:docs": "cd ../documentation && bun start",
+		"dev:canary": "bun install && bun build:release && cd ../kitchen && bun install && bun build:canary",
+		"dev:stable": "bun install && bun build:release && cd ../kitchen && bun install && bun build:stable",
 		"build:docs:release": "cd ../documentation && bun run build",
 		"npm:publish": "bun build:release && npm publish",
 		"npm:publish:beta": "bun build:release && npm publish --tag beta",
@@ -52,14 +49,14 @@
 		"bump-cef": "bun scripts/update-cef-version.ts"
 	},
 	"devDependencies": {
-		"@types/archiver": "^6.0.4",
 		"typescript": "^5.9.3"
 	},
 	"dependencies": {
-		"@types/bun": "^1.3.9",
-		"archiver": "^7.0.1",
+		"@babylonjs/core": "^7.45.0",
+		"@types/bun": "^1.3.8",
 		"png-to-ico": "^2.1.8",
+		"proxy-agent": "^6.5.0",
 		"rcedit": "^4.0.1",
-		"sui.ski": "^0.1.17"
+		"three": "^0.165.0"
 	}
 }

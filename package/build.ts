@@ -2,7 +2,7 @@
 
 import { $ } from "bun";
 import { platform, arch } from "os";
-import { join, dirname, relative } from "path";
+import { join, dirname, relative, basename } from "path";
 import {
 	existsSync,
 	readdirSync,
@@ -72,6 +72,7 @@ const MIN_DOWNLOAD_SIZES: Record<string, number> = {
 	"zig-asar": 100 * 1024, // zig-asar tarball should be > 100KB
 	"zig-bsdiff": 100 * 1024, // zig-bsdiff tarball should be > 100KB
 	"zig-zstd": 100 * 1024, // zig-zstd tarball should be > 100KB
+	wgpu: 1 * 1024 * 1024, // Dawn (WGPU) tarball should be > 1MB
 	cef: 50 * 1024 * 1024, // CEF tarball should be > 50MB
 };
 
@@ -463,6 +464,7 @@ async function setup() {
 	await vendorBsdiff(); // GitHub
 	await vendorZstd(); // GitHub
 	await vendorAsar(); // GitHub
+	await vendorWGPU(); // GitHub
 	await vendorZig(); // ziglang.org (not GitHub)
 	await vendorCEF(); // Spotify CDN (not GitHub)
 	await vendorWebview2();
@@ -541,6 +543,45 @@ async function copyToDist() {
 
 	// Copy zig-asar CLI and library from vendored zig-asar
 	const libExt = OS === "win" ? ".dll" : OS === "macos" ? ".dylib" : ".so";
+
+	// Copy thunderbun-dawn (WGPU) shared library only
+	const wgpuSourceDir = join(process.cwd(), "vendors", "wgpu", `${OS}-${ARCH}`);
+	if (existsSync(wgpuSourceDir)) {
+		const wgpuLibCandidates =
+			OS === "win"
+				? [
+						join(wgpuSourceDir, "bin", "webgpu_dawn.dll"),
+						join(wgpuSourceDir, "bin", "libwebgpu_dawn.dll"),
+						join(wgpuSourceDir, "lib", "webgpu_dawn.dll"),
+						join(wgpuSourceDir, "lib", "libwebgpu_dawn.dll"),
+					]
+				: [
+						join(wgpuSourceDir, "lib", `libwebgpu_dawn${libExt}`),
+						join(wgpuSourceDir, "lib", `libwebgpu_dawn_shared${libExt}`),
+					];
+
+		const wgpuLib = wgpuLibCandidates.find((p) => existsSync(p));
+		if (!wgpuLib) {
+			throw new Error(`WGPU shared library not found in ${wgpuSourceDir}`);
+		}
+		await $`cp ${wgpuLib} dist/${basename(wgpuLib)}`;
+		console.log("✓ Copied WGPU shared library to dist");
+
+		// On Windows, Dawn needs d3dcompiler_47.dll for D3D shader compilation.
+		// ARM64 Windows doesn't have an x64 version in system directories,
+		// so we must bundle it alongside the WGPU library.
+		if (OS === "win") {
+			const d3dCompilerCandidates = [
+				join(wgpuSourceDir, "bin", "d3dcompiler_47.dll"),
+				join(process.cwd(), "vendors", "cef", "Release", "d3dcompiler_47.dll"),
+			];
+			const d3dCompiler = d3dCompilerCandidates.find((p) => existsSync(p));
+			if (d3dCompiler) {
+				await $`cp ${d3dCompiler} dist/d3dcompiler_47.dll`;
+				console.log("✓ Copied d3dcompiler_47.dll to dist");
+			}
+		}
+	}
 
 	if (OS === "win") {
 		// On Windows, copy both x64 and arm64 versions
@@ -897,7 +938,7 @@ async function vendorBsdiff() {
 	const bsdiffPlatform = bsdiffPlatformMap[OS];
 	const bsdiffArch = ARCH;
 
-	const tarballUrl = `https://github.com/arbuthnot-eth/zig-bsdiff/releases/download/v${BSDIFF_VERSION}/zig-bsdiff-${bsdiffPlatform}-${bsdiffArch}.tar.gz`;
+	const tarballUrl = `https://github.com/blackboardsh/zig-bsdiff/releases/download/v${BSDIFF_VERSION}/zig-bsdiff-${bsdiffPlatform}-${bsdiffArch}.tar.gz`;
 	const tempTarball = join("vendors", `zig-bsdiff-temp.tar.gz`);
 
 	try {
@@ -965,7 +1006,7 @@ async function vendorZstd() {
 
 	try {
 		await $`mkdir -p vendors/zig-zstd`;
-		const tarballUrl = `https://github.com/arbuthnot-eth/zig-zstd/releases/download/v${ZSTD_VERSION}/zig-zstd-${zstdPlatform}-${zstdArch}.tar.gz`;
+		const tarballUrl = `https://github.com/blackboardsh/zig-zstd/releases/download/v${ZSTD_VERSION}/zig-zstd-${zstdPlatform}-${zstdArch}.tar.gz`;
 		console.log(`Downloading zig-zstd from: ${tarballUrl}`);
 		await $`rm -f "${tempTarball}"`;
 		const githubToken =
@@ -999,6 +1040,122 @@ async function vendorZstd() {
 		);
 		throw new Error(
 			`Failed to download zig-zstd binaries. Please try again in a minute.`,
+		);
+	}
+}
+
+async function vendorWGPU() {
+	const WGPU_VERSION = "0.2.3";
+	const wgpuBaseDir = join(process.cwd(), "vendors", "wgpu");
+	const wgpuDir = join(wgpuBaseDir, `${OS}-${ARCH}`);
+	const wgpuVersionFile = join(wgpuBaseDir, ".wgpu-version");
+	const currentVersion = existsSync(wgpuVersionFile)
+		? readFileSync(wgpuVersionFile, "utf8").trim()
+		: null;
+
+	const libExt = OS === "win" ? ".dll" : OS === "macos" ? ".dylib" : ".so";
+	const libCandidates =
+		OS === "win"
+			? [
+					join(wgpuDir, "bin", "webgpu_dawn.dll"),
+					join(wgpuDir, "bin", "libwebgpu_dawn.dll"),
+					join(wgpuDir, "lib", "webgpu_dawn.dll"),
+					join(wgpuDir, "lib", "libwebgpu_dawn.dll"),
+				]
+			: [
+					join(wgpuDir, "lib", `libwebgpu_dawn${libExt}`),
+					join(wgpuDir, "lib", `libwebgpu_dawn_shared${libExt}`),
+				];
+
+	if (libCandidates.some((p) => existsSync(p)) && currentVersion === WGPU_VERSION) {
+		return;
+	}
+
+	if (libCandidates.some((p) => existsSync(p)) && !currentVersion) {
+		writeFileSync(wgpuVersionFile, WGPU_VERSION);
+		return;
+	}
+
+	if (currentVersion && currentVersion !== WGPU_VERSION && existsSync(wgpuDir)) {
+		await $`rm -rf "${wgpuDir}"`;
+	}
+
+	await pauseForGitHub();
+	console.log("Downloading thunderbun-dawn binaries...");
+
+	const platformMap: Record<string, string> = {
+		macos: "darwin",
+		win: "win32",
+		linux: "linux",
+	};
+	const platformName = platformMap[OS];
+	const archName = ARCH;
+
+	const tarballUrl = `https://github.com/blackboardsh/thunderbun-dawn/releases/download/v${WGPU_VERSION}/thunderbun-dawn-${platformName}-${archName}.tar.gz`;
+	const tempTarball = join("vendors", `thunderbun-dawn-temp.tar.gz`);
+	const tempExtractDir = join("vendors", `thunderbun-dawn-extract-${Date.now()}`);
+
+	try {
+		await $`mkdir -p "${wgpuBaseDir}"`;
+		await $`rm -f "${tempTarball}"`;
+
+		const githubToken =
+			process.env["GITHUB_TOKEN"] ??
+			process.env["GH_TOKEN"] ??
+			process.env["GITHUB_ACCESS_TOKEN"];
+		if (githubToken) {
+			await $`curl -fL -H "Authorization: Bearer ${githubToken}" -H "Accept: application/octet-stream" "${tarballUrl}" -o "${tempTarball}"`;
+		} else {
+			await $`curl -fL -H "Accept: application/octet-stream" "${tarballUrl}" -o "${tempTarball}"`;
+		}
+
+		validateDownload(tempTarball, "wgpu");
+
+		await $`rm -rf "${tempExtractDir}"`;
+		await $`mkdir -p "${tempExtractDir}"`;
+		await $`tar -xzf "${tempTarball}" -C "${tempExtractDir}"`;
+
+		const extracted = readdirSync(tempExtractDir);
+		if (extracted.length === 1) {
+			const single = join(tempExtractDir, extracted[0]!);
+			if (existsSync(wgpuDir)) {
+				await $`rm -rf "${wgpuDir}"`;
+			}
+			await $`mv "${single}" "${wgpuDir}"`;
+		} else {
+			if (existsSync(wgpuDir)) {
+				await $`rm -rf "${wgpuDir}"`;
+			}
+			await $`mkdir -p "${wgpuDir}"`;
+			for (const item of extracted) {
+				await $`mv "${join(tempExtractDir, item)}" "${wgpuDir}/"`;
+			}
+		}
+
+		await $`rm -rf "${tempExtractDir}"`;
+		await $`rm -f "${tempTarball}"`;
+
+		if (!libCandidates.some((p) => existsSync(p))) {
+			throw new Error(`WGPU library not found after extraction: ${wgpuDir}`);
+		}
+
+		writeFileSync(wgpuVersionFile, WGPU_VERSION);
+
+		// Regenerate Bun FFI bindings when WGPU version changes
+		if (!existsSync(join(process.cwd(), "src", "bun", "webGPU.ts"))) {
+			await $`node scripts/gen-webgpu-ffi.mjs`;
+		} else if (currentVersion !== WGPU_VERSION) {
+			await $`node scripts/gen-webgpu-ffi.mjs`;
+		}
+
+		console.log("✓ thunderbun-dawn binaries downloaded successfully");
+	} catch (error: unknown) {
+		console.error(
+			"Failed to download thunderbun-dawn binaries:",
+			error instanceof Error ? error.message : error,
+		);
+		throw new Error(
+			`Failed to download thunderbun-dawn binaries. Please try again in a minute.`,
 		);
 	}
 }
@@ -1041,7 +1198,7 @@ async function vendorAsar() {
 			`Downloading zig-asar binaries for ${asarPlatform}-${targetArch}...`,
 		);
 
-		const tarballUrl = `https://github.com/arbuthnot-eth/zig-asar/releases/download/v${ASAR_VERSION}/zig-asar-${asarPlatform}-${targetArch}.tar.gz`;
+		const tarballUrl = `https://github.com/blackboardsh/zig-asar/releases/download/v${ASAR_VERSION}/zig-asar-${asarPlatform}-${targetArch}.tar.gz`;
 		const tempTarball = join("vendors", `zig-asar-temp-${targetArch}.tar.gz`);
 
 		try {
@@ -1626,8 +1783,18 @@ async function buildNative() {
 			}
 		}
 
-		await $`mkdir -p src/native/macos/build && clang++ -c src/native/macos/nativeWrapper.mm -o src/native/macos/build/nativeWrapper.o -fobjc-arc -fno-objc-msgsend-selector-stubs -I./vendors/cef -std=c++20`;
-		await $`mkdir -p src/native/build && clang++ -o src/native/build/libNativeWrapper.dylib src/native/macos/build/nativeWrapper.o ./vendors/zig-asar/libasar.dylib -framework Cocoa -framework WebKit -framework QuartzCore -framework UserNotifications -F./vendors/cef/Release -weak_framework 'Chromium Embedded Framework' -L./vendors/cef/build/libcef_dll_wrapper -lcef_dll_wrapper -stdlib=libc++ -shared -install_name @executable_path/libNativeWrapper.dylib -Wl,-rpath,@executable_path`;
+		const wgpuIncludeDir = join(
+			process.cwd(),
+			"vendors",
+			"wgpu",
+			`${OS}-${ARCH}`,
+			"include",
+		);
+		const wgpuIncludeFlag = existsSync(wgpuIncludeDir)
+			? `-I${wgpuIncludeDir}`
+			: "";
+		await $`mkdir -p src/native/macos/build && clang++ -c src/native/macos/nativeWrapper.mm -o src/native/macos/build/nativeWrapper.o -fobjc-arc -fno-objc-msgsend-selector-stubs -I./vendors/cef ${wgpuIncludeFlag} -std=c++20`;
+		await $`mkdir -p src/native/build && clang++ -o src/native/build/libNativeWrapper.dylib src/native/macos/build/nativeWrapper.o ./vendors/zig-asar/libasar.dylib -framework Cocoa -framework WebKit -framework QuartzCore -framework Metal -framework MetalKit -framework UserNotifications -F./vendors/cef/Release -weak_framework 'Chromium Embedded Framework' -L./vendors/cef/build/libcef_dll_wrapper -lcef_dll_wrapper -stdlib=libc++ -shared -install_name @executable_path/libNativeWrapper.dylib -Wl,-rpath,@executable_path`;
 	} else if (OS === "win") {
 		const webview2Include = `./vendors/webview2/Microsoft.Web.WebView2/build/native/include`;
 		// Always use x64 for Windows since we only build x64 Windows binaries
@@ -1637,11 +1804,22 @@ async function buildNative() {
 		const cefLib = `./vendors/cef/Release/libcef.lib`;
 		const cefWrapperLib = `./vendors/cef/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.lib`;
 
+		const wgpuIncludeDir = join(
+			process.cwd(),
+			"vendors",
+			"wgpu",
+			`win-${ARCH}`,
+			"include",
+		);
+		const wgpuIncludeFlag = existsSync(wgpuIncludeDir)
+			? `/I"${wgpuIncludeDir}"`
+			: "";
+
 		// Compile the main wrapper with both WebView2 and CEF support (runtime detection)
 		// Use /MT to statically link the C runtime (matches libcpmt.lib that CEF uses)
 		await $`mkdir -p src/native/win/build`;
 		await runMsvcCommand(
-			`cl /c /EHsc /std:c++20 /DNOMINMAX /MT /I"${webview2Include}" /I"${cefInclude}" /D_USRDLL /D_WINDLL /Fosrc/native/win/build/nativeWrapper.obj src/native/win/nativeWrapper.cpp`,
+			`cl /c /EHsc /std:c++20 /DNOMINMAX /MT /I"${webview2Include}" /I"${cefInclude}" ${wgpuIncludeFlag} /D_USRDLL /D_WINDLL /Fosrc/native/win/build/nativeWrapper.obj src/native/win/nativeWrapper.cpp`,
 		);
 
 		// Link with both WebView2 and CEF libraries using DelayLoad for CEF (similar to macOS weak linking)
@@ -1671,6 +1849,13 @@ async function buildNative() {
 		try {
 			// Always include CEF headers for Linux builds
 			const cefInclude = join(process.cwd(), "vendors", "cef");
+			const wgpuIncludeDir = join(
+				process.cwd(),
+				"vendors",
+				"wgpu",
+				`${OS}-${ARCH}`,
+				"include",
+			);
 			const cefLib = join(
 				process.cwd(),
 				"vendors",
@@ -1750,6 +1935,7 @@ async function buildNative() {
 				"-fPIC",
 				...pkgConfigCflags.split(/\s+/).filter((f) => f),
 				`-I${cefInclude}`,
+				...(existsSync(wgpuIncludeDir) ? [`-I${wgpuIncludeDir}`] : []),
 				...(hasAppIndicator ? [] : ["-DNO_APPINDICATOR"]),
 				"-o",
 				"src/native/linux/build/nativeWrapper.o",
@@ -1920,7 +2106,7 @@ async function buildPreload() {
 	const fullResult = await bunModule.build({
 		entrypoints: [fullPreloadEntry],
 		target: "browser",
-		format: "iife", // IIFE format for script injection (no export statements)
+		format: "esm",
 		minify: false,
 	});
 
@@ -1934,7 +2120,7 @@ async function buildPreload() {
 	const sandboxedResult = await bunModule.build({
 		entrypoints: [sandboxedPreloadEntry],
 		target: "browser",
-		format: "iife",
+		format: "esm",
 		minify: false,
 	});
 
@@ -1943,8 +2129,10 @@ async function buildPreload() {
 		throw new Error("Failed to build sandboxed preload script");
 	}
 
-	const fullPreloadJs = await fullResult.outputs[0].text();
-	const sandboxedPreloadJs = await sandboxedResult.outputs[0].text();
+	// Wrap in IIFE to prevent top-level variables from leaking into webview global scope
+	// (Bun removed iife format support in 1.3.10, so we build as esm and wrap manually)
+	const fullPreloadJs = `(function(){${await fullResult.outputs[0].text()}})();`;
+	const sandboxedPreloadJs = `(function(){${await sandboxedResult.outputs[0].text()}})();`;
 
 	const outputContent = `// Auto-generated file. Do not edit directly.
 // Run "bun build.ts" or "bun build:dev" from the package folder to regenerate.
@@ -2011,6 +2199,7 @@ async function generateTemplateEmbeddings() {
 					entry.name === ".DS_Store" ||
 					entry.name.startsWith(".") ||
 					entry.name === "package-lock.json" ||
+					entry.name === "bun.lock" ||
 					entry.name === "bun.lockb" ||
 					entry.name === "yarn.lock"
 				) {
@@ -2047,7 +2236,11 @@ async function generateTemplateEmbeddings() {
 		// Pin the thunderbun dependency version in template package.json
 		if (files["package.json"]) {
 			const pkgJson = JSON.parse(files["package.json"]);
-			if (pkgJson.dependencies?.thunderbun === "latest") {
+			const thunderbunDep = pkgJson.dependencies?.thunderbun;
+			if (
+				typeof thunderbunDep === "string" &&
+				(thunderbunDep === "latest" || thunderbunDep.startsWith("file:"))
+			) {
 				pkgJson.dependencies.thunderbun = thunderbunVersion;
 			}
 			files["package.json"] = JSON.stringify(pkgJson, null, "\t") + "\n";
